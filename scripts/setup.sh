@@ -145,7 +145,7 @@ echo -e "${BLUE}========================================${NC}"
 echo ""
 
 echo -e "${YELLOW}Starting PostgreSQL and Redis...${NC}"
-docker-compose up -d
+docker compose up -d
 echo -e "${GREEN}✓ Docker services started${NC}"
 
 echo -e "${YELLOW}Waiting for services to be ready...${NC}"
@@ -154,7 +154,7 @@ sleep 5
 # Check if PostgreSQL is ready
 max_attempts=30
 attempt=0
-while ! docker-compose exec -T postgres pg_isready -U arbor >/dev/null 2>&1; do
+while ! docker compose exec -T postgres pg_isready -U arbor >/dev/null 2>&1; do
     attempt=$((attempt + 1))
     if [ $attempt -ge $max_attempts ]; then
         echo -e "${RED}✗ PostgreSQL failed to start${NC}"

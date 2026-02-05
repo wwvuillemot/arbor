@@ -75,15 +75,15 @@ clean:
 
 # Docker
 up:
-	docker-compose up -d
+	docker compose up -d
 	@echo "Waiting for services to be ready..."
 	@sleep 5
 
 down:
-	docker-compose down
+	docker compose down
 
 logs:
-	docker-compose logs -f
+	docker compose logs -f
 
 restart:
 	make down
@@ -104,7 +104,7 @@ seed:
 	pnpm run db:seed
 
 db-reset:
-	docker-compose down -v
+	docker compose down -v
 	make up
 	make migrate
 	make seed
@@ -162,14 +162,14 @@ tauri-bundle:
 # Git & Backup
 backup:
 	@echo "Creating database backup..."
-	docker-compose exec postgres pg_dump -U arbor arbor > backup.sql
+	docker compose exec postgres pg_dump -U arbor arbor > backup.sql
 	git add backup.sql
 	git commit -m "Database backup: $$(date +%Y-%m-%d_%H:%M:%S)"
 	@echo "Backup complete!"
 
 restore:
 	@echo "Restoring from backup..."
-	docker-compose exec -T postgres psql -U arbor arbor < backup.sql
+	docker compose exec -T postgres psql -U arbor arbor < backup.sql
 	@echo "Restore complete!"
 
 export-md:
