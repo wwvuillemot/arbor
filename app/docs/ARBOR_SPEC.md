@@ -79,13 +79,40 @@ CREATE INDEX idx_nodes_embedding ON nodes USING ivfflat(embedding vector_cosine_
 CREATE INDEX idx_nodes_slug ON nodes(slug);
 ```
 
+**Node Type Hierarchy**:
+
+```
+Project (top-level)
+└── Folder
+    └── Folder (nested)
+        └── Note/File
+```
+
 **Example Node Types & Metadata**:
 
-- `folder`: `{}`
+- `project`: `{"description": "A fantasy novel", "status": "active", "created_date": "2024-01-01"}`
+  - Top-most node type (parent_id is NULL)
+  - Represents a complete writing project (story, RPG campaign, etc.)
+  - Examples: "My Novel", "D&D Campaign: Lost Mines", "Short Story Collection"
+
+- `folder`: `{"color": "#3b82f6", "icon": "folder"}`
+  - Organizational container within a project
+  - Can be nested infinitely
+  - Examples: "Characters", "World Building", "Chapter 1"
+
 - `note`: `{"tags": ["writing", "ideas"], "word_count": 1500, "reading_time": 6}`
+  - Markdown content node
+  - Contains actual writing/notes
+  - Examples: "Character Profile: Alice", "Plot Outline", "Session Notes"
+
 - `link`: `{"source_id": "uuid", "target_id": "uuid", "link_type": "references"}`
+  - Bidirectional link between notes
+
 - `ai_suggestion`: `{"original_text": "...", "suggested_text": "...", "status": "pending"}`
+  - AI-generated content suggestions
+
 - `audio_note`: `{"duration": 120, "transcription_id": "uuid", "audio_url": "/files/..."}`
+  - Voice recordings with transcriptions
 
 **Key Queries**:
 

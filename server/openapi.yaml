@@ -12,7 +12,7 @@ servers:
 
 tags:
   - name: nodes
-    description: Node operations (folders, notes, links)
+    description: Node operations (projects, folders, notes, links)
   - name: search
     description: Search and vector operations
   - name: ai
@@ -28,7 +28,7 @@ paths:
       summary: Health check
       operationId: getHealth
       responses:
-        '200':
+        "200":
           description: Service is healthy
           content:
             application/json:
@@ -62,14 +62,14 @@ paths:
             enum: [folder, note, link]
           description: Filter by node type
       responses:
-        '200':
+        "200":
           description: List of nodes
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Node'
+                  $ref: "#/components/schemas/Node"
 
     post:
       tags:
@@ -81,14 +81,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateNodeRequest'
+              $ref: "#/components/schemas/CreateNodeRequest"
       responses:
-        '201':
+        "201":
           description: Node created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Node'
+                $ref: "#/components/schemas/Node"
 
 components:
   schemas:
@@ -106,7 +106,15 @@ components:
           format: uuid
         type:
           type: string
-          enum: [folder, note, link]
+          enum: [project, folder, note, link, ai_suggestion, audio_note]
+          description: |
+            Node type hierarchy:
+            - project: Top-level container (parent_id is NULL)
+            - folder: Organizational container within a project
+            - note: Markdown content node
+            - link: Bidirectional link between notes
+            - ai_suggestion: AI-generated content suggestion
+            - audio_note: Voice recording with transcription
         title:
           type: string
         content:
@@ -134,7 +142,7 @@ components:
       properties:
         type:
           type: string
-          enum: [folder, note, link]
+          enum: [project, folder, note, link, ai_suggestion, audio_note]
         title:
           type: string
         content:
@@ -158,4 +166,3 @@ components:
         details:
           type: object
           additionalProperties: true
-
