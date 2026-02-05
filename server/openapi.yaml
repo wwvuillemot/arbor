@@ -1,0 +1,161 @@
+openapi: 3.0.3
+info:
+  title: Arbor API
+  description: Local-first AI-powered writing assistant API
+  version: 0.1.0
+  contact:
+    name: Arbor Team
+
+servers:
+  - url: http://localhost:3001/api
+    description: Local development server
+
+tags:
+  - name: nodes
+    description: Node operations (folders, notes, links)
+  - name: search
+    description: Search and vector operations
+  - name: ai
+    description: AI agent operations
+  - name: health
+    description: Health check endpoints
+
+paths:
+  /health:
+    get:
+      tags:
+        - health
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+
+  /nodes:
+    get:
+      tags:
+        - nodes
+      summary: List nodes
+      operationId: listNodes
+      parameters:
+        - name: parentId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by parent node ID
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [folder, note, link]
+          description: Filter by node type
+      responses:
+        '200':
+          description: List of nodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Node'
+
+    post:
+      tags:
+        - nodes
+      summary: Create a new node
+      operationId: createNode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNodeRequest'
+      responses:
+        '201':
+          description: Node created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Node'
+
+components:
+  schemas:
+    Node:
+      type: object
+      required:
+        - id
+        - type
+        - title
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [folder, note, link]
+        title:
+          type: string
+        content:
+          type: string
+          nullable: true
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CreateNodeRequest:
+      type: object
+      required:
+        - type
+        - title
+      properties:
+        type:
+          type: string
+          enum: [folder, note, link]
+        title:
+          type: string
+        content:
+          type: string
+        parentId:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+

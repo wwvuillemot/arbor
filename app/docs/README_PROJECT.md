@@ -1,4 +1,4 @@
-# Writing AI Assistant - Documentation Index
+# Arbor - Documentation Index
 
 > A local-first, AI-powered writing assistant with node-based architecture, TDD discipline, and Git integration.
 
@@ -156,7 +156,7 @@ app/docs/
 ├── README_PROJECT.md           # This file - documentation index
 ├── PROJECT_SUMMARY.md          # Executive summary (start here!)
 ├── QUICK_START.md              # Getting started guide
-├── WRITING_AI_ASSISTANT.md     # Complete specification (1,400+ lines)
+├── ARBOR_SPEC.md               # Complete specification (1,400+ lines)
 └── DATABASE_DECISION.md        # Database architecture rationale
 ```
 
@@ -164,7 +164,7 @@ app/docs/
 
 1. **Read** [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) for overview
 2. **Review** [DATABASE_DECISION.md](DATABASE_DECISION.md) to understand data model
-3. **Study** [WRITING_AI_ASSISTANT.md](WRITING_AI_ASSISTANT.md) for complete spec
+3. **Study** [ARBOR_SPEC.md](ARBOR_SPEC.md) for complete spec
 4. **Follow** [QUICK_START.md](QUICK_START.md) to begin development
 5. **Start** with Phase 0: Project Setup & Infrastructure
 

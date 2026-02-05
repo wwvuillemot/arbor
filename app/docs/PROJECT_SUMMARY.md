@@ -1,8 +1,9 @@
-# Writing AI Assistant - Project Summary
+# Arbor - Project Summary
 
 ## 📋 Overview
 
 A **local-first, AI-powered writing assistant** that helps you:
+
 - Track and organize notes with flexible taxonomy
 - Search semantically using RAG/vector search
 - Get AI assistance while maintaining your authorial voice
@@ -12,35 +13,45 @@ A **local-first, AI-powered writing assistant** that helps you:
 ## 🎯 Key Design Decisions
 
 ### 1. Node-Based Data Model ✅
+
 **Single `nodes` table** with self-referential hierarchy:
+
 - Arbitrary taxonomy (folders within folders)
 - Flexible JSONB metadata per node type
 - No complex ERD - just parent-child relationships
 - Simple, scalable, maintainable
 
 ### 2. PostgreSQL + pgvector ✅
+
 **Why not SQLite?**
+
 - Native JSONB with GIN indexing (critical for metadata queries)
 - Mature vector search (pgvector)
 - Better recursive CTE optimizer (tree traversal)
 - Still Git-friendly via pg_dump or JSON export
 
 ### 3. TypeScript/Node.js Backend ✅
+
 **Why not Go?**
+
 - Full-stack type safety with tRPC
 - Seamless Tauri IPC integration
 - Shared types between frontend/backend
 - Better AI/ML library ecosystem
 
 ### 4. TDD Throughout ✅
+
 **Test-Driven Development at every phase:**
+
 - Write tests FIRST (Red)
 - Implement minimal code (Green)
 - Refactor (Refactor)
 - 80%+ test coverage requirement
 
 ### 5. Makefile for Consistency ✅
+
 **Standard commands across all environments:**
+
 - `make setup` - One-command initialization
 - `make dev` - Start development
 - `make test` - Run all tests
@@ -95,6 +106,7 @@ CREATE TABLE nodes (
 ```
 
 **Example Metadata by Type:**
+
 - `folder`: `{}`
 - `note`: `{"tags": ["writing"], "word_count": 1500}`
 - `link`: `{"source_id": "...", "target_id": "...", "link_type": "references"}`
@@ -103,17 +115,20 @@ CREATE TABLE nodes (
 ## 🤖 AI Agent Modes
 
 ### 1. Ask Question
+
 - RAG-based Q&A over your notes
 - Semantic search for relevant context
 - Cited sources
 
 ### 2. Take Notes
+
 - Text or audio input (Whisper transcription)
 - Extract key points, structure thoughts
 - Auto-update related existing notes
 - Suggest links and tags
 
 ### 3. Editor
+
 - Analyze your writing style
 - Suggest improvements (clarity, tone, grammar)
 - **Never auto-applies** - you must manually rewrite
@@ -146,7 +161,7 @@ CREATE TABLE nodes (
 
 ## 📚 Documentation
 
-- **`WRITING_AI_ASSISTANT.md`** - Complete 1-pager with all phases
+- **`ARBOR_SPEC.md`** - Complete specification with all phases
 - **`DATABASE_DECISION.md`** - PostgreSQL vs SQLite comparison
 - **`QUICK_START.md`** - Getting started guide
 - **`PROJECT_SUMMARY.md`** - This file
@@ -167,6 +182,7 @@ make test
 ## ✅ Success Criteria
 
 ### Technical
+
 - 80%+ test coverage
 - API response < 200ms (p95)
 - Search latency < 500ms
@@ -174,12 +190,14 @@ make test
 - Lighthouse score > 95
 
 ### User Experience
+
 - Handles 10k+ notes smoothly
 - Zero data loss
 - Offline-capable
 - WCAG 2.1 AA accessible
 
 ### AI Quality
+
 - RAG accuracy > 90%
 - Search relevance > 85%
 - Transcription accuracy > 95%
@@ -211,4 +229,3 @@ make test
 ---
 
 **Next Steps**: Read `QUICK_START.md` to begin development!
-

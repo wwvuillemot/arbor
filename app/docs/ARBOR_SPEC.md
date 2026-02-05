@@ -1,8 +1,8 @@
-# Writing AI Assistant - Project Specification
+# Arbor - Project Specification
 
 ## Overview
 
-A local-first, AI-powered writing assistant that helps track notes, organize knowledge, and improve writing while maintaining authorial voice and provenance tracking.
+**Arbor** is a local-first, AI-powered writing assistant that helps track notes, organize knowledge, and improve writing while maintaining authorial voice and provenance tracking.
 
 ## Executive Summary
 
@@ -268,7 +268,7 @@ services:
 ### File Structure
 
 ```
-writing-assistant/
+arbor/
 ├── src-tauri/          # Rust/Tauri backend
 ├── src/                # Next.js frontend
 │   ├── app/            # App router pages

@@ -1,4 +1,4 @@
-# Writing AI Assistant
+# Arbor
 
 > A local-first, AI-powered writing assistant that helps you track notes, organize knowledge, and improve your writing while maintaining your authorial voice.
 
@@ -22,7 +22,7 @@ All project documentation is located in the [`docs/`](docs/) directory:
 - **[docs/README_PROJECT.md](docs/README_PROJECT.md)** - Start here! Documentation index and navigation guide
 - **[docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md)** - Executive summary and key decisions
 - **[docs/QUICK_START.md](docs/QUICK_START.md)** - Getting started guide and daily workflow
-- **[docs/WRITING_AI_ASSISTANT.md](docs/WRITING_AI_ASSISTANT.md)** - Complete specification (1,400+ lines)
+- **[docs/ARBOR_SPEC.md](docs/ARBOR_SPEC.md)** - Complete specification (1,400+ lines)
 - **[docs/DATABASE_DECISION.md](docs/DATABASE_DECISION.md)** - Database architecture rationale
 
 ## 🏗️ Architecture
@@ -37,23 +37,27 @@ All project documentation is located in the [`docs/`](docs/) directory:
 ## 🎯 Key Features
 
 ### Node-Based Data Model
+
 - Single `nodes` table with self-referential hierarchy
 - Arbitrary taxonomy (folders within folders)
 - Flexible JSONB metadata per node type
 - Semantic linking between notes
 
 ### AI Agent Modes
+
 1. **Ask Question** - RAG-based Q&A over your notes
 2. **Take Notes** - Text/audio input with auto-organization
 3. **Editor** - Style analysis and improvement suggestions
 
 ### Provenance Tracking
+
 - Block-level attribution (AI vs human content)
 - Approval workflow for AI suggestions
 - Force rewrite mode (AI provides outline, you write prose)
 - Learn and match your writing style
 
 ### Git Integration
+
 - Auto-commit on save (configurable)
 - Export notes as markdown
 - Backup and restore via pg_dump
@@ -143,4 +147,3 @@ Run `make help` to see all available commands.
 ---
 
 **Ready to start?** Read [docs/README_PROJECT.md](docs/README_PROJECT.md) for complete documentation!
-

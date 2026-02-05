@@ -84,3 +84,6 @@ logs/
 # Misc
 .eslintcache
 
+# Generated API client
+src/lib/api/generated/
+
