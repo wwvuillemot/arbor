@@ -99,6 +99,12 @@ fi
 
 # Check and install Rust (for Tauri)
 echo -e "${YELLOW}Checking Rust...${NC}"
+
+# Source cargo env if it exists (in case Rust is installed but not in PATH)
+if [ -f "$HOME/.cargo/env" ]; then
+    source "$HOME/.cargo/env"
+fi
+
 if ! command_exists rustc; then
     echo -e "${RED}✗ Rust not found${NC}"
     echo -e "${YELLOW}Installing Rust...${NC}"
@@ -172,9 +178,16 @@ echo -e "${BLUE}   Setting Up Database${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-echo -e "${YELLOW}Running database migrations...${NC}"
-pnpm run db:migrate
-echo -e "${GREEN}✓ Database migrations complete${NC}"
+# Check if database schema exists
+if [ -f "server/db/schema.ts" ]; then
+  echo -e "${YELLOW}Running database migrations...${NC}"
+  pnpm run db:push
+  echo -e "${GREEN}✓ Database migrations complete${NC}"
+else
+  echo -e "${YELLOW}⚠ No database schema found (server/db/schema.ts)${NC}"
+  echo -e "${YELLOW}Skipping migrations - this is normal for initial setup${NC}"
+  echo -e "${YELLOW}Database schema will be created in Phase 1${NC}"
+fi
 
 # Create .env.local if it doesn't exist
 if [ ! -f .env.local ]; then

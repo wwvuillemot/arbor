@@ -90,15 +90,14 @@ restart:
 	make up
 
 # Database
-migrate:
-	pnpm run db:migrate
+db-push:
+	pnpm run db:push
 
-migrate-rollback:
-	pnpm run db:rollback
+db-generate:
+	pnpm run db:generate
 
-migrate-create:
-	@read -p "Migration name: " name; \
-	pnpm run db:create $$name
+db-studio:
+	pnpm run db:studio
 
 seed:
 	pnpm run db:seed
@@ -106,7 +105,7 @@ seed:
 db-reset:
 	docker compose down -v
 	make up
-	make migrate
+	make db-push
 	make seed
 
 # Testing
