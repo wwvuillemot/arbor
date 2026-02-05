@@ -59,11 +59,11 @@ docker compose -f docker-compose.yml -f /Users/wwv/Projects/wwvuillemot/traefik/
 
 Once running with Traefik:
 
-- **Frontend**: http://arbor.local (when frontend service is added)
-- **Backend API**: http://api.arbor.local (when backend service is added)
+- **Frontend**: <http://arbor.local> (when frontend service is added)
+- **Backend API**: <http://api.arbor.local> (when backend service is added)
 - **PostgreSQL**: Not exposed (internal only)
 - **Redis**: Not exposed (internal only)
-- **Traefik Dashboard**: http://traefik.localhost:8080
+- **Traefik Dashboard**: <http://traefik.localhost:8080>
 
 ## Current Status
 
@@ -111,16 +111,19 @@ services:
 ### Cannot access arbor.local
 
 1. Check /etc/hosts has the entry:
+
    ```bash
    cat /etc/hosts | grep arbor
    ```
 
 2. Verify Traefik is running:
+
    ```bash
    docker ps | grep traefik
    ```
 
 3. Check traefik-network exists:
+
    ```bash
    docker network ls | grep traefik
    ```
@@ -128,17 +131,19 @@ services:
 ### Services not showing in Traefik
 
 1. Check service labels:
+
    ```bash
    docker inspect arbor-postgres | grep -A 10 Labels
    ```
 
 2. View Traefik logs:
+
    ```bash
    docker logs traefik
    ```
 
 3. Check Traefik dashboard:
-   http://traefik.localhost:8080
+   <http://traefik.localhost:8080>
 
 ## Development Workflow
 
@@ -162,5 +167,4 @@ docker compose -f arbor-docker-compose.yml -f arbor-docker-compose.traefik.yml u
 2. Add Dockerfile.backend for Node.js API
 3. Update docker-compose.yml with frontend and backend services
 4. Update arbor-docker-compose.traefik.yml with Traefik labels
-5. Test access at http://arbor.local
-
+5. Test access at <http://arbor.local>
