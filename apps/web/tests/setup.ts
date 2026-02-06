@@ -1,0 +1,51 @@
+import { expect, afterEach, vi } from 'vitest';
+import { cleanup } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+
+// Mock next-intl for tests
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+  NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Cleanup after each test
+afterEach(() => {
+  cleanup();
+});
+
+// Mock matchMedia if not available
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+});
+
+// Mock sessionStorage
+Object.defineProperty(window, 'sessionStorage', {
+  writable: true,
+  value: {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  },
+});
+
+// Mock localStorage
+Object.defineProperty(window, 'localStorage', {
+  writable: true,
+  value: {
+    getItem: vi.fn(),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  },
+});
