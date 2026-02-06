@@ -1,46 +1,19 @@
 'use client';
 
-import * as React from 'react';
-import { useTranslations } from 'next-intl';
-import { ThemeSelector } from '@/components/theme-selector';
-import { LanguageSelector } from '@/components/language-selector';
+import { useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 
 export default function SettingsPage() {
-  const t = useTranslations('settings');
+  const router = useRouter();
+  const pathname = usePathname();
 
-  return (
-    <div className="p-8 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-2">{t('title')}</h1>
-      <p className="text-muted-foreground mb-8">
-        {t('description')}
-      </p>
+  useEffect(() => {
+    // Redirect to preferences by default
+    // Extract locale from pathname (e.g., /en/settings -> /en/settings/preferences)
+    const newPath = `${pathname}/preferences`;
+    router.replace(newPath);
+  }, [router, pathname]);
 
-      {/* Appearance Section */}
-      <section className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">{t('appearance')}</h2>
-        <div className="space-y-6">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="theme-selector" className="text-sm font-medium">
-              {t('theme.label')}
-            </label>
-            <p className="text-sm text-muted-foreground mb-2">
-              {t('theme.description')}
-            </p>
-            <ThemeSelector className="max-w-xs" />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-medium">
-              {t('language.label')}
-            </label>
-            <p className="text-sm text-muted-foreground mb-2">
-              {t('language.description')}
-            </p>
-            <LanguageSelector className="max-w-xs" />
-          </div>
-        </div>
-      </section>
-    </div>
-  );
+  return null;
 }
 

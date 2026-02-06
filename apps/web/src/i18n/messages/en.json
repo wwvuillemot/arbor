@@ -16,6 +16,11 @@
   "settings": {
     "title": "Settings",
     "description": "Configure your Arbor preferences, themes, and integrations.",
+    "nav": {
+      "title": "Settings",
+      "preferences": "Preferences",
+      "integrations": "Integrations"
+    },
     "appearance": "Appearance",
     "theme": {
       "label": "Theme",
@@ -27,6 +32,22 @@
     "language": {
       "label": "Language",
       "description": "Select your preferred language for the Arbor interface."
+    },
+    "integrations": "Integrations",
+    "apiKeys": {
+      "title": "API Keys",
+      "description": "Manage your API keys for AI integrations. All keys are encrypted at rest.",
+      "openai": {
+        "label": "OpenAI API Key",
+        "placeholder": "sk-...",
+        "description": "Your OpenAI API key for GPT models. Get one at platform.openai.com"
+      },
+      "save": "Save",
+      "saved": "Saved!",
+      "saving": "Saving...",
+      "show": "Show",
+      "hide": "Hide",
+      "notSet": "Not set"
     }
   },
   "commandPalette": {
@@ -44,4 +65,3 @@
     "close": "Close"
   }
 }
-

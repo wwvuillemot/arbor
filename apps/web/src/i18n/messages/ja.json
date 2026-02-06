@@ -16,6 +16,11 @@
   "settings": {
     "title": "設定",
     "description": "Arborの設定、テーマ、統合を構成します。",
+    "nav": {
+      "title": "設定",
+      "preferences": "設定",
+      "integrations": "統合"
+    },
     "appearance": "外観",
     "theme": {
       "label": "テーマ",
@@ -27,6 +32,22 @@
     "language": {
       "label": "言語",
       "description": "Arborインターフェースの優先言語を選択します。"
+    },
+    "integrations": "統合",
+    "apiKeys": {
+      "title": "APIキー",
+      "description": "AI統合のためのAPIキーを管理します。すべてのキーは暗号化されて保存されます。",
+      "openai": {
+        "label": "OpenAI APIキー",
+        "placeholder": "sk-...",
+        "description": "GPTモデル用のOpenAI APIキー。platform.openai.comで取得できます"
+      },
+      "save": "保存",
+      "saved": "保存しました！",
+      "saving": "保存中...",
+      "show": "表示",
+      "hide": "非表示",
+      "notSet": "未設定"
     }
   },
   "commandPalette": {
@@ -44,4 +65,3 @@
     "close": "閉じる"
   }
 }
-

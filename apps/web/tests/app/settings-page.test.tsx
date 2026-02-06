@@ -8,12 +8,14 @@ import SettingsPage from '@/app/[locale]/(app)/settings/page';
 // Mock next/navigation
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
+const mockReplace = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
     refresh: mockRefresh,
+    replace: mockReplace,
   }),
-  usePathname: () => '/settings',
+  usePathname: () => '/en/settings',
 }));
 
 // Mock next-intl
@@ -21,6 +23,11 @@ vi.mock('next-intl', () => ({
   useLocale: () => 'en',
   useTranslations: () => (key: string) => key,
   NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Mock Tauri API
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn(),
 }));
 
 // Mock the tRPC client to avoid actual API calls
@@ -39,6 +46,7 @@ vi.mock('@/lib/trpc', () => {
           mutate: vi.fn(),
           mutateAsync: vi.fn(),
           isLoading: false,
+          isPending: false,
         })),
       },
       getAllAppPreferences: {
@@ -53,6 +61,7 @@ vi.mock('@/lib/trpc', () => {
           mutate: vi.fn(),
           mutateAsync: vi.fn(),
           isLoading: false,
+          isPending: false,
         })),
       },
       deleteAppPreference: {
@@ -60,12 +69,43 @@ vi.mock('@/lib/trpc', () => {
           mutate: vi.fn(),
           mutateAsync: vi.fn(),
           isLoading: false,
+          isPending: false,
+        })),
+      },
+    },
+    settings: {
+      getAllSettings: {
+        useQuery: vi.fn(() => ({
+          data: {},
+          isLoading: false,
+          error: null,
+        })),
+      },
+      setSetting: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isLoading: false,
+          isPending: false,
+        })),
+      },
+      deleteSetting: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          mutateAsync: vi.fn(),
+          isLoading: false,
+          isPending: false,
         })),
       },
     },
     useUtils: vi.fn(() => ({
       preferences: {
         getAllAppPreferences: {
+          invalidate: vi.fn(),
+        },
+      },
+      settings: {
+        getAllSettings: {
           invalidate: vi.fn(),
         },
       },
@@ -101,48 +141,11 @@ describe('SettingsPage', () => {
     vi.clearAllMocks();
   });
 
-  it('should render settings page', () => {
+  it('should redirect to preferences page', () => {
     render(<SettingsPage />, { wrapper: TestWrapper });
 
-    // The mock returns translation keys, so we check for "title" instead of "Settings"
-    expect(screen.getByRole('heading', { name: /title/i })).toBeInTheDocument();
-  });
-
-  it('should display theme selector', () => {
-    render(<SettingsPage />, { wrapper: TestWrapper });
-
-    // Check for theme selector heading/label (mock returns "theme.label")
-    expect(screen.getByText('theme.label')).toBeInTheDocument();
-
-    // Check for theme selector buttons
-    expect(screen.getByRole('button', { name: /light theme/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /dark theme/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /system theme/i })).toBeInTheDocument();
-  });
-
-  it('should display appearance section', () => {
-    render(<SettingsPage />, { wrapper: TestWrapper });
-
-    expect(screen.getByText(/appearance/i)).toBeInTheDocument();
-  });
-
-  it('should have theme selector in appearance section', () => {
-    render(<SettingsPage />, { wrapper: TestWrapper });
-
-    // Find the appearance section
-    const appearanceSection = screen.getByText(/appearance/i).closest('section');
-    expect(appearanceSection).toBeInTheDocument();
-
-    // Check that theme selector buttons are within the appearance section
-    const lightButton = screen.getByRole('button', { name: /light theme/i });
-    expect(appearanceSection?.contains(lightButton)).toBe(true);
-  });
-
-  it('should display theme description', () => {
-    render(<SettingsPage />, { wrapper: TestWrapper });
-
-    // Should have some description about theme selection (mock returns "theme.description")
-    expect(screen.getByText('theme.description')).toBeInTheDocument();
+    // Should redirect to /en/settings/preferences
+    expect(mockReplace).toHaveBeenCalledWith('/en/settings/preferences');
   });
 });
 
