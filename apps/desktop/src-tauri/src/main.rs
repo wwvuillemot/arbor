@@ -1,6 +1,8 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod keyring;
+
 use std::process::{Child, Command};
 use std::sync::Mutex;
 use tauri::{Manager, State};
@@ -102,7 +104,11 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             start_services,
             stop_services,
-            check_services_status
+            check_services_status,
+            keyring::get_master_key,
+            keyring::set_master_key,
+            keyring::generate_master_key,
+            keyring::get_or_generate_master_key
         ])
         .setup(|app| {
             let app_handle = app.handle().clone();

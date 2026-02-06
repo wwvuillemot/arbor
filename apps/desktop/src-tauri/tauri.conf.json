@@ -6,7 +6,7 @@
     "beforeDevCommand": "",
     "beforeBuildCommand": "cd ../.. && pnpm run build",
     "devUrl": "http://app.arbor.local",
-    "frontendDist": "../../web/dist"
+    "frontendDist": "../../../apps/web/dist"
   },
   "bundle": {
     "active": true,
