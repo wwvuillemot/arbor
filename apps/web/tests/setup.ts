@@ -8,6 +8,11 @@ vi.mock('next-intl', () => ({
   NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// Mock Tauri API
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke: vi.fn().mockResolvedValue('test-master-key-base64-encoded-32-bytes'),
+}));
+
 // Cleanup after each test
 afterEach(() => {
   cleanup();

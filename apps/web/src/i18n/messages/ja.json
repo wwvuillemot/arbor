@@ -19,7 +19,8 @@
     "nav": {
       "title": "設定",
       "preferences": "設定",
-      "integrations": "統合"
+      "integrations": "統合",
+      "configuration": "構成"
     },
     "appearance": "外観",
     "theme": {
@@ -42,12 +43,47 @@
         "placeholder": "sk-...",
         "description": "GPTモデル用のOpenAI APIキー。platform.openai.comで取得できます"
       },
+      "anthropic": {
+        "label": "Anthropic APIキー",
+        "placeholder": "sk-ant-...",
+        "description": "Claudeモデル用のAnthropic APIキー。console.anthropic.comで取得できます"
+      },
       "save": "保存",
       "saved": "保存しました！",
       "saving": "保存中...",
       "show": "表示",
       "hide": "非表示",
       "notSet": "未設定"
+    },
+    "configuration": {
+      "title": "構成",
+      "description": "接続URLとサービスエンドポイントを構成します。これらの設定は、すぐに使用できる適切なデフォルト値を使用します。",
+      "databaseUrl": {
+        "label": "データベースURL",
+        "placeholder": "postgres://arbor:arbor@localhost:5432/arbor",
+        "description": "PostgreSQLデータベース接続URL"
+      },
+      "redisUrl": {
+        "label": "Redis URL",
+        "placeholder": "redis://localhost:6379",
+        "description": "キャッシュとセッション用のRedis接続URL"
+      },
+      "apiUrl": {
+        "label": "API URL",
+        "placeholder": "http://localhost:3001",
+        "description": "バックエンドAPIサーバーURL"
+      },
+      "ollamaBaseUrl": {
+        "label": "Ollama ベースURL",
+        "placeholder": "http://localhost:11434",
+        "description": "ローカルLLM推論用のOllamaサーバーURL"
+      },
+      "reset": "デフォルトにリセット",
+      "resetConfirm": "本当にデフォルト値にリセットしますか？",
+      "usingDefault": "デフォルト値を使用中",
+      "save": "保存",
+      "saved": "保存しました！",
+      "saving": "保存中..."
     }
   },
   "commandPalette": {

@@ -19,7 +19,8 @@
     "nav": {
       "title": "Settings",
       "preferences": "Preferences",
-      "integrations": "Integrations"
+      "integrations": "Integrations",
+      "configuration": "Configuration"
     },
     "appearance": "Appearance",
     "theme": {
@@ -42,12 +43,47 @@
         "placeholder": "sk-...",
         "description": "Your OpenAI API key for GPT models. Get one at platform.openai.com"
       },
+      "anthropic": {
+        "label": "Anthropic API Key",
+        "placeholder": "sk-ant-...",
+        "description": "Your Anthropic API key for Claude models. Get one at console.anthropic.com"
+      },
       "save": "Save",
       "saved": "Saved!",
       "saving": "Saving...",
       "show": "Show",
       "hide": "Hide",
       "notSet": "Not set"
+    },
+    "configuration": {
+      "title": "Configuration",
+      "description": "Configure connection URLs and service endpoints. These settings use sensible defaults that work out of the box.",
+      "databaseUrl": {
+        "label": "Database URL",
+        "placeholder": "postgres://arbor:arbor@localhost:5432/arbor",
+        "description": "PostgreSQL database connection URL"
+      },
+      "redisUrl": {
+        "label": "Redis URL",
+        "placeholder": "redis://localhost:6379",
+        "description": "Redis connection URL for caching and sessions"
+      },
+      "apiUrl": {
+        "label": "API URL",
+        "placeholder": "http://localhost:3001",
+        "description": "Backend API server URL"
+      },
+      "ollamaBaseUrl": {
+        "label": "Ollama Base URL",
+        "placeholder": "http://localhost:11434",
+        "description": "Ollama server URL for local LLM inference"
+      },
+      "reset": "Reset to Default",
+      "resetConfirm": "Are you sure you want to reset this to the default value?",
+      "usingDefault": "Using default value",
+      "save": "Save",
+      "saved": "Saved!",
+      "saving": "Saving..."
     }
   },
   "commandPalette": {

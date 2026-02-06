@@ -11,29 +11,53 @@ export default function IntegrationsPage() {
   const { apiKeys, getApiKey, setApiKey, isUpdating, isLoading } = useApiKeys();
 
   const [openaiKey, setOpenaiKey] = React.useState('');
-  const [isSaving, setIsSaving] = React.useState(false);
-  const [isSaved, setIsSaved] = React.useState(false);
+  const [openaiSaving, setOpenaiSaving] = React.useState(false);
+  const [openaiSaved, setOpenaiSaved] = React.useState(false);
 
-  // Load OpenAI key when available
+  const [anthropicKey, setAnthropicKey] = React.useState('');
+  const [anthropicSaving, setAnthropicSaving] = React.useState(false);
+  const [anthropicSaved, setAnthropicSaved] = React.useState(false);
+
+  // Load API keys when available
   React.useEffect(() => {
-    const key = getApiKey('openai_api_key');
-    if (key) {
-      setOpenaiKey(key);
+    const openai = getApiKey('openai_api_key');
+    if (openai) {
+      setOpenaiKey(openai);
+    }
+
+    const anthropic = getApiKey('anthropic_api_key');
+    if (anthropic) {
+      setAnthropicKey(anthropic);
     }
   }, [getApiKey, apiKeys]);
 
   const handleSaveOpenAIKey = async () => {
-    setIsSaving(true);
-    setIsSaved(false);
+    setOpenaiSaving(true);
+    setOpenaiSaved(false);
     try {
       await setApiKey('openai_api_key', openaiKey);
-      setIsSaved(true);
+      setOpenaiSaved(true);
       // Reset saved state after 2 seconds
-      setTimeout(() => setIsSaved(false), 2000);
+      setTimeout(() => setOpenaiSaved(false), 2000);
     } catch (error) {
       console.error('Failed to save OpenAI API key:', error);
     } finally {
-      setIsSaving(false);
+      setOpenaiSaving(false);
+    }
+  };
+
+  const handleSaveAnthropicKey = async () => {
+    setAnthropicSaving(true);
+    setAnthropicSaved(false);
+    try {
+      await setApiKey('anthropic_api_key', anthropicKey);
+      setAnthropicSaved(true);
+      // Reset saved state after 2 seconds
+      setTimeout(() => setAnthropicSaved(false), 2000);
+    } catch (error) {
+      console.error('Failed to save Anthropic API key:', error);
+    } finally {
+      setAnthropicSaving(false);
     }
   };
 
@@ -50,7 +74,7 @@ export default function IntegrationsPage() {
         <p className="text-sm text-muted-foreground mb-4">
           {tApiKeys('description')}
         </p>
-        
+
         {isLoading ? (
           <div className="text-sm text-muted-foreground">Loading...</div>
         ) : (
@@ -62,8 +86,19 @@ export default function IntegrationsPage() {
               value={openaiKey}
               onChange={setOpenaiKey}
               onSave={handleSaveOpenAIKey}
-              isSaving={isSaving}
-              isSaved={isSaved}
+              isSaving={openaiSaving}
+              isSaved={openaiSaved}
+            />
+
+            <ApiKeyInput
+              label={tApiKeys('anthropic.label')}
+              description={tApiKeys('anthropic.description')}
+              placeholder={tApiKeys('anthropic.placeholder')}
+              value={anthropicKey}
+              onChange={setAnthropicKey}
+              onSave={handleSaveAnthropicKey}
+              isSaving={anthropicSaving}
+              isSaved={anthropicSaved}
             />
           </div>
         )}
