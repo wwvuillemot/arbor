@@ -1,0 +1,54 @@
+{
+  "productName": "Arbor",
+  "version": "0.1.0",
+  "identifier": "com.arbor.app",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "cd ../.. && pnpm run build",
+    "devUrl": "http://app.arbor.local",
+    "frontendDist": "../../web/dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "",
+    "category": "Productivity",
+    "shortDescription": "Local-first AI-powered writing assistant",
+    "longDescription": "Arbor is a local-first, AI-powered writing assistant with a node-based hierarchical data model.",
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.13",
+      "exceptionDomain": "",
+      "signingIdentity": null,
+      "entitlements": null
+    },
+    "windows": {
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": ""
+    }
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Arbor",
+        "width": 1400,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false,
+        "decorations": true,
+        "transparent": false,
+        "alwaysOnTop": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "devCsp": null,
+      "freezePrototype": false,
+      "dangerousDisableAssetCspModification": false
+    }
+  }
+}
