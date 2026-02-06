@@ -1,0 +1,61 @@
+name: arbor
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: arbor-postgres
+    ports:
+      - "5432:5432" # Expose for local development (drizzle-kit, etc.)
+    environment:
+      POSTGRES_USER: arbor
+      POSTGRES_PASSWORD: local_dev_only
+      POSTGRES_DB: arbor
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arbor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: arbor-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@arbor.local
+      PGADMIN_DEFAULT_PASSWORD: local_dev_only
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    image: arbor-api:latest
+    container_name: arbor-api
+    environment:
+      DATABASE_URL: postgresql://arbor:local_dev_only@postgres:5432/arbor
+      API_PORT: 3001
+      API_HOST: 0.0.0.0
+      CORS_ORIGIN: http://app.arbor.local
+    volumes:
+      - ../..:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  default:
+    name: api_default
