@@ -1,0 +1,54 @@
+import { NextIntlClientProvider } from 'next-intl';
+import { notFound } from 'next/navigation';
+import { locales } from '@/i18n/request';
+import '../../styles/globals.css';
+import { ThemeProvider } from '@/components/providers/theme-provider';
+import { TRPCProvider } from '@/components/providers/trpc-provider';
+
+export function generateStaticParams() {
+  return locales.map((locale) => ({ locale }));
+}
+
+export default async function LocaleLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ locale: string }>;
+}) {
+  // Await params as required by Next.js 15
+  const { locale } = await params;
+
+  // Validate that the incoming `locale` parameter is valid
+  if (!locales.includes(locale as any)) {
+    notFound();
+  }
+
+  // Load messages manually since we're not using the next-intl plugin in Docker
+  let messages;
+  try {
+    messages = (await import(`@/i18n/messages/${locale}.json`)).default;
+  } catch (error) {
+    notFound();
+  }
+
+  return (
+    <html lang={locale} suppressHydrationWarning>
+      <body>
+        <NextIntlClientProvider messages={messages} locale={locale}>
+          <TRPCProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </TRPCProvider>
+        </NextIntlClientProvider>
+      </body>
+    </html>
+  );
+}
+

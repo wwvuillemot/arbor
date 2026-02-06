@@ -1,0 +1,47 @@
+{
+  "app": {
+    "title": "Arbor - AI-Powered Writing Assistant",
+    "description": "A local-first, AI-powered writing assistant for creative writers"
+  },
+  "sidebar": {
+    "arbor": "Arbor",
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "search": "Search",
+    "chat": "Chat",
+    "settings": "Settings",
+    "collapseLabel": "Collapse sidebar",
+    "expandLabel": "Expand sidebar"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Configure your Arbor preferences, themes, and integrations.",
+    "appearance": "Appearance",
+    "theme": {
+      "label": "Theme",
+      "description": "Choose how Arbor looks to you. Select a single theme, or sync with your system and automatically switch between day and night themes.",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "language": {
+      "label": "Language",
+      "description": "Select your preferred language for the Arbor interface."
+    }
+  },
+  "commandPalette": {
+    "placeholder": "Type a command or search...",
+    "noResults": "No results found"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "close": "Close"
+  }
+}
+

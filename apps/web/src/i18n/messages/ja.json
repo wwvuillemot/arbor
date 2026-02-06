@@ -1,0 +1,47 @@
+{
+  "app": {
+    "title": "Arbor - AI搭載ライティングアシスタント",
+    "description": "クリエイティブライター向けのローカルファースト、AI搭載ライティングアシスタント"
+  },
+  "sidebar": {
+    "arbor": "Arbor",
+    "dashboard": "ダッシュボード",
+    "projects": "プロジェクト",
+    "search": "検索",
+    "chat": "チャット",
+    "settings": "設定",
+    "collapseLabel": "サイドバーを折りたたむ",
+    "expandLabel": "サイドバーを展開"
+  },
+  "settings": {
+    "title": "設定",
+    "description": "Arborの設定、テーマ、統合を構成します。",
+    "appearance": "外観",
+    "theme": {
+      "label": "テーマ",
+      "description": "Arborの外観を選択します。単一のテーマを選択するか、システムと同期して昼夜のテーマを自動的に切り替えます。",
+      "light": "ライト",
+      "dark": "ダーク",
+      "system": "システム"
+    },
+    "language": {
+      "label": "言語",
+      "description": "Arborインターフェースの優先言語を選択します。"
+    }
+  },
+  "commandPalette": {
+    "placeholder": "コマンドを入力または検索...",
+    "noResults": "結果が見つかりません"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "edit": "編集",
+    "create": "作成",
+    "close": "閉じる"
+  }
+}
+
