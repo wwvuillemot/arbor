@@ -37,7 +37,7 @@ check_version() {
 }
 
 # Check and install Homebrew (macOS/Linux)
-echo -e "${YELLOW}Checking Homebrew...${NC}"
+echo -e "${YELLOW} Checking Homebrew...${NC}"
 if ! command_exists brew; then
     echo -e "${RED}✗ Homebrew not found${NC}"
     echo -e "${YELLOW}Installing Homebrew...${NC}"
@@ -143,6 +143,10 @@ echo -e "${YELLOW}Installing npm packages...${NC}"
 pnpm install
 echo -e "${GREEN}✓ npm packages installed${NC}"
 
+echo -e "${YELLOW}Installing Redis client package...${NC}"
+pnpm add redis
+echo -e "${GREEN}✓ Redis client installed${NC}"
+
 # Start Docker services
 echo ""
 echo -e "${BLUE}========================================${NC}"
@@ -150,44 +154,9 @@ echo -e "${BLUE}   Starting Docker Services${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-echo -e "${YELLOW}Starting PostgreSQL and Redis...${NC}"
-docker compose up -d
+echo -e "${YELLOW}Starting Docker services via make up...${NC}"
+make up
 echo -e "${GREEN}✓ Docker services started${NC}"
-
-echo -e "${YELLOW}Waiting for services to be ready...${NC}"
-sleep 5
-
-# Check if PostgreSQL is ready
-max_attempts=30
-attempt=0
-while ! docker compose exec -T postgres pg_isready -U arbor >/dev/null 2>&1; do
-    attempt=$((attempt + 1))
-    if [ $attempt -ge $max_attempts ]; then
-        echo -e "${RED}✗ PostgreSQL failed to start${NC}"
-        exit 1
-    fi
-    echo -e "${YELLOW}Waiting for PostgreSQL... (attempt $attempt/$max_attempts)${NC}"
-    sleep 2
-done
-echo -e "${GREEN}✓ PostgreSQL is ready${NC}"
-
-# Run database migrations
-echo ""
-echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}   Setting Up Database${NC}"
-echo -e "${BLUE}========================================${NC}"
-echo ""
-
-# Check if database schema exists
-if [ -f "server/db/schema.ts" ]; then
-  echo -e "${YELLOW}Running database migrations...${NC}"
-  pnpm run db:push
-  echo -e "${GREEN}✓ Database migrations complete${NC}"
-else
-  echo -e "${YELLOW}⚠ No database schema found (server/db/schema.ts)${NC}"
-  echo -e "${YELLOW}Skipping migrations - this is normal for initial setup${NC}"
-  echo -e "${YELLOW}Database schema will be created in Phase 1${NC}"
-fi
 
 # Create .env.local if it doesn't exist
 if [ ! -f .env.local ]; then
@@ -220,12 +189,13 @@ echo -e "${GREEN}   Setup Complete! 🎉${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 echo -e "Next steps:"
-echo -e "  1. Add your API keys to ${YELLOW}.env.local${NC}"
-echo -e "  2. Run ${YELLOW}make dev${NC} to start development"
-echo -e "  3. Open ${YELLOW}http://localhost:3000${NC} in your browser"
+echo -e "  1. Run ${YELLOW}make desktop${NC} to start the Tauri desktop app"
+echo -e "  2. Or run ${YELLOW}make dev${NC} to start development servers"
+echo -e "  3. Add your API keys to ${YELLOW}.env.local${NC} (optional)"
 echo ""
 echo -e "Useful commands:"
 echo -e "  ${YELLOW}make help${NC}        - Show all available commands"
+echo -e "  ${YELLOW}make desktop${NC}     - Start Tauri desktop app"
 echo -e "  ${YELLOW}make test${NC}        - Run tests"
 echo -e "  ${YELLOW}make down${NC}        - Stop Docker services"
 echo ""
