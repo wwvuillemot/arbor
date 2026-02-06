@@ -113,3 +113,38 @@ export const userPreferences = pgTable('user_preferences', {
 export type UserPreference = typeof userPreferences.$inferSelect;
 export type NewUserPreference = typeof userPreferences.$inferInsert;
 
+/**
+ * App Settings Table
+ *
+ * Stores encrypted sensitive settings (API keys, tokens, etc.).
+ * All values are encrypted at rest using AES-256-GCM with a master key
+ * stored in the OS keychain.
+ *
+ * Separation of concerns:
+ * - app_preferences: Non-sensitive user choices (theme, language)
+ * - app_settings: Encrypted sensitive data (API keys, tokens)
+ */
+export const appSettings = pgTable('app_settings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  // Setting key (e.g., 'openai_api_key', 'anthropic_api_key')
+  key: varchar('key', { length: 255 }).notNull().unique(),
+
+  // Encrypted value (base64-encoded ciphertext + auth tag)
+  encryptedValue: text('encrypted_value').notNull(),
+
+  // Initialization vector for AES-256-GCM (base64-encoded, 12 bytes)
+  iv: text('iv').notNull(),
+
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  // Index for fast key lookups
+  keyIdx: index('idx_app_settings_key').on(table.key),
+}));
+
+// Type inference for TypeScript
+export type AppSetting = typeof appSettings.$inferSelect;
+export type NewAppSetting = typeof appSettings.$inferInsert;
+

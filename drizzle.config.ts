@@ -1,9 +1,9 @@
-import type { Config } from 'drizzle-kit';
+import { defineConfig } from 'drizzle-kit';
 
-export default {
+export default defineConfig({
   schema: './apps/api/src/db/schema.ts',
   out: './apps/api/src/db/migrations',
-  driver: 'pg',
+  dialect: 'postgresql',
   dbCredentials: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432'),
@@ -13,5 +13,5 @@ export default {
   },
   verbose: true,
   strict: true,
-} satisfies Config;
+});
 
