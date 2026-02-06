@@ -1,0 +1,33 @@
+name: arbor
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: arbor-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379" # Expose for local development and testing
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.redis.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.redis.entrypoints=redis"
+      - "traefik.tcp.services.redis.loadbalancer.server.port=6379"
+    networks:
+      - default
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  default:
+    name: api_default
+    driver: bridge
