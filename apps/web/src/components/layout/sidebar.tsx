@@ -135,11 +135,11 @@ export function Sidebar({ className, defaultCollapsed = false }: SidebarProps) {
       {/* Settings at bottom */}
       <div className="border-t p-2">
         <Link
-          href="/settings"
+          href="/settings/preferences"
           className={cn(
             'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
             'hover:bg-accent hover:text-accent-foreground',
-            pathname === '/settings' && 'bg-accent text-accent-foreground',
+            pathname.startsWith('/settings') && 'bg-accent text-accent-foreground',
             isCollapsed && 'justify-center px-2'
           )}
           title={isCollapsed ? t('settings') : undefined}
