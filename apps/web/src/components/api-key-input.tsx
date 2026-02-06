@@ -33,16 +33,30 @@ export function ApiKeyInput({
   const [localValue, setLocalValue] = React.useState(value);
   const [hasChanges, setHasChanges] = React.useState(false);
 
-  // Update local value when prop changes
+  // Store the initial value to compare against
+  const initialValueRef = React.useRef(value);
+  // Track if we're in the middle of user input
+  const isUserInputRef = React.useRef(false);
+
+  // Update local value when prop changes from external source (not from user input)
   React.useEffect(() => {
-    setLocalValue(value);
-    setHasChanges(false);
+    // Only update if this is not a user-initiated change
+    if (!isUserInputRef.current) {
+      setLocalValue(value);
+      initialValueRef.current = value;
+      setHasChanges(false);
+    }
+    // Reset the flag after processing
+    isUserInputRef.current = false;
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    // Mark that this is a user-initiated change
+    isUserInputRef.current = true;
     setLocalValue(newValue);
-    setHasChanges(newValue !== value);
+    // Compare against the initial value, not the current prop value
+    setHasChanges(newValue !== initialValueRef.current);
     onChange(newValue);
   };
 
