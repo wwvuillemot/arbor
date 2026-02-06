@@ -3,23 +3,24 @@ import path from 'path';
 
 export default defineConfig({
   test: {
-    name: 'web',
+    name: 'web-integration',
     root: __dirname,
     environment: 'jsdom',
     globals: true,
     setupFiles: [path.resolve(__dirname, './tests/setup.ts')],
-    include: [path.resolve(__dirname, './tests/**/*.test.{ts,tsx}')],
+    include: [path.resolve(__dirname, './tests/integration/**/*.test.{ts,tsx}')],
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       '**/.next/**',
-      // Exclude integration and e2e tests from unit test runs
-      '**/tests/integration/**',
-      '**/tests/e2e/**',
     ],
+    // Integration tests may take longer
+    testTimeout: 30000,
+    hookTimeout: 30000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
+      reportsDirectory: './coverage-integration',
       exclude: [
         'node_modules/',
         'tests/',
@@ -27,16 +28,14 @@ export default defineConfig({
         '**/*.config.*',
         '**/dist/**',
         '**/.next/**',
-        // Exclude generated files
-        'src/i18n/request.ts',
-        'src/middleware.ts', // Middleware is tested separately
       ],
-      // Unit test thresholds: 80% line and branch coverage
+      // Integration test thresholds: 50% line and branch coverage
+      // (lower due to higher runtime and maintenance costs)
       thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 80,
-        statements: 80,
+        lines: 50,
+        functions: 50,
+        branches: 50,
+        statements: 50,
       },
     },
   },

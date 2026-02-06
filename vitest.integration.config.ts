@@ -3,26 +3,21 @@ import path from 'path';
 
 export default defineConfig({
   test: {
-    name: 'api-unit',
+    name: 'api-integration',
     globals: true,
     environment: 'node',
     setupFiles: ['./tests/setup.ts'],
-    include: ['tests/**/*.test.ts'],
-    exclude: [
-      'apps/**',
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/.next/**',
-      // Exclude integration tests from unit test runs
-      'tests/integration/**',
-    ],
+    include: ['tests/integration/**/*.test.ts'],
+    exclude: ['apps/**', '**/node_modules/**', '**/dist/**', '**/.next/**'],
     // Run tests sequentially to avoid database conflicts
     pool: 'forks',
     fileParallelism: false,
+    testTimeout: 30000,
+    hookTimeout: 30000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
-      reportsDirectory: './coverage/api-unit',
+      reportsDirectory: './coverage/api-integration',
       exclude: [
         'node_modules/',
         'tests/',
@@ -30,16 +25,14 @@ export default defineConfig({
         '**/dist/**',
         '**/.next/**',
       ],
-      // Unit test thresholds: 80% line and branch coverage
+      // Integration test thresholds: 50% line and branch coverage
       thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 80,
-        statements: 80,
+        lines: 50,
+        functions: 50,
+        branches: 50,
+        statements: 50,
       },
     },
-    testTimeout: 10000,
-    hookTimeout: 10000,
   },
   resolve: {
     alias: {

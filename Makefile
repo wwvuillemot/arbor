@@ -230,9 +230,34 @@ test-watch:
 	@pnpm run test:watch
 
 test-coverage:
-	@echo "Running tests with coverage..."
-	@pnpm run test:coverage
-	@echo "Coverage report: ./coverage/index.html"
+	@echo "========================================="
+	@echo "   Running Tests with Coverage"
+	@echo "========================================="
+	@echo ""
+	@echo "📊 Unit Tests (Target: 80% line/branch)..."
+	@pnpm run test:coverage:unit
+	@echo ""
+	@echo "📊 Integration Tests (Target: 50% line/branch)..."
+	@pnpm run test:coverage:integration
+	@echo ""
+	@echo "========================================="
+	@echo "   ✅ Coverage reports generated!"
+	@echo "========================================="
+	@echo ""
+	@echo "Coverage reports:"
+	@echo "  API Unit:        ./coverage/api-unit/index.html"
+	@echo "  API Integration: ./coverage/api-integration/index.html"
+	@echo "  Web Unit:        ./apps/web/coverage/index.html"
+	@echo "  Web Integration: ./apps/web/coverage-integration/index.html"
+	@echo ""
+
+test-coverage-unit:
+	@echo "Running unit tests with coverage..."
+	@pnpm run test:coverage:unit
+
+test-coverage-integration:
+	@echo "Running integration tests with coverage..."
+	@pnpm run test:coverage:integration
 
 # Code Quality
 lint:
