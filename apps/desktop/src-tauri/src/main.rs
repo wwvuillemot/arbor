@@ -97,6 +97,7 @@ async fn check_services_status() -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_keyring::init())
         .manage(ServiceManager::new())
         .invoke_handler(tauri::generate_handler![
             start_services,
