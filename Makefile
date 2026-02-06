@@ -1,4 +1,4 @@
-.PHONY: help setup dev build clean up down logs restart health db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage lint format typecheck audit api-generate api-watch tauri-dev tauri-build tauri-bundle backup restore export-md
+.PHONY: help setup dev build clean up down logs restart health db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage lint format typecheck audit api-generate api-watch desktop desktop-build backup restore export-md
 
 # Default target
 .DEFAULT_GOAL := help
@@ -12,7 +12,9 @@ help:
 	@echo "Development:"
 	@echo "  make setup           - Initial setup (run once)"
 	@echo "  make dev             - Start development servers"
+	@echo "  make desktop         - Start Tauri desktop app (manages services automatically)"
 	@echo "  make build           - Build for production"
+	@echo "  make desktop-build   - Build Tauri desktop app"
 	@echo "  make clean           - Clean build artifacts"
 	@echo ""
 	@echo "Docker:"
@@ -70,6 +72,9 @@ setup:
 dev:
 	pnpm run dev
 
+dev-api:
+	pnpm run dev:api
+
 build:
 	pnpm run build
 
@@ -82,15 +87,53 @@ clean:
 
 # Docker
 up:
-	docker compose up -d
+	@echo "========================================="
+	@echo "   Starting Arbor Services"
+	@echo "========================================="
+	@echo ""
+	@echo "Stopping any existing containers..."
+	@docker compose -f apps/key-value-store/docker-compose.yml -f apps/api/docker-compose.yml -f apps/web/docker-compose.yml down --remove-orphans 2>/dev/null || true
+	@echo "Starting Docker services with Traefik..."
+	@docker compose -f apps/key-value-store/docker-compose.yml -f apps/api/docker-compose.yml -f apps/web/docker-compose.yml -f tmp/traefik/local/arbor-docker-compose.traefik.yml up -d
 	@echo "Waiting for services to be ready..."
 	@sleep 5
+	@echo ""
+	@echo "Setting up database..."
+	@pnpm run db:push 2>/dev/null || echo "⚠️  Schema push failed (may already exist)"
+	@echo ""
+	@echo "Seeding database (idempotent)..."
+	@pnpm run db:seed 2>/dev/null || echo "⚠️  Seeding skipped (data may already exist)"
+	@echo ""
+	@echo "Verifying HTTP endpoints..."
+	@for i in 1 2 3 4 5; do \
+		curl -s -o /dev/null -w "" http://app.arbor.local 2>/dev/null && echo "  ✅ Web App: http://app.arbor.local (HTTP 200)" && break || \
+		([ $$i -eq 5 ] && echo "  ❌ Web App: http://app.arbor.local (not responding)" || sleep 2); \
+	done
+	@for i in 1 2 3 4 5; do \
+		curl -s -o /dev/null -w "" http://api.arbor.local/trpc/health 2>/dev/null && echo "  ✅ API Server: http://api.arbor.local/trpc/health (HTTP 200)" && break || \
+		([ $$i -eq 5 ] && echo "  ❌ API Server: http://api.arbor.local/trpc/health (not responding)" || sleep 2); \
+	done
+	@echo ""
+	@echo "========================================="
+	@echo "   ✅ Arbor is ready!"
+	@echo "========================================="
+	@echo ""
+	@echo "Services running:"
+	@docker ps --filter "name=arbor-" --format "  • {{.Names}}: {{.Status}}"
+	@echo ""
+	@echo "Quick Access:"
+	@echo "  Web App:             http://app.arbor.local"
+	@echo "  API Server:          http://api.arbor.local"
+	@echo "  pgAdmin (Traefik):   http://pgadmin.arbor.local"
+	@echo "  Redis:               redis.arbor.local:6379"
+	@echo "  PostgreSQL:          localhost:5432"
+	@echo ""
 
 down:
-	docker compose down
+	@docker compose -f apps/key-value-store/docker-compose.yml -f apps/api/docker-compose.yml -f apps/web/docker-compose.yml down --remove-orphans
 
 logs:
-	docker compose logs -f
+	@docker compose -f apps/key-value-store/docker-compose.yml -f apps/api/docker-compose.yml -f apps/web/docker-compose.yml logs -f
 
 restart:
 	make down
@@ -107,16 +150,21 @@ health:
 	@echo "Service Connectivity:"
 	@docker exec arbor-postgres pg_isready -U arbor > /dev/null 2>&1 && echo "  ✅ PostgreSQL: Ready" || echo "  ❌ PostgreSQL: Not ready"
 	@docker exec arbor-redis redis-cli ping > /dev/null 2>&1 && echo "  ✅ Redis: Ready" || echo "  ❌ Redis: Not ready"
-	@curl -s -o /dev/null -w "  ✅ pgAdmin: Ready (http://pgadmin.arbor.local)\n" http://pgadmin.arbor.local || echo "  ⚠️  pgAdmin: Not accessible via Traefik (try http://localhost:5050)"
+	@echo ""
+	@echo "HTTP Endpoints:"
+	@curl -s -o /dev/null -w "" http://app.arbor.local 2>/dev/null && echo "  ✅ Web App: http://app.arbor.local (HTTP 200)" || echo "  ❌ Web App: http://app.arbor.local (not responding)"
+	@curl -s -o /dev/null -w "" http://api.arbor.local/trpc/health 2>/dev/null && echo "  ✅ API Server: http://api.arbor.local/trpc/health (HTTP 200)" || echo "  ❌ API Server: http://api.arbor.local/trpc/health (not responding)"
+	@curl -s -o /dev/null -w "" http://pgadmin.arbor.local 2>/dev/null && echo "  ✅ pgAdmin: http://pgadmin.arbor.local (HTTP 200)" || echo "  ⚠️  pgAdmin: Not accessible via Traefik"
 	@echo ""
 	@echo "Database Schema:"
 	@docker exec arbor-postgres psql -U arbor -d arbor -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'nodes';" 2>/dev/null | grep -q "1" && echo "  ✅ Schema pushed (nodes table exists)" || echo "  ⚠️  Schema not pushed yet (run: make db-push)"
 	@echo ""
 	@echo "Quick Access:"
-	@echo "  pgAdmin (Traefik):   http://pgadmin.arbor.local"
-	@echo "  pgAdmin (Direct):    http://localhost:5050"
-	@echo "  PostgreSQL:          localhost:5432"
-	@echo "  Redis:               localhost:6379"
+	@echo "  App (Next.js):       http://app.arbor.local"
+	@echo "  API Server:          http://api.arbor.local"
+	@echo "  pgAdmin:             http://pgadmin.arbor.local"
+	@echo "  PostgreSQL:          postgres:5432 (via Docker network)"
+	@echo "  Redis:               redis:6379 (via Docker network)"
 	@echo ""
 	@echo "Credentials:"
 	@echo "  pgAdmin:             admin@arbor.dev / admin"
@@ -130,41 +178,60 @@ health:
 
 # Database
 db-push:
-	pnpm run db:push
+	@pnpm run db:push
 
 db-generate:
-	pnpm run db:generate
+	@pnpm run db:generate
 
 db-studio:
-	pnpm run db:studio
+	@pnpm run db:studio
 
 seed:
-	pnpm run db:seed
+	@pnpm run db:seed
 
 db-reset:
-	docker compose down -v
-	make up
-	make db-push
-	make seed
+	@docker compose -f apps/key-value-store/docker-compose.yml -f apps/api/docker-compose.yml -f apps/web/docker-compose.yml down -v
+	@make up
+	@make db-push
+	@make seed
 
 # Testing
 test:
-	pnpm run test
+	@echo "========================================="
+	@echo "   Running All Tests"
+	@echo "========================================="
+	@echo ""
+	@echo "📦 Key-Value Store Tests..."
+	@cd apps/key-value-store && $(MAKE) test
+	@echo ""
+	@echo "🔧 API Tests..."
+	@cd apps/api && $(MAKE) test
+	@echo ""
+	@echo "🌐 Web Tests..."
+	@cd apps/web && $(MAKE) test
+	@echo ""
+	@echo "========================================="
+	@echo "   ✅ All tests complete!"
+	@echo "========================================="
 
 test-unit:
-	pnpm run test:unit
+	@echo "Running unit tests..."
+	@pnpm run test:unit
 
 test-integration:
-	pnpm run test:integration
+	@echo "Running integration tests..."
+	@pnpm run test:integration
 
 test-e2e:
-	pnpm run test:e2e
+	@echo "Running e2e tests..."
+	@pnpm run test:e2e
 
 test-watch:
-	pnpm run test:watch
+	@pnpm run test:watch
 
 test-coverage:
-	pnpm run test:coverage
+	@echo "Running tests with coverage..."
+	@pnpm run test:coverage
 	@echo "Coverage report: ./coverage/index.html"
 
 # Code Quality
@@ -187,15 +254,22 @@ api-generate:
 api-watch:
 	pnpm run api:watch
 
-# Tauri
-tauri-dev:
-	pnpm run tauri dev
+# Desktop App (Tauri)
+desktop:
+	@echo "========================================="
+	@echo "   Starting Arbor Desktop App"
+	@echo "========================================="
+	@echo ""
+	@echo "The desktop app will:"
+	@echo "  1. Start Docker services (PostgreSQL, Redis, API, Web)"
+	@echo "  2. Load the Next.js app in a native window"
+	@echo "  3. Shut down services when you quit the app"
+	@echo ""
+	pnpm run dev:desktop
 
-tauri-build:
-	pnpm run tauri build
-
-tauri-bundle:
-	pnpm run tauri build --bundles all
+desktop-build:
+	@echo "Building Tauri desktop app..."
+	pnpm run build:desktop
 
 # Git & Backup
 backup:

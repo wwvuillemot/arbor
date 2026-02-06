@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "jsx": "preserve",
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -21,9 +25,21 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@/server/*": ["./server/*"],
-      "@/tests/*": ["./tests/*"]
+      "@/*": [
+        "./apps/api/src/*"
+      ],
+      "@server": [
+        "./apps/api/src"
+      ],
+      "@server/*": [
+        "./apps/api/src/*"
+      ],
+      "@tests": [
+        "./tests"
+      ],
+      "@tests/*": [
+        "./tests/*"
+      ]
     }
   },
   "include": [
@@ -39,4 +55,3 @@
     ".next"
   ]
 }
-
