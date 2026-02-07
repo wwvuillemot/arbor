@@ -14,13 +14,13 @@ export interface LanguageSelectorProps {
 
 const languageOptions: Array<{
   value: Language;
-  label: string;
-  nativeLabel: string;
+  labelKey?: string; // Translation key for system option
+  nativeLabel?: string; // Native label for language options
   icon: typeof Languages;
 }> = [
-  { value: "system", label: "System", nativeLabel: "System", icon: Globe },
-  { value: "en", label: "English", nativeLabel: "English", icon: Languages },
-  { value: "ja", label: "Japanese", nativeLabel: "日本語", icon: Languages },
+  { value: "system", labelKey: "system", icon: Globe },
+  { value: "en", nativeLabel: "English", icon: Languages },
+  { value: "ja", nativeLabel: "日本語", icon: Languages },
 ];
 
 // Helper to detect browser language
@@ -32,6 +32,12 @@ function getBrowserLanguage(): "en" | "ja" {
   return "en";
 }
 
+// System label translations based on browser language
+const systemLabelByBrowserLanguage: Record<"en" | "ja", string> = {
+  en: "System",
+  ja: "システム",
+};
+
 export function LanguageSelector({ className }: LanguageSelectorProps) {
   const { getPreference, setPreference, isLoading } = useAppPreferences();
   const router = useRouter();
@@ -42,6 +48,14 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
 
   // The current language shown is based on the URL locale
   const language = languagePreference;
+
+  // Get browser language for translating "System" label
+  const [browserLanguage, setBrowserLanguage] = React.useState<"en" | "ja">(
+    "en",
+  );
+  React.useEffect(() => {
+    setBrowserLanguage(getBrowserLanguage());
+  }, []);
 
   const handleLanguageChange = React.useCallback(
     async (newLanguage: Language) => {
@@ -83,6 +97,10 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
       {languageOptions.map((option) => {
         const Icon = option.icon;
         const isSelected = language === option.value;
+        // Use browser language translation for "system", native label for languages
+        const label = option.labelKey
+          ? systemLabelByBrowserLanguage[browserLanguage]
+          : option.nativeLabel;
 
         return (
           <button
@@ -90,7 +108,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
             type="button"
             onClick={() => handleLanguageChange(option.value)}
             disabled={isLoading}
-            aria-label={`${option.label} language`}
+            aria-label={`${label} language`}
             aria-pressed={isSelected}
             className={cn(
               "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all whitespace-nowrap",
@@ -102,7 +120,7 @@ export function LanguageSelector({ className }: LanguageSelectorProps) {
             )}
           >
             <Icon className="h-4 w-4" />
-            <span>{option.nativeLabel}</span>
+            <span>{label}</span>
           </button>
         );
       })}

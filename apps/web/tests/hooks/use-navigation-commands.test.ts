@@ -17,30 +17,48 @@ vi.mock("next-intl", () => ({
     const translations: Record<string, string> = {
       "dashboard.label": "Go to Dashboard",
       "dashboard.description": "Navigate to the dashboard",
-      "dashboard.keywords.0": "home",
-      "dashboard.keywords.1": "main",
       "search.label": "Search",
       "search.description": "Search for content",
-      "search.keywords.0": "find",
-      "search.keywords.1": "lookup",
       "projects.label": "Projects",
       "projects.description": "View all projects",
-      "projects.keywords.0": "folders",
-      "projects.keywords.1": "files",
-      "projects.keywords.2": "workspace",
       "chat.label": "Chat",
       "chat.description": "Open chat interface",
-      "chat.keywords.0": "conversation",
-      "chat.keywords.1": "ai",
-      "chat.keywords.2": "assistant",
       "settings.label": "Settings",
       "settings.description": "Open settings",
-      "settings.keywords.0": "preferences",
-      "settings.keywords.1": "config",
-      "settings.keywords.2": "options",
     };
     return translations[key] || key;
   },
+  useMessages: () => ({
+    commands: {
+      navigation: {
+        dashboard: {
+          label: "Go to Dashboard",
+          description: "Navigate to the dashboard",
+          keywords: ["home", "overview"],
+        },
+        search: {
+          label: "Search",
+          description: "Search for content",
+          keywords: ["find", "lookup"],
+        },
+        projects: {
+          label: "Projects",
+          description: "View all projects",
+          keywords: ["folders", "files", "projects"],
+        },
+        chat: {
+          label: "Chat",
+          description: "Open chat interface",
+          keywords: ["ai", "assistant", "help"],
+        },
+        settings: {
+          label: "Settings",
+          description: "Open settings",
+          keywords: ["preferences", "config", "options"],
+        },
+      },
+    },
+  }),
 }));
 
 describe("useNavigationCommands", () => {
@@ -144,5 +162,41 @@ describe("useNavigationCommands", () => {
     unmount();
 
     expect(commandRegistry.getCommands().length).toBe(0);
+  });
+
+  it("should load keywords from array-based translations without infinite loop", () => {
+    // This test will fail with the current implementation because getKeywords()
+    // tries to access keywords.0, keywords.1, etc., but the translations use
+    // arrays: "keywords": ["home", "overview"]
+    // This causes an infinite loop because t("dashboard.keywords.0") returns
+    // "dashboard.keywords.0" (the key path), not the actual keyword
+
+    // Set a timeout to prevent the test from hanging forever
+    const timeout = setTimeout(() => {
+      throw new Error("Test timed out - infinite loop detected in getKeywords()");
+    }, 1000);
+
+    try {
+      renderHook(() => useNavigationCommands());
+
+      const dashboardCommand = commandRegistry
+        .getCommands()
+        .find((cmd) => cmd.id === "nav-dashboard");
+
+      expect(dashboardCommand).toBeDefined();
+      expect(dashboardCommand?.keywords).toEqual(["home", "overview"]);
+
+      const projectsCommand = commandRegistry
+        .getCommands()
+        .find((cmd) => cmd.id === "nav-projects");
+
+      expect(projectsCommand).toBeDefined();
+      expect(projectsCommand?.keywords).toEqual(["folders", "files", "projects"]);
+
+      clearTimeout(timeout);
+    } catch (error) {
+      clearTimeout(timeout);
+      throw error;
+    }
   });
 });

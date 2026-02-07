@@ -14,7 +14,12 @@ export function useAppPreferences() {
 
   // Get all app preferences
   const { data: preferences, isLoading } =
-    trpc.preferences.getAllAppPreferences.useQuery();
+    trpc.preferences.getAllAppPreferences.useQuery(undefined, {
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    });
 
   // Set a single preference
   const setPreferenceMutation = trpc.preferences.setAppPreference.useMutation({

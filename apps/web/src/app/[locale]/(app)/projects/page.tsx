@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Plus, FolderTree, Pencil, Trash2, X } from "lucide-react";
+import { Plus, FolderTree, Pencil, Trash2, X, Check } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { useCurrentProject } from "@/hooks/use-current-project";
 
 export default function ProjectsPage() {
   const t = useTranslations("projects");
@@ -19,8 +20,16 @@ export default function ProjectsPage() {
   } | null>(null);
   const [projectName, setProjectName] = React.useState("");
 
+  // Current project selection
+  const { currentProjectId, setCurrentProject } = useCurrentProject();
+
   // Queries
-  const projectsQuery = trpc.nodes.getAllProjects.useQuery();
+  const projectsQuery = trpc.nodes.getAllProjects.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   // Mutations
   const createMutation = trpc.nodes.create.useMutation({
@@ -41,7 +50,11 @@ export default function ProjectsPage() {
   });
 
   const deleteMutation = trpc.nodes.delete.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      // If we deleted the currently selected project, clear the selection
+      if (selectedProject && selectedProject.id === currentProjectId) {
+        await setCurrentProject(null);
+      }
       projectsQuery.refetch();
       setDeleteDialogOpen(false);
       setSelectedProject(null);
@@ -114,55 +127,72 @@ export default function ProjectsPage() {
         </div>
       ) : projectsQuery.data && projectsQuery.data.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projectsQuery.data.map((project) => (
-            <div
-              key={project.id}
-              className={cn(
-                "group relative rounded-lg border bg-card p-6 hover:shadow-md transition-shadow",
-              )}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <FolderTree className="h-8 w-8 text-primary flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-lg truncate">
-                      {project.name}
-                    </h3>
+          {projectsQuery.data.map((project) => {
+            const isSelected = currentProjectId === project.id;
+            return (
+              <div
+                key={project.id}
+                onClick={() => setCurrentProject(project.id)}
+                className={cn(
+                  "group relative rounded-lg border bg-card p-6 hover:shadow-md transition-shadow cursor-pointer",
+                  isSelected &&
+                  "border-green-500 bg-green-50 dark:bg-green-950",
+                )}
+              >
+                {/* Checkmark in upper-right corner */}
+                {isSelected && (
+                  <div className="absolute top-3 right-3">
+                    <div className="rounded-full bg-green-500 p-1">
+                      <Check className="h-4 w-4 text-white" />
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <FolderTree className="h-8 w-8 text-primary flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-lg truncate">
+                        {project.name}
+                      </h3>
+                    </div>
                   </div>
                 </div>
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEditDialog({ id: project.id, name: project.name });
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
+                      "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "transition-colors",
+                    )}
+                  >
+                    <Pencil className="h-3 w-3" />
+                    {tCommon("edit")}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDeleteDialog({ id: project.id, name: project.name });
+                    }}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
+                      "border border-input bg-background hover:bg-destructive hover:text-destructive-foreground",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "transition-colors",
+                    )}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {tCommon("delete")}
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() =>
-                    openEditDialog({ id: project.id, name: project.name })
-                  }
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
-                    "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    "transition-colors",
-                  )}
-                >
-                  <Pencil className="h-3 w-3" />
-                  {tCommon("edit")}
-                </button>
-                <button
-                  onClick={() =>
-                    openDeleteDialog({ id: project.id, name: project.name })
-                  }
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
-                    "border border-input bg-background hover:bg-destructive hover:text-destructive-foreground",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    "transition-colors",
-                  )}
-                >
-                  <Trash2 className="h-3 w-3" />
-                  {tCommon("delete")}
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="text-center py-12">

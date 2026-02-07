@@ -33,7 +33,8 @@
     },
     "language": {
       "label": "言語",
-      "description": "Arborインターフェースの優先言語を選択します。"
+      "description": "Arborインターフェースの優先言語を選択します。",
+      "system": "システム"
     },
     "integrations": "統合",
     "apiKeys": {
@@ -203,6 +204,8 @@
     "createProject": "プロジェクトを作成",
     "noProjects": "プロジェクトがありません",
     "noProjectsDescription": "最初のプロジェクトを作成して始めましょう。",
+    "selectProject": "プロジェクトを選択",
+    "noProjectSelected": "プロジェクトが選択されていません",
     "projectName": "プロジェクト名",
     "projectNamePlaceholder": "新しいプロジェクト",
     "createDialog": {

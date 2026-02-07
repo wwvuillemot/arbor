@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useMessages } from "next-intl";
 import {
   Search,
   LayoutDashboard,
@@ -15,8 +15,35 @@ import { commandRegistry } from "@/lib/command-registry";
 export function useNavigationCommands() {
   const router = useRouter();
   const t = useTranslations("commands.navigation");
+  const messages = useMessages() as Record<string, unknown>;
 
   React.useEffect(() => {
+    // Helper to safely get keywords array from messages
+    const getKeywords = (path: string): string[] => {
+      try {
+        // Navigate through the messages object to get the keywords array
+        const parts = `commands.navigation.${path}.keywords`.split(".");
+        let current: unknown = messages;
+
+        for (const part of parts) {
+          if (current && typeof current === "object" && part in current) {
+            current = (current as Record<string, unknown>)[part];
+          } else {
+            return [];
+          }
+        }
+
+        // If we found an array, return it
+        if (Array.isArray(current)) {
+          return current;
+        }
+
+        return [];
+      } catch {
+        return [];
+      }
+    };
+
     const unregister = commandRegistry.registerMany([
       {
         id: "nav-dashboard",
@@ -24,7 +51,7 @@ export function useNavigationCommands() {
         description: t("dashboard.description"),
         icon: LayoutDashboard,
         group: "navigation",
-        keywords: [t("dashboard.keywords.0"), t("dashboard.keywords.1")],
+        keywords: getKeywords("dashboard"),
         shortcut: ["g", "d"],
         action: () => router.push("/dashboard"),
       },
@@ -34,7 +61,7 @@ export function useNavigationCommands() {
         description: t("search.description"),
         icon: Search,
         group: "navigation",
-        keywords: [t("search.keywords.0"), t("search.keywords.1")],
+        keywords: getKeywords("search"),
         shortcut: ["g", "s"],
         action: () => router.push("/search"),
       },
@@ -44,11 +71,7 @@ export function useNavigationCommands() {
         description: t("projects.description"),
         icon: FolderTree,
         group: "navigation",
-        keywords: [
-          t("projects.keywords.0"),
-          t("projects.keywords.1"),
-          t("projects.keywords.2"),
-        ],
+        keywords: getKeywords("projects"),
         shortcut: ["g", "p"],
         action: () => router.push("/projects"),
       },
@@ -58,11 +81,7 @@ export function useNavigationCommands() {
         description: t("chat.description"),
         icon: MessageSquare,
         group: "navigation",
-        keywords: [
-          t("chat.keywords.0"),
-          t("chat.keywords.1"),
-          t("chat.keywords.2"),
-        ],
+        keywords: getKeywords("chat"),
         shortcut: ["g", "c"],
         action: () => router.push("/chat"),
       },
@@ -72,16 +91,12 @@ export function useNavigationCommands() {
         description: t("settings.description"),
         icon: Settings,
         group: "settings",
-        keywords: [
-          t("settings.keywords.0"),
-          t("settings.keywords.1"),
-          t("settings.keywords.2"),
-        ],
+        keywords: getKeywords("settings"),
         shortcut: ["g", ","],
         action: () => router.push("/settings"),
       },
     ]);
 
     return unregister;
-  }, [router, t]);
+  }, [router, t, messages]);
 }

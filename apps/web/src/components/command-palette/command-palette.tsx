@@ -18,6 +18,7 @@ export interface CommandPaletteProps {
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const [search, setSearch] = React.useState("");
   const [commands, setCommands] = React.useState<CommandType[]>([]);
+  const [pendingKey, setPendingKey] = React.useState<string | null>(null);
   const t = useTranslations("commandPalette");
 
   // Subscribe to command registry changes
@@ -73,15 +74,61 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   // Handle keyboard shortcuts
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      // CMD-K or CTRL-K to toggle
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         onOpenChange(!open);
+        return;
+      }
+      // ESC to close
+      if (e.key === "Escape" && open) {
+        e.preventDefault();
+        onOpenChange(false);
+        return;
+      }
+
+      // Don't handle shortcuts when typing in an input
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      // Handle two-key shortcuts (e.g., "g d" for dashboard)
+      if (pendingKey) {
+        // We have a pending key, check if this completes a shortcut
+        const shortcut = [pendingKey, e.key.toLowerCase()];
+        const command = commands.find(
+          (cmd) =>
+            cmd.shortcut &&
+            cmd.shortcut.length === 2 &&
+            cmd.shortcut[0] === shortcut[0] &&
+            cmd.shortcut[1] === shortcut[1],
+        );
+
+        if (command) {
+          e.preventDefault();
+          command.action();
+        }
+
+        // Clear pending key
+        setPendingKey(null);
+      } else if (e.key.toLowerCase() === "g") {
+        // Start of a two-key shortcut
+        e.preventDefault();
+        setPendingKey("g");
+
+        // Clear pending key after 1 second if no second key is pressed
+        setTimeout(() => setPendingKey(null), 1000);
       }
     };
 
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, pendingKey, commands]);
 
   if (!open) return null;
 

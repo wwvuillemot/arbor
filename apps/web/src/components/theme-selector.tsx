@@ -15,9 +15,9 @@ const themeOptions: Array<{
   labelKey: string;
   icon: React.ElementType;
 }> = [
+  { value: "system", labelKey: "system", icon: Monitor },
   { value: "light", labelKey: "light", icon: Sun },
   { value: "dark", labelKey: "dark", icon: Moon },
-  { value: "system", labelKey: "system", icon: Monitor },
 ];
 
 export function ThemeSelector({ className }: ThemeSelectorProps) {

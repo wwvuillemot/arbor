@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCommandPalette } from "@/hooks/use-command-palette";
+import { ProjectSelector } from "@/components/project-selector";
 
 export interface SidebarItem {
   id: string;
@@ -133,6 +134,11 @@ export function Sidebar({ className, defaultCollapsed = false }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* Project Selector */}
+      <div className="border-t p-2">
+        <ProjectSelector isCollapsed={isCollapsed} />
+      </div>
 
       {/* Settings at bottom */}
       <div className="border-t p-2">

@@ -94,7 +94,7 @@ describe("LanguageSelector", () => {
     render(<LanguageSelector />);
 
     const japaneseButton = screen.getByRole("button", {
-      name: /japanese language/i,
+      name: /日本語 language/i,
     });
     expect(japaneseButton).toHaveAttribute("aria-pressed", "true");
   });
@@ -103,7 +103,7 @@ describe("LanguageSelector", () => {
     render(<LanguageSelector />);
 
     const japaneseButton = screen.getByRole("button", {
-      name: /japanese language/i,
+      name: /日本語 language/i,
     });
     fireEvent.click(japaneseButton);
 
@@ -151,7 +151,7 @@ describe("LanguageSelector", () => {
       name: /english language/i,
     });
     const japaneseButton = screen.getByRole("button", {
-      name: /japanese language/i,
+      name: /日本語 language/i,
     });
 
     expect(englishButton).toBeDisabled();
@@ -165,7 +165,7 @@ describe("LanguageSelector", () => {
       screen.getByRole("button", { name: /english language/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /japanese language/i }),
+      screen.getByRole("button", { name: /日本語 language/i }),
     ).toBeInTheDocument();
   });
 
