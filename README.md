@@ -1,166 +1,101 @@
 # Arbor
 
-> A local-first, AI-powered writing assistant for organizing and enhancing your creative writing projects.
+> A local-first, AI-powered writing assistant with hierarchical node-based organization.
 
 ## Quick Start
 
 ```bash
-# One-command setup (installs dependencies, starts services, sets up database)
+# Initial setup (run once)
 make setup
 
 # Start development
 make dev
 
-# View all available commands
+# Run all quality checks (format → lint → test → coverage)
+make preflight
+
+# View all commands
 make help
 ```
 
 ## What is Arbor?
 
-Arbor helps you organize multiple writing projects with a flexible, hierarchical structure:
+Arbor organizes writing projects with a flexible, hierarchical structure:
 
 ```
-Project: "My Fantasy Novel"
-├── Folder: "Characters"
-│   ├── Note: "Protagonist: Aria"
-│   └── Note: "Antagonist: Lord Malachar"
-├── Folder: "World Building"
-│   └── Note: "Magic System"
-└── Folder: "Chapters"
-    ├── Note: "Chapter 1: The Awakening"
-    └── Note: "Chapter 2: First Lessons"
+Project → Folder → Folder (nested) → Note/File
 ```
 
-Perfect for:
+Perfect for novels, RPG campaigns, story collections, and general writing.
 
-- 📚 **Novels & Stories** - Organize characters, plots, and chapters
-- 🎲 **RPG Campaigns** - Track session notes, NPCs, and locations
-- ✍️ **Short Story Collections** - Manage multiple stories and ideas
-- 📝 **General Writing** - Any hierarchical note-taking needs
+## Key Features
 
-## Features
+- **Node-based data model**: Single `nodes` table with self-referential hierarchy
+- **Local-first**: All data stored locally, no cloud dependency
+- **Desktop app**: Tauri v2 wrapper manages services automatically
+- **AI-powered**: Writing assistance and semantic search (coming soon)
+- **Type-safe**: End-to-end TypeScript with tRPC
 
-- **Project-Based Organization**: Top-level projects contain folders and notes
-- **Flexible Hierarchy**: Nest folders infinitely to match your workflow
-- **Markdown Support**: Write in Markdown with full formatting
-- **AI Assistance**: Get writing suggestions and improvements (coming soon)
-- **Semantic Search**: Find notes using vector embeddings (coming soon)
-- **Local-First**: All data stored locally, no cloud dependency
-- **Git Integration**: Built-in backup and versioning
-
-## Development Commands
-
-All development tasks use `make` - never use raw `pnpm` or `npm` commands directly.
-
-### Essential Commands
+## Essential Commands
 
 ```bash
-make setup          # Initial setup (run once)
-make dev            # Start development servers
+# Development
+make dev            # Start all services
+make desktop        # Run desktop app
+
+# Database
+make db-push        # Push schema changes
+make db-studio      # Open Drizzle Studio
+make seed           # Add example data
+
+# Quality
+make preflight      # Run format → lint → test → coverage
+make test           # Run all tests
+make coverage       # Generate coverage report
+
+# Services
 make up             # Start Docker services
 make down           # Stop Docker services
-make help           # Show all available commands
 ```
 
-### Database Commands
-
-```bash
-make db-push        # Push schema to database
-make db-studio      # Open database GUI
-make seed           # Add example projects
-make db-reset       # Reset database (⚠️  destroys data)
-```
-
-### Testing Commands
-
-```bash
-make test           # Run all tests
-make test-unit      # Run unit tests
-make test-watch     # Run tests in watch mode
-make test-coverage  # Generate coverage report
-```
-
-### Code Quality
-
-```bash
-make lint           # Lint code
-make format         # Format code
-make typecheck      # Type checking
-make audit          # Security audit
-```
-
-## Quick Access
-
-Once services are running:
-
-- **pgAdmin**: http://localhost:5050
-  - Email: `admin@arbor.dev`
-  - Password: `admin`
-- **PostgreSQL**: `localhost:5432`
-  - User: `arbor`
-  - Password: `local_dev_only`
-- **Redis**: `localhost:6379`
+Run `make help` for all available commands.
 
 ## Project Structure
 
 ```
 arbor/
-├── src/                    # Next.js frontend
-│   ├── app/               # App router pages
-│   ├── components/        # React components
-│   └── lib/               # Utilities and API client
-├── server/                # Backend
-│   ├── api/              # API routes
-│   ├── db/               # Database schema and migrations
-│   └── agents/           # AI agents
-├── src-tauri/            # Tauri desktop wrapper
-├── tests/                # Test suites
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
-├── docker-compose.yml    # Docker services
-├── Makefile              # All development commands
-└── package.json          # Dependencies
+├── apps/
+│   ├── api/                # Backend (Fastify + tRPC)
+│   ├── desktop/            # Tauri desktop app
+│   ├── key-value-store/    # Redis service
+│   └── web/                # Next.js frontend
+├── docs/                   # Documentation
+├── tests/                  # Root-level tests
+├── Makefile                # All commands
+└── package.json            # Root dependencies
 ```
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
-- **Backend**: Node.js, TypeScript, Fastify, tRPC
-- **Database**: PostgreSQL 16 + pgvector
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: Fastify, tRPC, Node.js 20+
+- **Database**: PostgreSQL 16 + pgvector, Drizzle ORM
+- **Cache**: Redis 7
 - **Desktop**: Tauri v2 (Rust)
-- **Testing**: Vitest, Playwright
-- **ORM**: Drizzle
-- **Package Manager**: pnpm 8+
+- **Testing**: Vitest, Testing Library
+- **Package Manager**: pnpm 9+
 
 ## Documentation
 
-- [Quick Start Guide](app/docs/QUICK_START.md) - Detailed setup instructions
-- [Project Summary](app/docs/PROJECT_SUMMARY.md) - Executive overview
-- [Full Specification](app/docs/ARBOR_SPEC.md) - Complete technical spec
-- [Traefik Setup](TRAEFIK.md) - Local domain configuration
+See [`docs/README.md`](docs/README.md) for links to app-specific documentation.
 
-## Development Workflow
+## Development Principles
 
-1. **Start services**: `make up`
-2. **Push database schema**: `make db-push`
-3. **Seed example data**: `make seed`
-4. **Start development**: `make dev`
-5. **Run tests**: `make test`
-
-## Contributing
-
-This project follows Test-Driven Development (TDD):
-
-1. Write tests first
-2. Implement features to pass tests
-3. Maintain 80%+ code coverage
-4. All commands via `make` (never raw pnpm/npm)
+- **TDD**: Write tests first, maintain high coverage
+- **Makefile-driven**: All commands via `make`, never raw pnpm/npm
+- **Type-safe**: End-to-end TypeScript with tRPC
+- **Monorepo**: Apps isolated under `apps/` with shared packages
 
 ## License
 
 MIT
-
-## Support
-
-For issues, questions, or contributions, please see the documentation in `app/docs/`.
