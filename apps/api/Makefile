@@ -50,6 +50,7 @@ test:
 
 coverage:
 	@echo "Running API tests with coverage in container..."
+	@docker exec arbor-api rm -rf coverage
 	@docker exec arbor-api pnpm run test:unit --coverage
 	@docker exec arbor-api pnpm run test:integration --coverage || echo "⚠️  No integration tests configured yet"
 

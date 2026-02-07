@@ -30,6 +30,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     return commandRegistry.subscribe(updateCommands);
   }, []);
 
+  // Auto-focus input when dialog opens
+  React.useEffect(() => {
+    if (open) {
+      // Use requestAnimationFrame to ensure the dialog is fully rendered
+      requestAnimationFrame(() => {
+        const input = document.querySelector(
+          "[cmdk-input]",
+        ) as HTMLInputElement;
+        if (input) {
+          input.focus();
+        }
+      });
+    }
+  }, [open]);
+
   // Filter commands based on search
   const filteredCommands = React.useMemo(() => {
     if (!search) return commands;

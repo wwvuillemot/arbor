@@ -22,10 +22,12 @@ export function useSessionPreferences(sessionId: string) {
     trpc.preferences.setSessionPreference.useMutation({
       onSuccess: (_, variables) => {
         // Update local cache immediately for optimistic UI
-        setSessionCache((prev) => ({
-          ...prev,
-          [variables.key]: variables.value,
-        }));
+        if (variables) {
+          setSessionCache((prev) => ({
+            ...prev,
+            [variables.key]: variables.value,
+          }));
+        }
       },
     });
 
@@ -34,10 +36,12 @@ export function useSessionPreferences(sessionId: string) {
     trpc.preferences.setSessionPreferences.useMutation({
       onSuccess: (_, variables) => {
         // Update local cache immediately for optimistic UI
-        setSessionCache((prev) => ({
-          ...prev,
-          ...variables.preferences,
-        }));
+        if (variables && variables.preferences) {
+          setSessionCache((prev) => ({
+            ...prev,
+            ...variables.preferences,
+          }));
+        }
       },
     });
 
@@ -46,11 +50,13 @@ export function useSessionPreferences(sessionId: string) {
     trpc.preferences.deleteSessionPreference.useMutation({
       onSuccess: (_, variables) => {
         // Remove from local cache
-        setSessionCache((prev) => {
-          const newCache = { ...prev };
-          delete newCache[variables.key];
-          return newCache;
-        });
+        if (variables) {
+          setSessionCache((prev) => {
+            const newCache = { ...prev };
+            delete newCache[variables.key];
+            return newCache;
+          });
+        }
       },
     });
 
@@ -87,9 +93,10 @@ export function useSessionPreferences(sessionId: string) {
   );
 
   // Helper to fetch a preference from the server (if not in cache)
+  const utils = trpc.useUtils();
   const fetchPreference = React.useCallback(
     async (key: string) => {
-      const result = await trpc.preferences.getSessionPreference.query({
+      const result = await utils.preferences.getSessionPreference.fetch({
         sessionId,
         key,
       });
@@ -101,7 +108,7 @@ export function useSessionPreferences(sessionId: string) {
       }
       return result.value;
     },
-    [sessionId],
+    [sessionId, utils],
   );
 
   return {

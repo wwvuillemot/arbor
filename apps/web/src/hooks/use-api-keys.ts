@@ -20,9 +20,23 @@ export function useApiKeys() {
       try {
         // Check if we're in Tauri environment
         if (typeof window !== "undefined" && "__TAURI__" in window) {
-          const { invoke } = await import("@tauri-apps/api/core");
-          const key = await invoke<string>("get_or_generate_master_key");
-          setMasterKey(key);
+          try {
+            // Dynamic import to avoid build-time errors when Tauri is not available
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const tauri = (window as any).__TAURI__;
+            if (tauri && tauri.core && tauri.core.invoke) {
+              const key = (await tauri.core.invoke(
+                "get_or_generate_master_key",
+              )) as string;
+              setMasterKey(key);
+            } else {
+              throw new Error("Tauri invoke not available");
+            }
+          } catch (importError) {
+            // Tauri API not available (e.g., in web-only build)
+            console.warn("Tauri API not available:", importError);
+            setMasterKey("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=");
+          }
         } else {
           // Development mode: use a test key
           console.warn("Not in Tauri environment, using test master key");

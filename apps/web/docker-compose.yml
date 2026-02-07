@@ -1,18 +1,7 @@
 name: arbor
 
-services:
-  app:
-    build:
-      context: ../..
-      dockerfile: apps/web/Dockerfile
-    image: arbor-app:latest
-    container_name: arbor-app
-    environment:
-      NEXT_PUBLIC_API_URL: http://api.arbor.local
-    volumes:
-      - ../..:/app
-      - /app/.next
-    restart: unless-stopped
+# Web app runs on host machine for hot-reload
+# Start with: cd apps/web && pnpm run dev
 
 networks:
   default:

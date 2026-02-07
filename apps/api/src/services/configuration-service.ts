@@ -64,7 +64,6 @@ export class ConfigurationService {
         .update(userPreferences)
         .set({
           value,
-          updatedAt: new Date(),
         })
         .where(eq(userPreferences.key, dbKey));
     } else {

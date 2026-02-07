@@ -12,9 +12,11 @@ import {
   FolderTree,
   MessageSquare,
   Settings,
+  Command,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useCommandPalette } from "@/hooks/use-command-palette";
 
 export interface SidebarItem {
   id: string;

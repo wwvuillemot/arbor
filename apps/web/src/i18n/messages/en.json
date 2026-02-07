@@ -10,6 +10,7 @@
     "search": "Search",
     "chat": "Chat",
     "settings": "Settings",
+    "commandPalette": "Command Palette",
     "collapseLabel": "Collapse sidebar",
     "expandLabel": "Expand sidebar"
   },
@@ -88,7 +89,91 @@
   },
   "commandPalette": {
     "placeholder": "Type a command or search...",
-    "noResults": "No results found"
+    "noResults": "No results found",
+    "groups": {
+      "navigation": "Navigation",
+      "actions": "Actions",
+      "settings": "Settings",
+      "help": "Help"
+    }
+  },
+  "commands": {
+    "navigation": {
+      "dashboard": {
+        "label": "Go to Dashboard",
+        "description": "View your dashboard",
+        "keywords": ["home", "overview"]
+      },
+      "search": {
+        "label": "Go to Search",
+        "description": "Search your content",
+        "keywords": ["find", "lookup"]
+      },
+      "projects": {
+        "label": "Go to Projects",
+        "description": "Browse your projects",
+        "keywords": ["folders", "files"]
+      },
+      "chat": {
+        "label": "Go to AI Chat",
+        "description": "Chat with AI assistant",
+        "keywords": ["ai", "assistant", "help"]
+      },
+      "settings": {
+        "label": "Go to Settings",
+        "description": "Configure your preferences",
+        "keywords": ["preferences", "config"]
+      }
+    },
+    "help": {
+      "about": {
+        "label": "About Arbor",
+        "description": "View information about Arbor",
+        "keywords": ["about", "info", "version"]
+      }
+    }
+  },
+  "about": {
+    "title": "About Arbor",
+    "description": "A local-first, AI-powered writing assistant with hierarchical node-based data model.",
+    "version": "Version",
+    "license": "License",
+    "github": "View on GitHub",
+    "techStack": "Tech Stack",
+    "footer": "Made with ❤️ for creative writers",
+    "close": "Close"
+  },
+  "setup": {
+    "title": "Setting up Arbor",
+    "coldStart": {
+      "title": "Welcome to Arbor",
+      "description": "Let's get everything set up for you.",
+      "steps": {
+        "checkingDocker": "Checking Docker installation...",
+        "startingServices": "Starting services...",
+        "initializingDatabase": "Initializing database...",
+        "seedingData": "Seeding initial data...",
+        "generatingKeys": "Generating encryption keys...",
+        "complete": "Setup complete!"
+      }
+    },
+    "warmStart": {
+      "title": "Starting Arbor",
+      "description": "Checking services and preparing your workspace.",
+      "steps": {
+        "checkingServices": "Checking services...",
+        "verifyingDatabase": "Verifying database connection...",
+        "verifyingRedis": "Verifying Redis connection...",
+        "checkingKeys": "Checking encryption keys...",
+        "ready": "Ready!"
+      }
+    },
+    "error": {
+      "title": "Setup Error",
+      "description": "Something went wrong during setup.",
+      "retry": "Retry",
+      "viewLogs": "View Logs"
+    }
   },
   "common": {
     "loading": "Loading...",
@@ -99,5 +184,49 @@
     "edit": "Edit",
     "create": "Create",
     "close": "Close"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "description": "Welcome to your Arbor dashboard. This is where you'll see an overview of your projects, recent activity, and quick actions."
+  },
+  "chat": {
+    "title": "AI Chat",
+    "description": "Chat with AI to brainstorm ideas, get writing suggestions, and collaborate on your content."
+  },
+  "search": {
+    "title": "Search",
+    "description": "Search across all your notes, projects, and content."
+  },
+  "projects": {
+    "title": "Projects",
+    "description": "Browse and manage your writing projects. Each project can contain folders and notes in a hierarchical structure.",
+    "createProject": "Create Project",
+    "noProjects": "No projects yet",
+    "noProjectsDescription": "Get started by creating your first project.",
+    "projectName": "Project Name",
+    "projectNamePlaceholder": "My New Project",
+    "createDialog": {
+      "title": "Create New Project",
+      "description": "Create a new writing project to organize your work.",
+      "name": "Project Name",
+      "namePlaceholder": "My Novel",
+      "creating": "Creating...",
+      "create": "Create Project"
+    },
+    "editDialog": {
+      "title": "Edit Project",
+      "description": "Update your project details.",
+      "name": "Project Name",
+      "saving": "Saving...",
+      "save": "Save Changes"
+    },
+    "deleteDialog": {
+      "title": "Delete Project",
+      "description": "Are you sure you want to delete this project? This action cannot be undone.",
+      "deleting": "Deleting...",
+      "delete": "Delete Project"
+    },
+    "lastModified": "Last modified",
+    "items": "items"
   }
 }

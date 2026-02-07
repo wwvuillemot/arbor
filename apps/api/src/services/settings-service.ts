@@ -55,7 +55,6 @@ export class SettingsService {
         .set({
           encryptedValue,
           iv,
-          updatedAt: new Date(),
         })
         .where(eq(appSettings.key, key));
     } else {

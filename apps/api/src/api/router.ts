@@ -3,6 +3,7 @@ import { nodesRouter } from "./routers/nodes";
 import { preferencesRouter } from "./routers/preferences";
 import { settingsRouter } from "./routers/settings";
 import { configurationRouter } from "./routers/configuration";
+import { setupRouter } from "./routers/setup";
 
 /**
  * Main application router
@@ -13,6 +14,7 @@ export const appRouter = router({
   preferences: preferencesRouter,
   settings: settingsRouter,
   configuration: configurationRouter,
+  setup: setupRouter,
 
   // Health check endpoint
   health: publicProcedure.query(() => ({

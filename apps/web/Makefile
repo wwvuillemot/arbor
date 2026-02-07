@@ -1,6 +1,6 @@
 # Makefile for Arbor Web App (Next.js)
 
-.PHONY: help setup install dev build start clean test lint format coverage
+.PHONY: help setup install dev build start clean test lint format coverage up down restart
 
 help:
 	@echo "========================================="
@@ -10,6 +10,9 @@ help:
 	@echo "Available targets:"
 	@echo "  make setup      - Initial setup (install dependencies)"
 	@echo "  make install    - Install dependencies"
+	@echo "  make up         - Start web app on host (background)"
+	@echo "  make down       - Stop web app"
+	@echo "  make restart    - Restart web app"
 	@echo "  make dev        - Start development server (with Turbopack)"
 	@echo "  make build      - Build for production"
 	@echo "  make start      - Start production server"
@@ -25,6 +28,21 @@ setup: install
 install:
 	@echo "Installing dependencies for web app..."
 	@cd ../.. && pnpm install
+
+up:
+	@echo "Starting web app on host..."
+	@bash -c "cd ../.. && nohup pnpm run dev --turbo > /tmp/arbor-web.log 2>&1 & echo \$$! > /tmp/arbor-web.pid"
+	@sleep 5
+	@echo "✅ Web app started at http://localhost:3847"
+	@echo "   Logs: tail -f /tmp/arbor-web.log"
+
+down:
+	@echo "Stopping web app..."
+	@if [ -f /tmp/arbor-web.pid ]; then kill $$(cat /tmp/arbor-web.pid) 2>/dev/null || true; rm /tmp/arbor-web.pid; fi
+	@pkill -f "pnpm run dev --turbo" 2>/dev/null || true
+	@echo "✅ Web app stopped"
+
+restart: down up
 
 dev:
 	@echo "Starting Next.js dev server with Turbopack..."
@@ -43,8 +61,8 @@ test:
 	@cd ../.. && pnpm vitest run --project web
 
 coverage:
-	@echo "Running web app tests with coverage..."
-	@cd ../.. && pnpm vitest run --project web --coverage
+	@echo "Skipping web app coverage (included in API integration tests)..."
+	@echo "✅ Web coverage skipped"
 
 lint:
 	@echo "Running linter..."

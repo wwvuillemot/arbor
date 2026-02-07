@@ -110,6 +110,14 @@ class CommandRegistry {
     this.groups.clear();
     this.notifyListeners();
   }
+
+  /**
+   * Clear only groups (useful for re-registering with translations)
+   */
+  clearGroups(): void {
+    this.groups.clear();
+    this.notifyListeners();
+  }
 }
 
 // Singleton instance

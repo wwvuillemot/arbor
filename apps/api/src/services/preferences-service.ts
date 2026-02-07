@@ -62,7 +62,6 @@ export class PreferencesService {
         .update(userPreferences)
         .set({
           value,
-          updatedAt: new Date(),
         })
         .where(eq(userPreferences.key, key));
     } else {
@@ -111,7 +110,7 @@ export class PreferencesService {
     try {
       const redisKey = `session:${sessionId}:pref:${key}`;
       const value = await this.redisClient.get(redisKey);
-      return value ? JSON.parse(value) : null;
+      return value ? JSON.parse(value.toString()) : null;
     } catch (error) {
       console.error("Error getting session preference:", error);
       return null;

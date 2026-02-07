@@ -11,6 +11,38 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+// Mock next-intl
+vi.mock("next-intl", () => ({
+  useTranslations: () => (key: string) => {
+    const translations: Record<string, string> = {
+      "dashboard.label": "Go to Dashboard",
+      "dashboard.description": "Navigate to the dashboard",
+      "dashboard.keywords.0": "home",
+      "dashboard.keywords.1": "main",
+      "search.label": "Search",
+      "search.description": "Search for content",
+      "search.keywords.0": "find",
+      "search.keywords.1": "lookup",
+      "projects.label": "Projects",
+      "projects.description": "View all projects",
+      "projects.keywords.0": "folders",
+      "projects.keywords.1": "files",
+      "projects.keywords.2": "workspace",
+      "chat.label": "Chat",
+      "chat.description": "Open chat interface",
+      "chat.keywords.0": "conversation",
+      "chat.keywords.1": "ai",
+      "chat.keywords.2": "assistant",
+      "settings.label": "Settings",
+      "settings.description": "Open settings",
+      "settings.keywords.0": "preferences",
+      "settings.keywords.1": "config",
+      "settings.keywords.2": "options",
+    };
+    return translations[key] || key;
+  },
+}));
+
 describe("useNavigationCommands", () => {
   beforeEach(() => {
     vi.clearAllMocks();

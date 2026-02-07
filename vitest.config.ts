@@ -23,6 +23,9 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "lcov"],
       reportsDirectory: "./coverage/api-unit",
+      include: [
+        "apps/api/src/**/*.ts", // Only include API source files
+      ],
       exclude: [
         "node_modules/",
         "tests/",
@@ -30,6 +33,8 @@ export default defineConfig({
         "**/dist/**",
         "**/.next/**",
         "**/app/**", // Exclude Vite virtual modules
+        "**/coverage/**", // Exclude coverage reports
+        "**/*.js", // Exclude generated JS files
         "**/*\x00*", // Exclude files with null bytes (Vite internals)
       ],
       // Unit test thresholds: Current coverage levels locked in

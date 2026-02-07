@@ -16,7 +16,7 @@ import { eq } from "drizzle-orm";
  *     - Note: "Session 1: The Goblin Ambush"
  */
 
-async function seed() {
+export async function seed(closeConnectionAfter = false) {
   console.log("🌱 Seeding database...");
 
   try {
@@ -222,9 +222,13 @@ Head to Phandalin and investigate Gundren's disappearance
     console.error("❌ Seeding failed:", error);
     throw error;
   } finally {
-    await closeConnection();
+    if (closeConnectionAfter) {
+      await closeConnection();
+    }
   }
 }
 
-// Run seed
-seed();
+// Run seed when called directly from command line
+if (require.main === module) {
+  seed(true);
+}

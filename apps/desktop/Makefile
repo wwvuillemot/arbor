@@ -27,7 +27,14 @@ dev:
 
 build:
 	@echo "Building Tauri app for production..."
-	@cd ../.. && pnpm tauri build
+	@cd ../.. && pnpm tauri build && \
+	if [ -d "apps/desktop/src-tauri/target/release/bundle/macos/Arbor.app" ]; then \
+		echo "Copying app to ~/Applications..."; \
+		cp -r apps/desktop/src-tauri/target/release/bundle/macos/Arbor.app ~/Applications/; \
+		echo "✅ Arbor.app copied to ~/Applications/"; \
+	else \
+		echo "⚠️  macOS app bundle not found. Build may have failed or you're not on macOS."; \
+	fi
 
 icon:
 	@echo "Generate icons using: pnpm tauri icon path/to/icon.png"

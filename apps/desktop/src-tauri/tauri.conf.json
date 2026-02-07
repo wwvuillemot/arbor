@@ -4,9 +4,9 @@
   "identifier": "com.arbor.app",
   "build": {
     "beforeDevCommand": "",
-    "beforeBuildCommand": "cd ../.. && pnpm run build",
+    "beforeBuildCommand": "pnpm run build",
     "devUrl": "http://app.arbor.local",
-    "frontendDist": "../../../apps/web/dist"
+    "frontendDist": "../../web/dist"
   },
   "bundle": {
     "active": true,

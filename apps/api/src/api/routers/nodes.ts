@@ -61,7 +61,15 @@ export const nodesRouter = router({
   create: publicProcedure
     .input(createNodeSchema)
     .mutation(async ({ input }) => {
-      return await nodeService.createNode(input);
+      return await nodeService.createNode({
+        type: input.type,
+        name: input.name,
+        parentId: input.parentId,
+        slug: input.slug,
+        content: input.content,
+        metadata: input.metadata,
+        authorType: input.authorType,
+      });
     }),
 
   // Update a node

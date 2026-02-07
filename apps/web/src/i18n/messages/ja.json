@@ -10,6 +10,7 @@
     "search": "検索",
     "chat": "チャット",
     "settings": "設定",
+    "commandPalette": "コマンドパレット",
     "collapseLabel": "サイドバーを折りたたむ",
     "expandLabel": "サイドバーを展開"
   },
@@ -88,7 +89,91 @@
   },
   "commandPalette": {
     "placeholder": "コマンドを入力または検索...",
-    "noResults": "結果が見つかりません"
+    "noResults": "結果が見つかりません",
+    "groups": {
+      "navigation": "ナビゲーション",
+      "actions": "アクション",
+      "settings": "設定",
+      "help": "ヘルプ"
+    }
+  },
+  "commands": {
+    "navigation": {
+      "dashboard": {
+        "label": "ダッシュボードへ移動",
+        "description": "ダッシュボードを表示",
+        "keywords": ["ホーム", "概要"]
+      },
+      "search": {
+        "label": "検索へ移動",
+        "description": "コンテンツを検索",
+        "keywords": ["検索", "探す"]
+      },
+      "projects": {
+        "label": "プロジェクトへ移動",
+        "description": "プロジェクトを閲覧",
+        "keywords": ["フォルダ", "ファイル", "プロジェクト"]
+      },
+      "chat": {
+        "label": "AIチャットへ移動",
+        "description": "AIアシスタントとチャット",
+        "keywords": ["AI", "アシスタント", "ヘルプ"]
+      },
+      "settings": {
+        "label": "設定へ移動",
+        "description": "設定を変更",
+        "keywords": ["設定", "環境設定", "オプション"]
+      }
+    },
+    "help": {
+      "about": {
+        "label": "Arborについて",
+        "description": "Arborの情報を表示",
+        "keywords": ["について", "情報", "バージョン"]
+      }
+    }
+  },
+  "about": {
+    "title": "Arborについて",
+    "description": "階層的なノードベースのデータモデルを持つローカルファースト、AI搭載ライティングアシスタント。",
+    "version": "バージョン",
+    "license": "ライセンス",
+    "github": "GitHubで表示",
+    "techStack": "技術スタック",
+    "footer": "クリエイティブライターのために❤️を込めて作成",
+    "close": "閉じる"
+  },
+  "setup": {
+    "title": "Arborのセットアップ",
+    "coldStart": {
+      "title": "Arborへようこそ",
+      "description": "すべてをセットアップしましょう。",
+      "steps": {
+        "checkingDocker": "Dockerのインストールを確認中...",
+        "startingServices": "サービスを起動中...",
+        "initializingDatabase": "データベースを初期化中...",
+        "seedingData": "初期データを投入中...",
+        "generatingKeys": "暗号化キーを生成中...",
+        "complete": "セットアップ完了！"
+      }
+    },
+    "warmStart": {
+      "title": "Arborを起動中",
+      "description": "サービスを確認し、ワークスペースを準備しています。",
+      "steps": {
+        "checkingServices": "サービスを確認中...",
+        "verifyingDatabase": "データベース接続を確認中...",
+        "verifyingRedis": "Redis接続を確認中...",
+        "checkingKeys": "暗号化キーを確認中...",
+        "ready": "準備完了！"
+      }
+    },
+    "error": {
+      "title": "セットアップエラー",
+      "description": "セットアップ中に問題が発生しました。",
+      "retry": "再試行",
+      "viewLogs": "ログを表示"
+    }
   },
   "common": {
     "loading": "読み込み中...",
@@ -99,5 +184,49 @@
     "edit": "編集",
     "create": "作成",
     "close": "閉じる"
+  },
+  "dashboard": {
+    "title": "ダッシュボード",
+    "description": "Arborダッシュボードへようこそ。ここでは、プロジェクトの概要、最近のアクティビティ、クイックアクションが表示されます。"
+  },
+  "chat": {
+    "title": "AIチャット",
+    "description": "AIとチャットしてアイデアをブレインストーミングし、執筆の提案を受け、コンテンツで協力します。"
+  },
+  "search": {
+    "title": "検索",
+    "description": "すべてのノート、プロジェクト、コンテンツを検索します。"
+  },
+  "projects": {
+    "title": "プロジェクト",
+    "description": "執筆プロジェクトを閲覧・管理します。各プロジェクトには階層構造でフォルダやノートを含めることができます。",
+    "createProject": "プロジェクトを作成",
+    "noProjects": "プロジェクトがありません",
+    "noProjectsDescription": "最初のプロジェクトを作成して始めましょう。",
+    "projectName": "プロジェクト名",
+    "projectNamePlaceholder": "新しいプロジェクト",
+    "createDialog": {
+      "title": "新しいプロジェクトを作成",
+      "description": "作業を整理するための新しい執筆プロジェクトを作成します。",
+      "name": "プロジェクト名",
+      "namePlaceholder": "私の小説",
+      "creating": "作成中...",
+      "create": "プロジェクトを作成"
+    },
+    "editDialog": {
+      "title": "プロジェクトを編集",
+      "description": "プロジェクトの詳細を更新します。",
+      "name": "プロジェクト名",
+      "saving": "保存中...",
+      "save": "変更を保存"
+    },
+    "deleteDialog": {
+      "title": "プロジェクトを削除",
+      "description": "このプロジェクトを削除してもよろしいですか？この操作は元に戻せません。",
+      "deleting": "削除中...",
+      "delete": "プロジェクトを削除"
+    },
+    "lastModified": "最終更新",
+    "items": "項目"
   }
 }
