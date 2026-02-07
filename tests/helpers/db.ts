@@ -1,12 +1,13 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import * as schema from '@server/db/schema';
-import { sql } from 'drizzle-orm';
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "@server/db/schema";
+import { sql } from "drizzle-orm";
 
 // Use a separate test database or the same database with a test schema
-const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ||
+const TEST_DATABASE_URL =
+  process.env.TEST_DATABASE_URL ||
   process.env.DATABASE_URL ||
-  'postgresql://arbor:local_dev_only@localhost:5432/arbor';
+  "postgresql://arbor:local_dev_only@localhost:5432/arbor";
 
 let testClient: postgres.Sql | null = null;
 let testDb: ReturnType<typeof drizzle> | null = null;
@@ -89,13 +90,23 @@ export async function createTestSchema() {
   `);
 
   // Create indexes for nodes
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id)`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type)`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_nodes_slug ON nodes(slug)`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_nodes_deleted_at ON nodes(deleted_at)`);
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id)`,
+  );
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type)`,
+  );
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS idx_nodes_slug ON nodes(slug)`,
+  );
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS idx_nodes_deleted_at ON nodes(deleted_at)`,
+  );
 
   // Create indexes for user_preferences
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key)`);
+  await db.execute(
+    sql`CREATE INDEX IF NOT EXISTS idx_user_preferences_key ON user_preferences(key)`,
+  );
 }
 
 /**
@@ -106,4 +117,3 @@ export async function dropTestSchema() {
   await db.execute(sql`DROP TABLE IF EXISTS user_preferences CASCADE`);
   await db.execute(sql`DROP TABLE IF EXISTS nodes CASCADE`);
 }
-

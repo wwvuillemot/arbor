@@ -174,4 +174,3 @@ Press `F12` or `Cmd+Option+I` (macOS) to open the browser DevTools.
 - [Tauri Documentation](https://tauri.app/)
 - [Tauri Prerequisites](https://v2.tauri.app/start/prerequisites/)
 - [Arbor Desktop README](apps/desktop/README.md)
-

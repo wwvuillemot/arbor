@@ -1,12 +1,19 @@
-import { z } from 'zod';
-import { router, publicProcedure } from '../trpc';
-import { NodeService } from '../../services/node-service';
+import { z } from "zod";
+import { router, publicProcedure } from "../trpc";
+import { NodeService } from "../../services/node-service";
 
 const nodeService = new NodeService();
 
 // Zod schemas for validation
-const nodeTypeSchema = z.enum(['project', 'folder', 'note', 'link', 'ai_suggestion', 'audio_note']);
-const authorTypeSchema = z.enum(['human', 'ai', 'mixed']);
+const nodeTypeSchema = z.enum([
+  "project",
+  "folder",
+  "note",
+  "link",
+  "ai_suggestion",
+  "audio_note",
+]);
+const authorTypeSchema = z.enum(["human", "ai", "mixed"]);
 
 const createNodeSchema = z.object({
   type: nodeTypeSchema,
@@ -28,10 +35,9 @@ const updateNodeSchema = z.object({
 
 export const nodesRouter = router({
   // Get all projects
-  getAllProjects: publicProcedure
-    .query(async () => {
-      return await nodeService.getAllProjects();
-    }),
+  getAllProjects: publicProcedure.query(async () => {
+    return await nodeService.getAllProjects();
+  }),
 
   // Get node by ID
   getById: publicProcedure
@@ -39,7 +45,7 @@ export const nodesRouter = router({
     .query(async ({ input }) => {
       const node = await nodeService.getNodeById(input.id);
       if (!node) {
-        throw new Error('Node not found');
+        throw new Error("Node not found");
       }
       return node;
     }),
@@ -60,10 +66,12 @@ export const nodesRouter = router({
 
   // Update a node
   update: publicProcedure
-    .input(z.object({
-      id: z.string().uuid(),
-      data: updateNodeSchema,
-    }))
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        data: updateNodeSchema,
+      }),
+    )
     .mutation(async ({ input }) => {
       return await nodeService.updateNode(input.id, input.data);
     }),
@@ -76,4 +84,3 @@ export const nodesRouter = router({
       return { success: true };
     }),
 });
-

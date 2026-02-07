@@ -146,18 +146,18 @@ CREATE TABLE nodes (
 
 **18 weeks (4.5 months) to MVP**
 
-| Phase | Duration | Focus |
-|-------|----------|-------|
-| 0: Setup | 1 week | Infrastructure, Docker, Makefile |
-| 1: Data Layer | 2 weeks | Node repository, tree traversal (TDD) |
-| 2: Backend API | 2 weeks | tRPC, validation, error handling |
-| 3: Frontend | 2 weeks | Next.js, folder tree, editor |
-| 4: Vector Search | 2 weeks | Embeddings, RAG, hybrid search |
-| 5: AI Agents | 3 weeks | Ask, Take Notes, Editor modes |
-| 6: Provenance | 1 week | Attribution, approval workflow |
-| 7: Tauri | 2 weeks | Desktop app, native integration |
-| 8: Git Integration | 1 week | Auto-commit, backup, restore |
-| 9: Polish | 2 weeks | Performance, UX, accessibility |
+| Phase              | Duration | Focus                                 |
+| ------------------ | -------- | ------------------------------------- |
+| 0: Setup           | 1 week   | Infrastructure, Docker, Makefile      |
+| 1: Data Layer      | 2 weeks  | Node repository, tree traversal (TDD) |
+| 2: Backend API     | 2 weeks  | tRPC, validation, error handling      |
+| 3: Frontend        | 2 weeks  | Next.js, folder tree, editor          |
+| 4: Vector Search   | 2 weeks  | Embeddings, RAG, hybrid search        |
+| 5: AI Agents       | 3 weeks  | Ask, Take Notes, Editor modes         |
+| 6: Provenance      | 1 week   | Attribution, approval workflow        |
+| 7: Tauri           | 2 weeks  | Desktop app, native integration       |
+| 8: Git Integration | 1 week   | Auto-commit, backup, restore          |
+| 9: Polish          | 2 weeks  | Performance, UX, accessibility        |
 
 ## 📚 Documentation
 

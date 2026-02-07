@@ -1,29 +1,29 @@
-import { defineConfig } from 'vitest/config';
-import path from 'path';
+import { defineConfig } from "vitest/config";
+import path from "path";
 
 export default defineConfig({
   test: {
-    name: 'api-integration',
+    name: "api-integration",
     globals: true,
-    environment: 'node',
-    setupFiles: ['./tests/setup.ts'],
-    include: ['tests/integration/**/*.test.ts'],
-    exclude: ['apps/**', '**/node_modules/**', '**/dist/**', '**/.next/**'],
+    environment: "node",
+    setupFiles: ["./tests/setup.ts"],
+    include: ["tests/integration/**/*.test.ts"],
+    exclude: ["apps/**", "**/node_modules/**", "**/dist/**", "**/.next/**"],
     // Run tests sequentially to avoid database conflicts
-    pool: 'forks',
+    pool: "forks",
     fileParallelism: false,
     testTimeout: 30000,
     hookTimeout: 30000,
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
-      reportsDirectory: './coverage/api-integration',
+      provider: "v8",
+      reporter: ["text", "json", "html", "lcov"],
+      reportsDirectory: "./coverage/api-integration",
       exclude: [
-        'node_modules/',
-        'tests/',
-        '**/*.config.*',
-        '**/dist/**',
-        '**/.next/**',
+        "node_modules/",
+        "tests/",
+        "**/*.config.*",
+        "**/dist/**",
+        "**/.next/**",
       ],
       // Integration test thresholds: 50% line and branch coverage
       thresholds: {
@@ -36,10 +36,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './apps/api/src'),
-      '@server': path.resolve(__dirname, './apps/api/src'),
-      '@tests': path.resolve(__dirname, './tests'),
+      "@": path.resolve(__dirname, "./apps/api/src"),
+      "@server": path.resolve(__dirname, "./apps/api/src"),
+      "@tests": path.resolve(__dirname, "./tests"),
     },
   },
 });
-

@@ -1,9 +1,9 @@
-import { NextIntlClientProvider } from 'next-intl';
-import { notFound } from 'next/navigation';
-import { locales } from '@/i18n/request';
-import '../../styles/globals.css';
-import { ThemeProvider } from '@/components/providers/theme-provider';
-import { TRPCProvider } from '@/components/providers/trpc-provider';
+import { NextIntlClientProvider } from "next-intl";
+import { notFound } from "next/navigation";
+import { locales } from "@/i18n/request";
+import "../../styles/globals.css";
+import { ThemeProvider } from "@/components/providers/theme-provider";
+import { TRPCProvider } from "@/components/providers/trpc-provider";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -20,7 +20,7 @@ export default async function LocaleLayout({
   const { locale } = await params;
 
   // Validate that the incoming `locale` parameter is valid
-  if (!locales.includes(locale as any)) {
+  if (!locales.includes(locale as (typeof locales)[number])) {
     notFound();
   }
 
@@ -28,7 +28,7 @@ export default async function LocaleLayout({
   let messages;
   try {
     messages = (await import(`@/i18n/messages/${locale}.json`)).default;
-  } catch (error) {
+  } catch {
     notFound();
   }
 
@@ -51,4 +51,3 @@ export default async function LocaleLayout({
     </html>
   );
 }
-

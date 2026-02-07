@@ -1,8 +1,8 @@
-import { beforeAll, afterAll, beforeEach } from 'vitest';
-import { getTestDb, cleanupTestDb, resetTestDb } from './helpers/db';
+import { beforeAll, afterAll, beforeEach } from "vitest";
+import { getTestDb, cleanupTestDb, resetTestDb } from "./helpers/db";
 
 // Skip database setup for tests that don't need it
-const SKIP_DB_SETUP = process.env.SKIP_DB_SETUP === 'true';
+const SKIP_DB_SETUP = process.env.SKIP_DB_SETUP === "true";
 
 // Global test setup
 beforeAll(async () => {
@@ -28,4 +28,3 @@ beforeEach(async () => {
   }
   await resetTestDb();
 });
-

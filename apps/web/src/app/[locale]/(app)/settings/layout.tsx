@@ -1,5 +1,5 @@
-import * as React from 'react';
-import { SettingsSidebar } from '@/components/settings-sidebar';
+import * as React from "react";
+import { SettingsSidebar } from "@/components/settings-sidebar";
 
 export default function SettingsLayout({
   children,
@@ -9,10 +9,7 @@ export default function SettingsLayout({
   return (
     <div className="flex h-full">
       <SettingsSidebar />
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
+      <main className="flex-1 overflow-auto">{children}</main>
     </div>
   );
 }
-

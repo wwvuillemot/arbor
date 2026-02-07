@@ -1,14 +1,18 @@
-import { db } from '../db';
-import { userPreferences } from '../db/schema';
-import { eq } from 'drizzle-orm';
-import { DEFAULT_CONFIG, CONFIG_KEYS, type ConfigKey } from '../config/defaults';
+import { db } from "../db";
+import { userPreferences } from "../db/schema";
+import { eq } from "drizzle-orm";
+import {
+  DEFAULT_CONFIG,
+  CONFIG_KEYS,
+  type ConfigKey,
+} from "../config/defaults";
 
 /**
  * ConfigurationService
- * 
+ *
  * Manages application configuration settings with sensible defaults.
  * Configuration values are stored in the user_preferences table with a 'config.' prefix.
- * 
+ *
  * When a configuration value is not set, the service returns the default value.
  * This allows the app to work out of the box without requiring manual configuration.
  */
@@ -19,7 +23,7 @@ export class ConfigurationService {
    */
   async getConfiguration(key: ConfigKey): Promise<string> {
     const dbKey = CONFIG_KEYS[key];
-    
+
     const [result] = await db
       .select()
       .from(userPreferences)
@@ -27,7 +31,12 @@ export class ConfigurationService {
       .limit(1);
 
     // If value exists and is not empty, return it
-    if (result && result.value && typeof result.value === 'string' && result.value.trim() !== '') {
+    if (
+      result &&
+      result.value &&
+      typeof result.value === "string" &&
+      result.value.trim() !== ""
+    ) {
       return result.value;
     }
 
@@ -53,7 +62,7 @@ export class ConfigurationService {
       // Update existing configuration
       await db
         .update(userPreferences)
-        .set({ 
+        .set({
           value,
           updatedAt: new Date(),
         })
@@ -92,9 +101,7 @@ export class ConfigurationService {
   async resetConfiguration(key: ConfigKey): Promise<void> {
     const dbKey = CONFIG_KEYS[key];
 
-    await db
-      .delete(userPreferences)
-      .where(eq(userPreferences.key, dbKey));
+    await db.delete(userPreferences).where(eq(userPreferences.key, dbKey));
   }
 
   /**
@@ -106,4 +113,3 @@ export class ConfigurationService {
     return currentValue !== DEFAULT_CONFIG[key];
   }
 }
-

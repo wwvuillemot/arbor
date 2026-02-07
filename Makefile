@@ -1,4 +1,4 @@
-.PHONY: help setup dev build clean up down logs restart health db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage lint format typecheck audit api-generate api-watch desktop desktop-build backup restore export-md
+.PHONY: help setup dev build clean up down logs restart health db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage coverage lint format typecheck audit preflight api-generate api-watch desktop desktop-build backup restore export-md
 
 # Default target
 .DEFAULT_GOAL := help
@@ -38,13 +38,14 @@ help:
 	@echo "  make test-integration - Run integration tests"
 	@echo "  make test-e2e        - Run E2E tests"
 	@echo "  make test-watch      - Run tests in watch mode"
-	@echo "  make test-coverage   - Generate coverage report"
+	@echo "  make coverage        - Generate coverage report (delegates to apps)"
 	@echo ""
 	@echo "Code Quality:"
-	@echo "  make lint            - Lint code"
-	@echo "  make format          - Format code"
+	@echo "  make lint            - Lint code (delegates to apps)"
+	@echo "  make format          - Format code with auto-fix (delegates to apps)"
 	@echo "  make typecheck       - Run TypeScript type checking"
 	@echo "  make audit           - Security audit (pnpm audit)"
+	@echo "  make preflight       - Run format, lint, test, and coverage (CI-ready)"
 	@echo ""
 	@echo "API Client:"
 	@echo "  make api-generate    - Generate typed API client from OpenAPI spec"
@@ -70,6 +71,7 @@ setup:
 	@./scripts/setup.sh
 
 dev:
+	@echo "Starting development with Turbopack..."
 	pnpm run dev
 
 dev-api:
@@ -259,18 +261,94 @@ test-coverage-integration:
 	@echo "Running integration tests with coverage..."
 	@pnpm run test:coverage:integration
 
+# Coverage (delegates to each app)
+coverage:
+	@echo "========================================="
+	@echo "   Running Coverage for All Apps"
+	@echo "========================================="
+	@echo ""
+	@echo "📦 Key-Value Store Coverage..."
+	@cd apps/key-value-store && $(MAKE) coverage
+	@echo ""
+	@echo "🔧 API Coverage..."
+	@cd apps/api && $(MAKE) coverage
+	@echo ""
+	@echo "🌐 Web Coverage..."
+	@cd apps/web && $(MAKE) coverage
+	@echo ""
+	@echo "========================================="
+	@echo "   ✅ Coverage complete!"
+	@echo "========================================="
+	@echo ""
+	@echo "Coverage reports:"
+	@echo "  API:  ./coverage/api-unit/index.html"
+	@echo "  Web:  ./apps/web/coverage/index.html"
+	@echo ""
+
 # Code Quality
 lint:
-	pnpm run lint
+	@echo "========================================="
+	@echo "   Running Linters for All Apps"
+	@echo "========================================="
+	@echo ""
+	@echo "📦 Key-Value Store Lint..."
+	@cd apps/key-value-store && $(MAKE) lint
+	@echo ""
+	@echo "🔧 API Lint..."
+	@cd apps/api && $(MAKE) lint
+	@echo ""
+	@echo "🌐 Web Lint..."
+	@cd apps/web && $(MAKE) lint
+	@echo ""
+	@echo "========================================="
+	@echo "   ✅ Linting complete!"
+	@echo "========================================="
 
 format:
-	pnpm run format
+	@echo "========================================="
+	@echo "   Formatting Code for All Apps"
+	@echo "========================================="
+	@echo ""
+	@echo "📦 Key-Value Store Format..."
+	@cd apps/key-value-store && $(MAKE) format
+	@echo ""
+	@echo "🔧 API Format..."
+	@cd apps/api && $(MAKE) format
+	@echo ""
+	@echo "🌐 Web Format..."
+	@cd apps/web && $(MAKE) format
+	@echo ""
+	@echo "========================================="
+	@echo "   ✅ Formatting complete!"
+	@echo "========================================="
 
 typecheck:
 	pnpm run typecheck
 
 audit:
 	pnpm audit
+
+# Preflight - Run all quality checks before commit/push
+preflight:
+	@echo "========================================="
+	@echo "   🚀 Running Preflight Checks"
+	@echo "========================================="
+	@echo ""
+	@echo "Step 1/4: Formatting code..."
+	@$(MAKE) format
+	@echo ""
+	@echo "Step 2/4: Linting code..."
+	@$(MAKE) lint
+	@echo ""
+	@echo "Step 3/4: Running tests..."
+	@$(MAKE) test
+	@echo ""
+	@echo "Step 4/4: Generating coverage..."
+	@$(MAKE) coverage
+	@echo ""
+	@echo "========================================="
+	@echo "   ✅ Preflight Complete - Ready to Commit!"
+	@echo "========================================="
 
 # API Client
 api-generate:

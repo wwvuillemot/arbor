@@ -1,8 +1,8 @@
-import { getRequestConfig } from 'next-intl/server';
-import { notFound } from 'next/navigation';
+import { getRequestConfig } from "next-intl/server";
+import { notFound } from "next/navigation";
 
 // Supported locales
-export const locales = ['en', 'ja'] as const;
+export const locales = ["en", "ja"] as const;
 export type Locale = (typeof locales)[number];
 
 export default getRequestConfig(async ({ locale }) => {
@@ -13,4 +13,3 @@ export default getRequestConfig(async ({ locale }) => {
     messages: (await import(`./messages/${locale}.json`)).default,
   };
 });
-

@@ -1,10 +1,11 @@
-import { drizzle } from 'drizzle-orm/postgres-js';
-import postgres from 'postgres';
-import * as schema from './schema';
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import * as schema from "./schema";
 
 // Database connection string
-const connectionString = process.env.DATABASE_URL ||
-  'postgresql://arbor:local_dev_only@localhost:5432/arbor';
+const connectionString =
+  process.env.DATABASE_URL ||
+  "postgresql://arbor:local_dev_only@localhost:5432/arbor";
 
 // Create postgres client
 const client = postgres(connectionString, {
@@ -23,4 +24,3 @@ export { schema };
 export const closeConnection = async () => {
   await client.end();
 };
-

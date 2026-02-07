@@ -21,12 +21,12 @@ make api-watch
 ### Using the Generated Client
 
 ```typescript
-import { useListNodes, useCreateNode } from '@/lib/api/generated/nodes';
+import { useListNodes, useCreateNode } from "@/lib/api/generated/nodes";
 
 function MyComponent() {
   // Query with React Query hooks
   const { data: nodes, isLoading } = useListNodes({
-    parentId: 'some-uuid',
+    parentId: "some-uuid",
   });
 
   // Mutation
@@ -35,9 +35,9 @@ function MyComponent() {
   const handleCreate = async () => {
     await createNode.mutateAsync({
       data: {
-        type: 'note',
-        title: 'My Note',
-        content: 'Note content',
+        type: "note",
+        title: "My Note",
+        content: "Note content",
       },
     });
   };
@@ -62,6 +62,7 @@ src/lib/api/
 The Orval configuration is in `orval.config.ts` at the project root.
 
 Key settings:
+
 - **Input**: `server/openapi.yaml`
 - **Output**: `src/lib/api/generated`
 - **Client**: React Query hooks
@@ -77,12 +78,14 @@ Key settings:
 ## Customization
 
 To customize the API client behavior, edit:
+
 - `client.ts` - Axios instance configuration
 - `orval.config.ts` - Orval generation settings
 
 ## Integration with Backend
 
 The backend should expose its OpenAPI spec at `server/openapi.yaml`. This spec should be:
+
 - **Complete** - All endpoints documented
 - **Accurate** - Types match actual responses
 - **Versioned** - Updated with API changes
@@ -104,4 +107,3 @@ function App() {
   );
 }
 ```
-

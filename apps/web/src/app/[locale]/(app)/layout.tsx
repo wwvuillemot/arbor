@@ -1,4 +1,4 @@
-import { AppLayout } from '@/components/layout/app-layout';
+import { AppLayout } from "@/components/layout/app-layout";
 
 export default function AppGroupLayout({
   children,
@@ -7,4 +7,3 @@ export default function AppGroupLayout({
 }) {
   return <AppLayout>{children}</AppLayout>;
 }
-

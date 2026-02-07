@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+import { redirect } from "next/navigation";
 
 export default async function Home({
   params,
@@ -7,7 +7,6 @@ export default async function Home({
 }) {
   const { locale } = await params;
   // Use locale prefix only for non-default locales (as-needed strategy)
-  const prefix = locale === 'en' ? '' : `/${locale}`;
+  const prefix = locale === "en" ? "" : `/${locale}`;
   redirect(`${prefix}/dashboard`);
 }
-

@@ -1,16 +1,17 @@
-import { expect, afterEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
-import '@testing-library/jest-dom/vitest';
+import { expect, afterEach, vi } from "vitest";
+import { cleanup } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 
 // Mock next-intl for tests
-vi.mock('next-intl', () => ({
+vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
-  NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
+  NextIntlClientProvider: ({ children }: { children: React.ReactNode }) =>
+    children,
 }));
 
 // Mock Tauri API
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn().mockResolvedValue('test-master-key-base64-encoded-32-bytes'),
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue("test-master-key-base64-encoded-32-bytes"),
 }));
 
 // Cleanup after each test
@@ -19,7 +20,7 @@ afterEach(() => {
 });
 
 // Mock matchMedia if not available
-Object.defineProperty(window, 'matchMedia', {
+Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
     matches: false,
@@ -34,7 +35,7 @@ Object.defineProperty(window, 'matchMedia', {
 });
 
 // Mock sessionStorage
-Object.defineProperty(window, 'sessionStorage', {
+Object.defineProperty(window, "sessionStorage", {
   writable: true,
   value: {
     getItem: vi.fn(),
@@ -45,7 +46,7 @@ Object.defineProperty(window, 'sessionStorage', {
 });
 
 // Mock localStorage
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(window, "localStorage", {
   writable: true,
   value: {
     getItem: vi.fn(),

@@ -7,16 +7,19 @@ Arbor follows a comprehensive testing strategy with strict coverage requirements
 ## Coverage Thresholds
 
 ### Unit Tests
+
 - **Target**: ≥80% line and branch coverage
 - **Rationale**: Unit tests are fast, cheap to maintain, and provide high confidence in individual components
 - **Scope**: Individual functions, classes, and components in isolation
 
 ### Integration Tests
+
 - **Target**: ≥50% line and branch coverage
 - **Rationale**: Higher runtime and maintenance costs, but critical for testing component interactions
 - **Scope**: Multiple components working together, database operations, API endpoints
 
 ### End-to-End (E2E) Tests
+
 - **Target**: ≥30% line and branch coverage
 - **Rationale**: Focus on critical user paths, not comprehensive coverage
 - **Scope**: Complete user workflows from UI to database
@@ -24,11 +27,13 @@ Arbor follows a comprehensive testing strategy with strict coverage requirements
 ## Running Tests
 
 ### All Tests
+
 ```bash
 make test
 ```
 
 ### Unit Tests Only
+
 ```bash
 make test-unit
 # or
@@ -36,6 +41,7 @@ pnpm run test:unit
 ```
 
 ### Integration Tests Only
+
 ```bash
 make test-integration
 # or
@@ -43,6 +49,7 @@ pnpm run test:integration
 ```
 
 ### E2E Tests Only
+
 ```bash
 make test-e2e
 # or
@@ -50,6 +57,7 @@ pnpm run test:e2e
 ```
 
 ### With Coverage Reports
+
 ```bash
 make test-coverage
 # or
@@ -57,6 +65,7 @@ pnpm run test:coverage
 ```
 
 ### Individual Coverage Reports
+
 ```bash
 # Unit tests only
 pnpm run test:coverage:unit
@@ -78,10 +87,12 @@ Coverage reports are generated in separate directories:
 ## Configuration Files
 
 ### API (Root Level)
+
 - **Unit**: `vitest.config.ts`
 - **Integration**: `vitest.integration.config.ts`
 
 ### Web App
+
 - **Unit**: `apps/web/vitest.config.ts`
 - **Integration**: `apps/web/vitest.integration.config.ts`
 - **E2E**: `apps/web/vitest.e2e.config.ts`
@@ -105,6 +116,7 @@ tests/
 ## Best Practices
 
 ### Unit Tests
+
 - ✅ Test individual functions/components in isolation
 - ✅ Mock external dependencies
 - ✅ Fast execution (< 100ms per test)
@@ -113,6 +125,7 @@ tests/
 - ❌ No file system operations
 
 ### Integration Tests
+
 - ✅ Test multiple components working together
 - ✅ Real database operations (with test database)
 - ✅ Real API calls (to test server)
@@ -121,6 +134,7 @@ tests/
 - ❌ Avoid testing every edge case (that's for unit tests)
 
 ### E2E Tests
+
 - ✅ Test complete user workflows
 - ✅ Focus on critical business paths
 - ✅ Synthetic user interactions
@@ -142,6 +156,7 @@ tests/
 ## Coverage Enforcement
 
 Coverage thresholds are enforced in CI/CD:
+
 - Unit tests must meet 80% threshold or build fails
 - Integration tests must meet 50% threshold or build fails
 - E2E tests must meet 30% threshold or build fails
@@ -157,8 +172,8 @@ open apps/web/coverage/index.html
 ```
 
 Or use the Makefile:
+
 ```bash
 make test-coverage
 # Reports are automatically generated and paths are displayed
 ```
-

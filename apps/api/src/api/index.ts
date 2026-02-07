@@ -1,21 +1,21 @@
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
-import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
-import { appRouter } from './router';
-import { createContext } from './trpc';
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+import { fastifyTRPCPlugin } from "@trpc/server/adapters/fastify";
+import { appRouter } from "./router";
+import { createContext } from "./trpc";
 
-const PORT = parseInt(process.env.API_PORT || '3001', 10);
-const HOST = process.env.API_HOST || '0.0.0.0';
+const PORT = parseInt(process.env.API_PORT || "3001", 10);
+const HOST = process.env.API_HOST || "0.0.0.0";
 
 async function main() {
   const server = Fastify({
     logger: {
-      level: process.env.LOG_LEVEL || 'info',
+      level: process.env.LOG_LEVEL || "info",
       transport: {
-        target: 'pino-pretty',
+        target: "pino-pretty",
         options: {
-          translateTime: 'HH:MM:ss Z',
-          ignore: 'pid,hostname',
+          translateTime: "HH:MM:ss Z",
+          ignore: "pid,hostname",
         },
       },
     },
@@ -24,13 +24,13 @@ async function main() {
 
   // Register CORS
   await server.register(cors, {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
     credentials: true,
   });
 
   // Register tRPC
   await server.register(fastifyTRPCPlugin, {
-    prefix: '/trpc',
+    prefix: "/trpc",
     trpcOptions: {
       router: appRouter,
       createContext,
@@ -41,22 +41,22 @@ async function main() {
   });
 
   // Health check endpoint (non-tRPC)
-  server.get('/health', async () => {
+  server.get("/health", async () => {
     return {
-      status: 'ok',
+      status: "ok",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
     };
   });
 
   // Root endpoint
-  server.get('/', async () => {
+  server.get("/", async () => {
     return {
-      name: 'Arbor API',
-      version: '0.1.0',
+      name: "Arbor API",
+      version: "0.1.0",
       endpoints: {
-        health: '/health',
-        trpc: '/trpc',
+        health: "/health",
+        trpc: "/trpc",
       },
     };
   });
@@ -77,7 +77,7 @@ async function main() {
   }
 
   // Graceful shutdown
-  const signals = ['SIGINT', 'SIGTERM'];
+  const signals = ["SIGINT", "SIGTERM"];
   signals.forEach((signal) => {
     process.on(signal, async () => {
       console.log(`\n${signal} received, shutting down gracefully...`);
@@ -88,4 +88,3 @@ async function main() {
 }
 
 main();
-

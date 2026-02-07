@@ -1,11 +1,11 @@
-import { db } from '../db/index';
-import { userPreferences } from '../db/schema';
-import { eq } from 'drizzle-orm';
-import { createClient } from 'redis';
+import { db } from "../db/index";
+import { userPreferences } from "../db/schema";
+import { eq } from "drizzle-orm";
+import { createClient } from "redis";
 
 /**
  * PreferencesService
- * 
+ *
  * Manages both session-scope and app-scope user preferences:
  * - Session-scope: Stored in Redis, cleared when session ends
  * - App-scope: Stored in PostgreSQL, persisted permanently
@@ -23,17 +23,17 @@ export class PreferencesService {
   private async initRedis() {
     try {
       this.redisClient = createClient({
-        url: process.env.REDIS_URL || 'redis://arbor-redis:6379',
+        url: process.env.REDIS_URL || "redis://arbor-redis:6379",
       });
 
-      this.redisClient.on('error', (err) => {
-        console.error('Redis Client Error:', err);
+      this.redisClient.on("error", (err) => {
+        console.error("Redis Client Error:", err);
       });
 
       await this.redisClient.connect();
-      console.log('✅ Redis connected for session preferences');
+      console.log("✅ Redis connected for session preferences");
     } catch (error) {
-      console.error('❌ Failed to connect to Redis:', error);
+      console.error("❌ Failed to connect to Redis:", error);
       this.redisClient = null;
     }
   }
@@ -87,18 +87,24 @@ export class PreferencesService {
   async getAllAppPreferences(): Promise<Record<string, any>> {
     const prefs = await db.select().from(userPreferences);
 
-    return prefs.reduce((acc, pref) => {
-      acc[pref.key] = pref.value;
-      return acc;
-    }, {} as Record<string, any>);
+    return prefs.reduce(
+      (acc, pref) => {
+        acc[pref.key] = pref.value;
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
   }
 
   /**
    * Get session-scope preference (from Redis)
    */
-  async getSessionPreference(sessionId: string, key: string): Promise<any | null> {
+  async getSessionPreference(
+    sessionId: string,
+    key: string,
+  ): Promise<any | null> {
     if (!this.redisClient) {
-      console.warn('Redis not available, session preferences disabled');
+      console.warn("Redis not available, session preferences disabled");
       return null;
     }
 
@@ -107,7 +113,7 @@ export class PreferencesService {
       const value = await this.redisClient.get(redisKey);
       return value ? JSON.parse(value) : null;
     } catch (error) {
-      console.error('Error getting session preference:', error);
+      console.error("Error getting session preference:", error);
       return null;
     }
   }
@@ -115,9 +121,14 @@ export class PreferencesService {
   /**
    * Set session-scope preference (to Redis)
    */
-  async setSessionPreference(sessionId: string, key: string, value: any, ttl?: number): Promise<void> {
+  async setSessionPreference(
+    sessionId: string,
+    key: string,
+    value: any,
+    ttl?: number,
+  ): Promise<void> {
     if (!this.redisClient) {
-      console.warn('Redis not available, session preferences disabled');
+      console.warn("Redis not available, session preferences disabled");
       return;
     }
 
@@ -132,7 +143,7 @@ export class PreferencesService {
         await this.redisClient.setEx(redisKey, 86400, serialized);
       }
     } catch (error) {
-      console.error('Error setting session preference:', error);
+      console.error("Error setting session preference:", error);
     }
   }
 
@@ -148,8 +159,7 @@ export class PreferencesService {
       const redisKey = `session:${sessionId}:pref:${key}`;
       await this.redisClient.del(redisKey);
     } catch (error) {
-      console.error('Error deleting session preference:', error);
+      console.error("Error deleting session preference:", error);
     }
   }
 }
-

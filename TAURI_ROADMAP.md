@@ -3,6 +3,7 @@
 ## Current Status ✅
 
 **Infrastructure Ready:**
+
 - ✅ Docker services running (PostgreSQL, Redis, pgAdmin)
 - ✅ Database schema created with Project node type
 - ✅ Traefik configured for local domains
@@ -10,6 +11,7 @@
 - ✅ All commands via `make` (no raw pnpm/npm)
 
 **Access Points:**
+
 - pgAdmin: http://pgadmin.arbor.local (or http://localhost:5050)
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
@@ -37,6 +39,7 @@ pnpm create tauri-app --skip-install
 ```
 
 **Key Configuration:**
+
 ```json
 {
   "build": {
@@ -51,24 +54,26 @@ pnpm create tauri-app --skip-install
 **Why needed:** Currently there's no API server running, which is why api.arbor.local returns 404.
 
 **Create:** `server/api/index.ts`
+
 ```typescript
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
+import Fastify from "fastify";
+import cors from "@fastify/cors";
 
 const server = Fastify({ logger: true });
 
 await server.register(cors, {
-  origin: ['http://localhost:3000', 'tauri://localhost'],
+  origin: ["http://localhost:3000", "tauri://localhost"],
 });
 
-server.get('/health', async () => {
-  return { status: 'ok', timestamp: new Date().toISOString() };
+server.get("/health", async () => {
+  return { status: "ok", timestamp: new Date().toISOString() };
 });
 
-server.listen({ port: 3001, host: '0.0.0.0' });
+server.listen({ port: 3001, host: "0.0.0.0" });
 ```
 
 **Add to Makefile:**
+
 ```makefile
 dev:
 	pnpm run dev:api & pnpm run dev:web
@@ -83,8 +88,9 @@ dev:web:
 ### Phase 3: Connect Frontend to Backend (30 minutes)
 
 **Update:** `src/lib/api-client.ts`
+
 ```typescript
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export const apiClient = createClient({
   baseURL: API_URL,
@@ -109,6 +115,7 @@ make tauri-dev
 ## Dual Development Mode
 
 ### Browser Mode (for QA/Debugging)
+
 ```bash
 # Terminal 1: Start services
 make up
@@ -126,6 +133,7 @@ make dev:web
 ```
 
 ### Tauri Mode (primary interface)
+
 ```bash
 # Terminal 1: Start services
 make up
@@ -192,4 +200,3 @@ make tauri-dev
 4. **Fourth**: Test in both browser and Tauri modes
 
 This way you can QA in the browser while building, then switch to Tauri once everything works.
-

@@ -1,11 +1,14 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { Command } from 'cmdk';
-import { Search } from 'lucide-react';
-import { useTranslations } from 'next-intl';
-import { cn } from '@/lib/utils';
-import { commandRegistry, type Command as CommandType } from '@/lib/command-registry';
+import * as React from "react";
+import { Command } from "cmdk";
+import { Search } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { cn } from "@/lib/utils";
+import {
+  commandRegistry,
+  type Command as CommandType,
+} from "@/lib/command-registry";
 
 export interface CommandPaletteProps {
   open: boolean;
@@ -13,9 +16,9 @@ export interface CommandPaletteProps {
 }
 
 export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
-  const [search, setSearch] = React.useState('');
+  const [search, setSearch] = React.useState("");
   const [commands, setCommands] = React.useState<CommandType[]>([]);
-  const t = useTranslations('commandPalette');
+  const t = useTranslations("commandPalette");
 
   // Subscribe to command registry changes
   React.useEffect(() => {
@@ -46,23 +49,23 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const handleSelect = React.useCallback(
     async (command: CommandType) => {
       onOpenChange(false);
-      setSearch('');
+      setSearch("");
       await command.action();
     },
-    [onOpenChange]
+    [onOpenChange],
   );
 
   // Handle keyboard shortcuts
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+      if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         onOpenChange(!open);
       }
     };
 
-    document.addEventListener('keydown', down);
-    return () => document.removeEventListener('keydown', down);
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
   }, [open, onOpenChange]);
 
   if (!open) return null;
@@ -79,13 +82,13 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             <Command.Input
               value={search}
               onValueChange={setSearch}
-              placeholder={t('placeholder')}
+              placeholder={t("placeholder")}
               className="flex h-12 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
             />
           </div>
           <Command.List className="max-h-[400px] overflow-y-auto p-2">
             <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
-              {t('noResults')}
+              {t("noResults")}
             </Command.Empty>
 
             {groupedCommands.map((group) => {
@@ -105,9 +108,9 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                         value={command.id}
                         onSelect={() => handleSelect(command)}
                         className={cn(
-                          'relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none',
-                          'aria-selected:bg-accent aria-selected:text-accent-foreground',
-                          'data-[disabled]:pointer-events-none data-[disabled]:opacity-50'
+                          "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none",
+                          "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                          "data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
                         )}
                       >
                         {Icon && <Icon className="mr-2 h-4 w-4" />}
@@ -148,4 +151,3 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     </div>
   );
 }
-

@@ -1,9 +1,9 @@
-import { sql } from 'drizzle-orm';
-import { db } from './index';
+import { sql } from "drizzle-orm";
+import { db } from "./index";
 
 async function pushSchema() {
-  console.log('🔨 Creating database schema...');
-  
+  console.log("🔨 Creating database schema...");
+
   try {
     // Create nodes table
     await db.execute(sql`
@@ -21,20 +21,27 @@ async function pushSchema() {
         deleted_at TIMESTAMP
       )
     `);
-    
+
     // Create indexes
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_nodes_slug ON nodes(slug)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_nodes_deleted_at ON nodes(deleted_at)`);
-    
-    console.log('✅ Schema created successfully!');
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_nodes_parent ON nodes(parent_id)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_nodes_type ON nodes(type)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_nodes_slug ON nodes(slug)`,
+    );
+    await db.execute(
+      sql`CREATE INDEX IF NOT EXISTS idx_nodes_deleted_at ON nodes(deleted_at)`,
+    );
+
+    console.log("✅ Schema created successfully!");
     process.exit(0);
   } catch (error) {
-    console.error('❌ Failed to create schema:', error);
+    console.error("❌ Failed to create schema:", error);
     process.exit(1);
   }
 }
 
 pushSchema();
-

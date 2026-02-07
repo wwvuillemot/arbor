@@ -1,15 +1,15 @@
-import { db } from '../db/index';
-import { appSettings } from '../db/schema';
-import { eq } from 'drizzle-orm';
-import { EncryptionService } from './encryption-service';
+import { db } from "../db/index";
+import { appSettings } from "../db/schema";
+import { eq } from "drizzle-orm";
+import { EncryptionService } from "./encryption-service";
 
 /**
  * SettingsService
- * 
+ *
  * Manages encrypted sensitive settings (API keys, tokens, etc.)
  * All values are encrypted at rest using AES-256-GCM with a master key
  * stored in the OS keychain.
- * 
+ *
  * Separation of concerns:
  * - PreferencesService: Non-sensitive user choices (theme, language)
  * - SettingsService: Encrypted sensitive data (API keys, tokens)
@@ -27,16 +27,23 @@ export class SettingsService {
    * @param value - Plaintext value to encrypt
    * @param masterKey - Base64-encoded 32-byte master key from OS keychain
    */
-  async setSetting(key: string, value: string, masterKey: string): Promise<void> {
+  async setSetting(
+    key: string,
+    value: string,
+    masterKey: string,
+  ): Promise<void> {
     if (!key || key.length === 0) {
-      throw new Error('Setting key cannot be empty');
+      throw new Error("Setting key cannot be empty");
     }
     if (!value || value.length === 0) {
-      throw new Error('Setting value cannot be empty');
+      throw new Error("Setting value cannot be empty");
     }
 
     // Encrypt the value
-    const { encryptedValue, iv } = await this.encryptionService.encrypt(value, masterKey);
+    const { encryptedValue, iv } = await this.encryptionService.encrypt(
+      value,
+      masterKey,
+    );
 
     // Check if setting already exists
     const existing = await this.hasSetting(key);
@@ -81,7 +88,7 @@ export class SettingsService {
     const decrypted = await this.encryptionService.decrypt(
       setting.encryptedValue,
       setting.iv,
-      masterKey
+      masterKey,
     );
 
     return decrypted;
@@ -109,7 +116,7 @@ export class SettingsService {
       const value = await this.encryptionService.decrypt(
         setting.encryptedValue,
         setting.iv,
-        masterKey
+        masterKey,
       );
       decrypted[setting.key] = value;
     }
@@ -137,8 +144,9 @@ export class SettingsService {
    * @returns Array of setting keys
    */
   async getAllKeys(): Promise<string[]> {
-    const settings = await db.select({ key: appSettings.key }).from(appSettings);
+    const settings = await db
+      .select({ key: appSettings.key })
+      .from(appSettings);
     return settings.map((s) => s.key);
   }
 }
-

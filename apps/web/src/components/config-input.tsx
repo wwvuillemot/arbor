@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { useTranslations } from 'next-intl';
-import { cn } from '@/lib/utils';
+import * as React from "react";
+import { useTranslations } from "next-intl";
+import { cn } from "@/lib/utils";
 
 export interface ConfigInputProps {
   label: string;
@@ -31,7 +31,7 @@ export function ConfigInput({
   isDefault = false,
   className,
 }: ConfigInputProps) {
-  const t = useTranslations('settings.configuration');
+  const t = useTranslations("settings.configuration");
   const [localValue, setLocalValue] = React.useState(value);
   const [hasChanges, setHasChanges] = React.useState(false);
 
@@ -70,7 +70,7 @@ export function ConfigInput({
   };
 
   const handleReset = () => {
-    if (confirm(t('resetConfirm'))) {
+    if (confirm(t("resetConfirm"))) {
       onReset();
     }
   };
@@ -83,7 +83,7 @@ export function ConfigInput({
         </label>
         {isDefault && (
           <span className="text-xs text-muted-foreground">
-            {t('usingDefault')}
+            {t("usingDefault")}
           </span>
         )}
       </div>
@@ -96,42 +96,41 @@ export function ConfigInput({
           value={localValue}
           onChange={handleChange}
           className={cn(
-            'flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            'disabled:cursor-not-allowed disabled:opacity-50',
-            'placeholder:text-muted-foreground'
+            "flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "disabled:cursor-not-allowed disabled:opacity-50",
+            "placeholder:text-muted-foreground",
           )}
         />
         <button
           onClick={handleSave}
           disabled={!hasChanges || isSaving}
           className={cn(
-            'inline-flex items-center justify-center rounded-md text-sm font-medium',
-            'h-9 px-4 py-2',
-            'bg-primary text-primary-foreground hover:bg-primary/90',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-            'disabled:pointer-events-none disabled:opacity-50'
+            "inline-flex items-center justify-center rounded-md text-sm font-medium",
+            "h-9 px-4 py-2",
+            "bg-primary text-primary-foreground hover:bg-primary/90",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "disabled:pointer-events-none disabled:opacity-50",
           )}
         >
-          {isSaving ? t('saving') : isSaved ? t('saved') : t('save')}
+          {isSaving ? t("saving") : isSaved ? t("saved") : t("save")}
         </button>
         {!isDefault && (
           <button
             onClick={handleReset}
             disabled={isSaving}
             className={cn(
-              'inline-flex items-center justify-center rounded-md text-sm font-medium',
-              'h-9 px-4 py-2',
-              'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              'disabled:pointer-events-none disabled:opacity-50'
+              "inline-flex items-center justify-center rounded-md text-sm font-medium",
+              "h-9 px-4 py-2",
+              "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              "disabled:pointer-events-none disabled:opacity-50",
             )}
           >
-            {t('reset')}
+            {t("reset")}
           </button>
         )}
       </div>
     </div>
   );
 }
-

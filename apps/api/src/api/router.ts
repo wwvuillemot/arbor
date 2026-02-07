@@ -1,8 +1,8 @@
-import { router, publicProcedure } from './trpc';
-import { nodesRouter } from './routers/nodes';
-import { preferencesRouter } from './routers/preferences';
-import { settingsRouter } from './routers/settings';
-import { configurationRouter } from './routers/configuration';
+import { router, publicProcedure } from "./trpc";
+import { nodesRouter } from "./routers/nodes";
+import { preferencesRouter } from "./routers/preferences";
+import { settingsRouter } from "./routers/settings";
+import { configurationRouter } from "./routers/configuration";
 
 /**
  * Main application router
@@ -16,11 +16,10 @@ export const appRouter = router({
 
   // Health check endpoint
   health: publicProcedure.query(() => ({
-    status: 'ok',
+    status: "ok",
     timestamp: new Date().toISOString(),
   })),
 });
 
 // Export type definition for client
 export type AppRouter = typeof appRouter;
-

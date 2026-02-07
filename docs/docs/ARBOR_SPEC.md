@@ -392,37 +392,37 @@ arbor/
 
 ```typescript
 // tests/repositories/node.test.ts
-describe('NodeRepository', () => {
-  test('should create a folder node', async () => {
+describe("NodeRepository", () => {
+  test("should create a folder node", async () => {
     const folder = await nodeRepo.create({
-      type: 'folder',
-      name: 'My Projects',
-      parent_id: null
+      type: "folder",
+      name: "My Projects",
+      parent_id: null,
     });
     expect(folder.id).toBeDefined();
-    expect(folder.type).toBe('folder');
+    expect(folder.type).toBe("folder");
   });
 
-  test('should get all children of a folder', async () => {
-    const parent = await createFolder('Parent');
-    const child1 = await createNote('Child 1', parent.id);
-    const child2 = await createNote('Child 2', parent.id);
+  test("should get all children of a folder", async () => {
+    const parent = await createFolder("Parent");
+    const child1 = await createNote("Child 1", parent.id);
+    const child2 = await createNote("Child 2", parent.id);
 
     const children = await nodeRepo.getChildren(parent.id);
     expect(children).toHaveLength(2);
   });
 
-  test('should get full path to a node', async () => {
-    const root = await createFolder('Root');
-    const sub = await createFolder('Sub', root.id);
-    const note = await createNote('Note', sub.id);
+  test("should get full path to a node", async () => {
+    const root = await createFolder("Root");
+    const sub = await createFolder("Sub", root.id);
+    const note = await createNote("Note", sub.id);
 
     const path = await nodeRepo.getPath(note.id);
-    expect(path).toEqual(['Root', 'Sub', 'Note']);
+    expect(path).toEqual(["Root", "Sub", "Note"]);
   });
 
-  test('should soft delete and restore nodes', async () => {
-    const node = await createNote('Test');
+  test("should soft delete and restore nodes", async () => {
+    const node = await createNote("Test");
     await nodeRepo.delete(node.id);
 
     const deleted = await nodeRepo.findById(node.id);
@@ -433,9 +433,9 @@ describe('NodeRepository', () => {
     expect(restored).toBeDefined();
   });
 
-  test('should cascade delete children', async () => {
-    const parent = await createFolder('Parent');
-    const child = await createNote('Child', parent.id);
+  test("should cascade delete children", async () => {
+    const parent = await createFolder("Parent");
+    const child = await createNote("Child", parent.id);
 
     await nodeRepo.delete(parent.id);
 
@@ -485,50 +485,50 @@ describe('NodeRepository', () => {
 
 ```typescript
 // tests/api/nodes.test.ts
-describe('Node API', () => {
-  test('POST /api/nodes - create folder', async () => {
+describe("Node API", () => {
+  test("POST /api/nodes - create folder", async () => {
     const response = await trpc.nodes.create.mutate({
-      type: 'folder',
-      name: 'Test Folder',
-      parent_id: null
+      type: "folder",
+      name: "Test Folder",
+      parent_id: null,
     });
 
     expect(response.id).toBeDefined();
-    expect(response.type).toBe('folder');
+    expect(response.type).toBe("folder");
   });
 
-  test('GET /api/nodes/:id/children - get children', async () => {
-    const parent = await createFolder('Parent');
-    await createNote('Child 1', parent.id);
-    await createNote('Child 2', parent.id);
+  test("GET /api/nodes/:id/children - get children", async () => {
+    const parent = await createFolder("Parent");
+    await createNote("Child 1", parent.id);
+    await createNote("Child 2", parent.id);
 
     const children = await trpc.nodes.getChildren.query({
-      id: parent.id
+      id: parent.id,
     });
 
     expect(children).toHaveLength(2);
   });
 
-  test('GET /api/nodes/search - full-text search', async () => {
-    await createNote('JavaScript Tutorial', null, 'Learn JS');
-    await createNote('Python Guide', null, 'Learn Python');
+  test("GET /api/nodes/search - full-text search", async () => {
+    await createNote("JavaScript Tutorial", null, "Learn JS");
+    await createNote("Python Guide", null, "Learn Python");
 
     const results = await trpc.nodes.search.query({
-      query: 'JavaScript'
+      query: "JavaScript",
     });
 
     expect(results).toHaveLength(1);
-    expect(results[0].name).toBe('JavaScript Tutorial');
+    expect(results[0].name).toBe("JavaScript Tutorial");
   });
 
-  test('should validate node type metadata', async () => {
+  test("should validate node type metadata", async () => {
     await expect(
       trpc.nodes.create.mutate({
-        type: 'note',
-        name: 'Test',
-        metadata: { invalid_field: true }
-      })
-    ).rejects.toThrow('Invalid metadata for type: note');
+        type: "note",
+        name: "Test",
+        metadata: { invalid_field: true },
+      }),
+    ).rejects.toThrow("Invalid metadata for type: note");
   });
 });
 ```
@@ -660,17 +660,17 @@ test('should create and edit a note', async ({ page }) => {
 
 ```typescript
 // tests/services/embeddings.test.ts
-describe('EmbeddingService', () => {
-  test('should generate embeddings for text', async () => {
-    const text = 'This is a test note about JavaScript';
+describe("EmbeddingService", () => {
+  test("should generate embeddings for text", async () => {
+    const text = "This is a test note about JavaScript";
     const embedding = await embeddingService.generate(text);
 
     expect(embedding).toHaveLength(1536); // OpenAI ada-002
-    expect(embedding[0]).toBeTypeOf('number');
+    expect(embedding[0]).toBeTypeOf("number");
   });
 
-  test('should store embeddings in database', async () => {
-    const note = await createNote('Test', null, 'Content');
+  test("should store embeddings in database", async () => {
+    const note = await createNote("Test", null, "Content");
     await embeddingService.embedNode(note.id);
 
     const updated = await nodeRepo.findById(note.id);
@@ -679,40 +679,40 @@ describe('EmbeddingService', () => {
 });
 
 // tests/services/search.test.ts
-describe('SearchService', () => {
-  test('should perform semantic search', async () => {
-    await createNote('JS Tutorial', null, 'Learn JavaScript');
-    await createNote('Python Guide', null, 'Learn Python');
+describe("SearchService", () => {
+  test("should perform semantic search", async () => {
+    await createNote("JS Tutorial", null, "Learn JavaScript");
+    await createNote("Python Guide", null, "Learn Python");
     await embeddingService.embedAll();
 
-    const results = await searchService.semantic('ECMAScript');
+    const results = await searchService.semantic("ECMAScript");
 
-    expect(results[0].name).toBe('JS Tutorial');
+    expect(results[0].name).toBe("JS Tutorial");
     expect(results[0].similarity).toBeGreaterThan(0.7);
   });
 
-  test('should perform hybrid search', async () => {
-    await createNote('React Hooks', null, 'useState and useEffect');
-    await createNote('Vue Composition', null, 'ref and reactive');
+  test("should perform hybrid search", async () => {
+    await createNote("React Hooks", null, "useState and useEffect");
+    await createNote("Vue Composition", null, "ref and reactive");
     await embeddingService.embedAll();
 
-    const results = await searchService.hybrid('React hooks');
+    const results = await searchService.hybrid("React hooks");
 
-    expect(results[0].name).toBe('React Hooks');
+    expect(results[0].name).toBe("React Hooks");
   });
 });
 
 // tests/services/rag.test.ts
-describe('RAGService', () => {
-  test('should retrieve relevant context', async () => {
-    await createNote('Note 1', null, 'AI and machine learning');
-    await createNote('Note 2', null, 'Deep learning models');
+describe("RAGService", () => {
+  test("should retrieve relevant context", async () => {
+    await createNote("Note 1", null, "AI and machine learning");
+    await createNote("Note 2", null, "Deep learning models");
     await embeddingService.embedAll();
 
-    const context = await ragService.getContext('neural networks');
+    const context = await ragService.getContext("neural networks");
 
     expect(context).toHaveLength(2);
-    expect(context[0].content).toContain('learning');
+    expect(context[0].content).toContain("learning");
   });
 });
 ```
@@ -758,24 +758,24 @@ describe('RAGService', () => {
 
 ```typescript
 // tests/agents/ask-question.test.ts
-describe('AskQuestionAgent', () => {
-  test('should answer question using RAG', async () => {
-    await createNote('JS Basics', null, 'Variables: let, const, var');
+describe("AskQuestionAgent", () => {
+  test("should answer question using RAG", async () => {
+    await createNote("JS Basics", null, "Variables: let, const, var");
     await embeddingService.embedAll();
 
     const response = await askAgent.run(
-      'What are the types of variables in JavaScript?'
+      "What are the types of variables in JavaScript?",
     );
 
-    expect(response.answer).toContain('let');
+    expect(response.answer).toContain("let");
     expect(response.sources).toHaveLength(1);
-    expect(response.sources[0].name).toBe('JS Basics');
+    expect(response.sources[0].name).toBe("JS Basics");
   });
 });
 
 // tests/agents/take-notes.test.ts
-describe('TakeNotesAgent', () => {
-  test('should extract key points from text', async () => {
+describe("TakeNotesAgent", () => {
+  test("should extract key points from text", async () => {
     const input = `
       Today I learned about React hooks.
       useState manages state, useEffect handles side effects.
@@ -786,30 +786,26 @@ describe('TakeNotesAgent', () => {
 
     expect(result.notes).toContainEqual(
       expect.objectContaining({
-        title: expect.stringContaining('React'),
-        content: expect.stringContaining('useState')
-      })
+        title: expect.stringContaining("React"),
+        content: expect.stringContaining("useState"),
+      }),
     );
   });
 
-  test('should update existing related notes', async () => {
-    const existing = await createNote(
-      'React Learning',
-      null,
-      'Basic concepts'
-    );
+  test("should update existing related notes", async () => {
+    const existing = await createNote("React Learning", null, "Basic concepts");
 
-    const input = 'Learned about useContext hook today';
+    const input = "Learned about useContext hook today";
     const result = await takeNotesAgent.run(input);
 
     expect(result.updated).toContainEqual(existing.id);
 
     const updated = await nodeRepo.findById(existing.id);
-    expect(updated.content).toContain('useContext');
+    expect(updated.content).toContain("useContext");
   });
 
-  test('should transcribe audio and take notes', async () => {
-    const audioFile = './fixtures/voice-note.mp3';
+  test("should transcribe audio and take notes", async () => {
+    const audioFile = "./fixtures/voice-note.mp3";
 
     const result = await takeNotesAgent.runAudio(audioFile);
 
@@ -819,37 +815,37 @@ describe('TakeNotesAgent', () => {
 });
 
 // tests/agents/editor.test.ts
-describe('EditorAgent', () => {
-  test('should analyze writing style', async () => {
-    const text = 'This is my writing. I like short sentences.';
+describe("EditorAgent", () => {
+  test("should analyze writing style", async () => {
+    const text = "This is my writing. I like short sentences.";
 
     const analysis = await editorAgent.analyzeStyle(text);
 
     expect(analysis.avgSentenceLength).toBeLessThan(10);
-    expect(analysis.tone).toBe('casual');
+    expect(analysis.tone).toBe("casual");
   });
 
-  test('should suggest improvements', async () => {
-    const text = 'The thing is very good and nice.';
+  test("should suggest improvements", async () => {
+    const text = "The thing is very good and nice.";
 
     const suggestions = await editorAgent.suggest(text);
 
     expect(suggestions).toContainEqual(
       expect.objectContaining({
-        type: 'clarity',
-        original: 'very good and nice',
-        suggestion: expect.any(String)
-      })
+        type: "clarity",
+        original: "very good and nice",
+        suggestion: expect.any(String),
+      }),
     );
   });
 
-  test('should NOT auto-apply suggestions', async () => {
-    const note = await createNote('Test', null, 'Bad writing.');
+  test("should NOT auto-apply suggestions", async () => {
+    const note = await createNote("Test", null, "Bad writing.");
 
     const suggestions = await editorAgent.suggest(note.content);
     const current = await nodeRepo.findById(note.id);
 
-    expect(current.content).toBe('Bad writing.'); // Unchanged
+    expect(current.content).toBe("Bad writing."); // Unchanged
     expect(suggestions).toHaveLength(1);
   });
 });
@@ -896,38 +892,35 @@ describe('EditorAgent', () => {
 
 ```typescript
 // tests/services/provenance.test.ts
-describe('ProvenanceService', () => {
-  test('should track AI-generated content', async () => {
-    const note = await createNote('Test', null, '');
+describe("ProvenanceService", () => {
+  test("should track AI-generated content", async () => {
+    const note = await createNote("Test", null, "");
 
     await provenanceService.addBlock(note.id, {
-      content: 'AI generated text',
-      author_type: 'ai',
-      source: 'gpt-4'
+      content: "AI generated text",
+      author_type: "ai",
+      source: "gpt-4",
     });
 
     const blocks = await provenanceService.getBlocks(note.id);
-    expect(blocks[0].author_type).toBe('ai');
+    expect(blocks[0].author_type).toBe("ai");
   });
 
-  test('should require approval for AI suggestions', async () => {
-    const suggestion = await createSuggestion(
-      'Original text',
-      'Improved text'
-    );
+  test("should require approval for AI suggestions", async () => {
+    const suggestion = await createSuggestion("Original text", "Improved text");
 
-    expect(suggestion.metadata.status).toBe('pending');
+    expect(suggestion.metadata.status).toBe("pending");
 
     await provenanceService.approve(suggestion.id);
 
     const approved = await nodeRepo.findById(suggestion.id);
-    expect(approved.metadata.status).toBe('approved');
+    expect(approved.metadata.status).toBe("approved");
   });
 
-  test('should track acceptance rate', async () => {
-    await createSuggestion('A', 'B', 'approved');
-    await createSuggestion('C', 'D', 'rejected');
-    await createSuggestion('E', 'F', 'approved');
+  test("should track acceptance rate", async () => {
+    await createSuggestion("A", "B", "approved");
+    await createSuggestion("C", "D", "rejected");
+    await createSuggestion("E", "F", "approved");
 
     const metrics = await provenanceService.getMetrics();
 
@@ -970,14 +963,14 @@ describe('ProvenanceService', () => {
 
 ```typescript
 // tests/tauri/ipc.test.ts
-describe('Tauri IPC', () => {
-  test('should invoke backend commands', async () => {
-    const result = await invoke('get_app_version');
+describe("Tauri IPC", () => {
+  test("should invoke backend commands", async () => {
+    const result = await invoke("get_app_version");
     expect(result).toMatch(/\d+\.\d+\.\d+/);
   });
 
-  test('should access file system', async () => {
-    const path = await invoke('select_folder');
+  test("should access file system", async () => {
+    const path = await invoke("select_folder");
     expect(path).toBeDefined();
   });
 });
@@ -1015,24 +1008,24 @@ describe('Tauri IPC', () => {
 
 ```typescript
 // tests/services/git.test.ts
-describe('GitService', () => {
-  test('should auto-commit on save', async () => {
+describe("GitService", () => {
+  test("should auto-commit on save", async () => {
     await gitService.enable();
 
-    const note = await createNote('Test', null, 'Content');
-    await new Promise(r => setTimeout(r, 1000)); // Wait for auto-commit
+    const note = await createNote("Test", null, "Content");
+    await new Promise((r) => setTimeout(r, 1000)); // Wait for auto-commit
 
     const commits = await gitService.getCommits();
-    expect(commits[0].message).toContain('Test');
+    expect(commits[0].message).toContain("Test");
   });
 
-  test('should export notes as markdown', async () => {
-    await createNote('Note 1', null, 'Content 1');
-    await createNote('Note 2', null, 'Content 2');
+  test("should export notes as markdown", async () => {
+    await createNote("Note 1", null, "Content 1");
+    await createNote("Note 2", null, "Content 2");
 
-    await gitService.exportMarkdown('./export');
+    await gitService.exportMarkdown("./export");
 
-    expect(fs.existsSync('./export/Note 1.md')).toBe(true);
+    expect(fs.existsSync("./export/Note 1.md")).toBe(true);
   });
 });
 ```
@@ -1322,7 +1315,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+          cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install
@@ -1429,19 +1422,19 @@ jobs:
 
 ## Technology Decisions Summary
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **Database** | PostgreSQL + pgvector | Native JSONB, mature vector search, better for node-based model |
-| **Backend** | TypeScript/Node.js | Full-stack type safety, Tauri IPC compatibility |
-| **Frontend** | Next.js 14 | Modern React, App Router, excellent DX |
-| **Desktop** | Tauri v2 | Small bundle, native performance, Rust security |
-| **Testing** | Vitest + Playwright | Fast, modern, great DX |
-| **ORM** | Drizzle | Type-safe, lightweight, great PostgreSQL support |
-| **API** | tRPC | End-to-end type safety, no code generation |
-| **Build** | Makefile | Simple, universal, no extra dependencies |
-| **Package Manager** | pnpm | Fast, efficient, workspace support |
-| **AI Framework** | LangChain.js | Mature, extensive tool ecosystem |
-| **Vector DB** | pgvector | Integrated with PostgreSQL, no separate service |
+| Decision            | Choice                | Rationale                                                       |
+| ------------------- | --------------------- | --------------------------------------------------------------- |
+| **Database**        | PostgreSQL + pgvector | Native JSONB, mature vector search, better for node-based model |
+| **Backend**         | TypeScript/Node.js    | Full-stack type safety, Tauri IPC compatibility                 |
+| **Frontend**        | Next.js 14            | Modern React, App Router, excellent DX                          |
+| **Desktop**         | Tauri v2              | Small bundle, native performance, Rust security                 |
+| **Testing**         | Vitest + Playwright   | Fast, modern, great DX                                          |
+| **ORM**             | Drizzle               | Type-safe, lightweight, great PostgreSQL support                |
+| **API**             | tRPC                  | End-to-end type safety, no code generation                      |
+| **Build**           | Makefile              | Simple, universal, no extra dependencies                        |
+| **Package Manager** | pnpm                  | Fast, efficient, workspace support                              |
+| **AI Framework**    | LangChain.js          | Mature, extensive tool ecosystem                                |
+| **Vector DB**       | pgvector              | Integrated with PostgreSQL, no separate service                 |
 
 ---
 

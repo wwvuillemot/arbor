@@ -109,6 +109,7 @@ Tests use the following path aliases (configured in `tsconfig.json` and `vitest.
 **Cause**: Services (PostgreSQL, Redis) not running or not accessible
 
 **Solution**:
+
 ```bash
 make up
 docker logs arbor-postgres
@@ -120,6 +121,7 @@ docker logs arbor-redis
 **Cause**: Path aliases not configured correctly or dependencies missing
 
 **Solution**:
+
 ```bash
 pnpm install
 # Check tsconfig.json and vitest.config.ts path aliases
@@ -130,6 +132,7 @@ pnpm install
 **Cause**: Database schema not pushed or connection string incorrect
 
 **Solution**:
+
 ```bash
 make db-push
 # Check DATABASE_URL in environment
@@ -140,6 +143,7 @@ make db-push
 **Cause**: Redis not running or `redis` package not installed in Docker image
 
 **Solution**:
+
 ```bash
 # Rebuild API image with new dependencies
 docker compose -f apps/key-value-store/docker-compose.yml \
@@ -156,21 +160,21 @@ make restart
 ### Unit Test Example
 
 ```typescript
-import { describe, it, expect, beforeEach } from 'vitest';
-import { getTestDb, resetTestDb } from '@tests/helpers/db';
+import { describe, it, expect, beforeEach } from "vitest";
+import { getTestDb, resetTestDb } from "@tests/helpers/db";
 
-describe('MyFeature', () => {
+describe("MyFeature", () => {
   beforeEach(async () => {
     await resetTestDb();
   });
 
-  it('should do something', async () => {
+  it("should do something", async () => {
     // Arrange
     const db = getTestDb();
-    
+
     // Act
     const result = await myFunction();
-    
+
     // Assert
     expect(result).toBe(expected);
   });
@@ -184,4 +188,3 @@ describe('MyFeature', () => {
 3. **Add Missing Tests** - Ensure 80%+ coverage
 4. **Create Integration Tests** - Test tRPC endpoints
 5. **Add Frontend Tests** - Test React hooks and components
-

@@ -5,6 +5,7 @@ Session-scope preference storage for Arbor.
 ## Overview
 
 This app provides a Redis instance for storing temporary, session-scoped data:
+
 - User session preferences
 - Temporary UI state
 - Cache data
@@ -41,6 +42,7 @@ make clean
 ## Data Persistence
 
 Redis is configured with AOF (Append-Only File) persistence:
+
 - Data is persisted to disk automatically
 - Survives container restarts
 - Can be cleared with `make clean`
@@ -57,10 +59,10 @@ Redis is configured with AOF (Append-Only File) persistence:
 ### Node.js (apps/api)
 
 ```typescript
-import { createClient } from 'redis';
+import { createClient } from "redis";
 
 const client = createClient({
-  url: 'redis://arbor-redis:6379',
+  url: "redis://arbor-redis:6379",
 });
 
 await client.connect();
@@ -75,12 +77,14 @@ REDIS_URL=redis://arbor-redis:6379
 ## Monitoring
 
 Check Redis health:
+
 ```bash
 docker exec arbor-redis redis-cli ping
 # Should return: PONG
 ```
 
 View Redis info:
+
 ```bash
 docker exec arbor-redis redis-cli info
 ```
@@ -91,4 +95,3 @@ docker exec arbor-redis redis-cli info
 - Only accessible within the Docker network
 - No authentication required (internal use only)
 - For production, add authentication via `requirepass`
-

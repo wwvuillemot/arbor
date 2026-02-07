@@ -1,42 +1,43 @@
-import * as React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { trpc, getTRPCClient } from '@/lib/trpc';
-import SettingsPage from '@/app/[locale]/(app)/settings/page';
+import * as React from "react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { trpc, getTRPCClient } from "@/lib/trpc";
+import SettingsPage from "@/app/[locale]/(app)/settings/page";
 
 // Mock next/navigation
 const mockPush = vi.fn();
 const mockRefresh = vi.fn();
 const mockReplace = vi.fn();
-vi.mock('next/navigation', () => ({
+vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: mockPush,
     refresh: mockRefresh,
     replace: mockReplace,
   }),
-  usePathname: () => '/en/settings',
+  usePathname: () => "/en/settings",
 }));
 
 // Mock next-intl
-vi.mock('next-intl', () => ({
-  useLocale: () => 'en',
+vi.mock("next-intl", () => ({
+  useLocale: () => "en",
   useTranslations: () => (key: string) => key,
-  NextIntlClientProvider: ({ children }: { children: React.ReactNode }) => children,
+  NextIntlClientProvider: ({ children }: { children: React.ReactNode }) =>
+    children,
 }));
 
 // Mock Tauri API
-vi.mock('@tauri-apps/api/core', () => ({
+vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
 // Mock the tRPC client to avoid actual API calls
-vi.mock('@/lib/trpc', () => {
+vi.mock("@/lib/trpc", () => {
   const mockTrpc = {
     preferences: {
       getAppPreference: {
         useQuery: vi.fn(() => ({
-          data: 'system',
+          data: "system",
           isLoading: false,
           error: null,
         })),
@@ -51,7 +52,7 @@ vi.mock('@/lib/trpc', () => {
       },
       getAllAppPreferences: {
         useQuery: vi.fn(() => ({
-          data: { theme: 'system', language: 'en' },
+          data: { theme: "system", language: "en" },
           isLoading: false,
           error: null,
         })),
@@ -121,31 +122,31 @@ vi.mock('@/lib/trpc', () => {
 
 // Test wrapper with providers
 function TestWrapper({ children }: { children: React.ReactNode }) {
-  const [queryClient] = React.useState(() => new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  }));
+  const [queryClient] = React.useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+          },
+        },
+      }),
+  );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 }
 
-describe('SettingsPage', () => {
+describe("SettingsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should redirect to preferences page', () => {
+  it("should redirect to preferences page", () => {
     render(<SettingsPage />, { wrapper: TestWrapper });
 
     // Should redirect to /en/settings/preferences
-    expect(mockReplace).toHaveBeenCalledWith('/en/settings/preferences');
+    expect(mockReplace).toHaveBeenCalledWith("/en/settings/preferences");
   });
 });
-

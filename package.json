@@ -4,7 +4,7 @@
   "description": "A local-first, AI-powered writing assistant",
   "private": true,
   "scripts": {
-    "dev": "cd apps/web && next dev",
+    "dev": "cd apps/web && next dev --turbo",
     "dev:api": "tsx watch apps/api/src/api/index.ts",
     "dev:server": "tsx watch apps/api/src/index.ts",
     "dev:desktop": "tauri dev",
@@ -12,7 +12,9 @@
     "build:desktop": "tauri build",
     "start": "cd apps/web && next start",
     "lint": "cd apps/web && next lint",
+    "lint:fix": "cd apps/web && next lint --fix",
     "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --config vitest.config.ts",

@@ -32,6 +32,7 @@ Project: "My Fantasy Novel"
 ```
 
 Perfect for:
+
 - 📚 **Novels & Stories** - Organize characters, plots, and chapters
 - 🎲 **RPG Campaigns** - Track session notes, NPCs, and locations
 - ✍️ **Short Story Collections** - Manage multiple stories and ideas
@@ -163,4 +164,3 @@ MIT
 ## Support
 
 For issues, questions, or contributions, please see the documentation in `app/docs/`.
-

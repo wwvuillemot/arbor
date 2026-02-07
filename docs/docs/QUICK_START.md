@@ -204,7 +204,7 @@ lsof -ti:3000 | xargs kill -9
    ```bash
    # Create test file
    touch tests/unit/my-feature.test.ts
-   
+
    # Write test
    # Run: make test-watch
    ```

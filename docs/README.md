@@ -67,18 +67,18 @@ All project documentation is located in the [`docs/`](docs/) directory:
 
 **18 weeks (4.5 months) to MVP**
 
-| Phase | Duration | Focus |
-|-------|----------|-------|
-| Phase 0 | 1 week | Project Setup & Infrastructure |
-| Phase 1 | 2 weeks | Core Data Layer (TDD) |
-| Phase 2 | 2 weeks | Backend API (tRPC) |
-| Phase 3 | 2 weeks | Frontend Foundation |
-| Phase 4 | 2 weeks | Vector Search & RAG |
-| Phase 5 | 3 weeks | AI Agent Framework |
-| Phase 6 | 1 week | Provenance & Authorship |
-| Phase 7 | 2 weeks | Tauri Desktop Integration |
-| Phase 8 | 1 week | Git Integration & Backup |
-| Phase 9 | 2 weeks | Polish & Performance |
+| Phase   | Duration | Focus                          |
+| ------- | -------- | ------------------------------ |
+| Phase 0 | 1 week   | Project Setup & Infrastructure |
+| Phase 1 | 2 weeks  | Core Data Layer (TDD)          |
+| Phase 2 | 2 weeks  | Backend API (tRPC)             |
+| Phase 3 | 2 weeks  | Frontend Foundation            |
+| Phase 4 | 2 weeks  | Vector Search & RAG            |
+| Phase 5 | 3 weeks  | AI Agent Framework             |
+| Phase 6 | 1 week   | Provenance & Authorship        |
+| Phase 7 | 2 weeks  | Tauri Desktop Integration      |
+| Phase 8 | 1 week   | Git Integration & Backup       |
+| Phase 9 | 2 weeks  | Polish & Performance           |
 
 ## 🛠️ Common Commands
 

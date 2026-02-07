@@ -85,18 +85,18 @@ See [QUICK_START.md](QUICK_START.md) for detailed instructions.
 
 **18 weeks (4.5 months) to MVP**
 
-| Phase | Weeks | Focus |
-|-------|-------|-------|
-| Phase 0 | 1 | Project Setup & Infrastructure |
-| Phase 1 | 2 | Core Data Layer (TDD) |
-| Phase 2 | 2 | Backend API (tRPC) |
-| Phase 3 | 2 | Frontend Foundation |
-| Phase 4 | 2 | Vector Search & RAG |
-| Phase 5 | 3 | AI Agent Framework |
-| Phase 6 | 1 | Provenance & Authorship |
-| Phase 7 | 2 | Tauri Desktop Integration |
-| Phase 8 | 1 | Git Integration & Backup |
-| Phase 9 | 2 | Polish & Performance |
+| Phase   | Weeks | Focus                          |
+| ------- | ----- | ------------------------------ |
+| Phase 0 | 1     | Project Setup & Infrastructure |
+| Phase 1 | 2     | Core Data Layer (TDD)          |
+| Phase 2 | 2     | Backend API (tRPC)             |
+| Phase 3 | 2     | Frontend Foundation            |
+| Phase 4 | 2     | Vector Search & RAG            |
+| Phase 5 | 3     | AI Agent Framework             |
+| Phase 6 | 1     | Provenance & Authorship        |
+| Phase 7 | 2     | Tauri Desktop Integration      |
+| Phase 8 | 1     | Git Integration & Backup       |
+| Phase 9 | 2     | Polish & Performance           |
 
 Each phase includes:
 

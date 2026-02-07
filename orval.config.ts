@@ -1,21 +1,21 @@
-import { defineConfig } from 'orval';
+import { defineConfig } from "orval";
 
 export default defineConfig({
   arbor: {
     input: {
-      target: './server/openapi.yaml',
+      target: "./server/openapi.yaml",
     },
     output: {
-      mode: 'tags-split',
-      target: './src/lib/api/generated',
-      schemas: './src/lib/api/generated/models',
-      client: 'react-query',
+      mode: "tags-split",
+      target: "./src/lib/api/generated",
+      schemas: "./src/lib/api/generated/models",
+      client: "react-query",
       mock: true,
       prettier: true,
       override: {
         mutator: {
-          path: './src/lib/api/client.ts',
-          name: 'customInstance',
+          path: "./src/lib/api/client.ts",
+          name: "customInstance",
         },
         query: {
           useQuery: true,
@@ -25,8 +25,7 @@ export default defineConfig({
       },
     },
     hooks: {
-      afterAllFilesWrite: 'prettier --write',
+      afterAllFilesWrite: "prettier --write",
     },
   },
 });
-

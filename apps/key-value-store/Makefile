@@ -1,6 +1,6 @@
 # Makefile for Key-Value Store (Redis)
 
-.PHONY: help up down restart logs clean test
+.PHONY: help up down restart logs clean test coverage lint format
 
 .DEFAULT_GOAL := help
 
@@ -15,6 +15,10 @@ help:
 	@echo "  make logs       - View Redis logs"
 	@echo "  make clean      - Remove Redis data volume"
 	@echo "  make cli        - Open Redis CLI"
+	@echo "  make test       - Run tests (N/A for Redis)"
+	@echo "  make coverage   - Run coverage (N/A for Redis)"
+	@echo "  make lint       - Run linter (N/A for Redis)"
+	@echo "  make format     - Format code (N/A for Redis)"
 	@echo ""
 
 up:
@@ -39,4 +43,13 @@ cli:
 
 test:
 	@echo "✅ No tests for key-value-store (Redis service only)"
+
+coverage:
+	@echo "✅ No coverage for key-value-store (Redis service only)"
+
+lint:
+	@echo "✅ No linting for key-value-store (Redis service only)"
+
+format:
+	@echo "✅ No formatting for key-value-store (Redis service only)"
 

@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import * as React from 'react';
+import * as React from "react";
 
 export function useCommandPalette() {
   const [open, setOpen] = React.useState(false);
@@ -11,4 +11,3 @@ export function useCommandPalette() {
     toggle: () => setOpen((prev) => !prev),
   };
 }
-

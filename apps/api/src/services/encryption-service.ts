@@ -1,11 +1,11 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
 /**
  * EncryptionService provides AES-256-GCM encryption/decryption for sensitive data
  * Uses authenticated encryption to ensure data integrity and confidentiality
  */
 export class EncryptionService {
-  private readonly algorithm = 'aes-256-gcm';
+  private readonly algorithm = "aes-256-gcm";
   private readonly ivLength = 12; // 96 bits recommended for GCM
   private readonly authTagLength = 16; // 128 bits
 
@@ -17,23 +17,23 @@ export class EncryptionService {
    */
   async encrypt(
     plaintext: string,
-    masterKey: string
+    masterKey: string,
   ): Promise<{ encryptedValue: string; iv: string }> {
     // Validation
     if (!plaintext || plaintext.length === 0) {
-      throw new Error('Plaintext cannot be empty');
+      throw new Error("Plaintext cannot be empty");
     }
     if (!masterKey || masterKey.length === 0) {
-      throw new Error('Master key cannot be empty');
+      throw new Error("Master key cannot be empty");
     }
 
     try {
       // Decode the base64 master key
-      const keyBuffer = Buffer.from(masterKey, 'base64');
-      
+      const keyBuffer = Buffer.from(masterKey, "base64");
+
       // Validate key length (must be 32 bytes for AES-256)
       if (keyBuffer.length !== 32) {
-        throw new Error('Master key must be 32 bytes (256 bits)');
+        throw new Error("Master key must be 32 bytes (256 bits)");
       }
 
       // Generate random IV (initialization vector)
@@ -45,27 +45,27 @@ export class EncryptionService {
       });
 
       // Encrypt the plaintext
-      let encrypted = cipher.update(plaintext, 'utf8', 'base64');
-      encrypted += cipher.final('base64');
+      let encrypted = cipher.update(plaintext, "utf8", "base64");
+      encrypted += cipher.final("base64");
 
       // Get the authentication tag
       const authTag = cipher.getAuthTag();
 
       // Combine encrypted data and auth tag
       const encryptedWithTag = Buffer.concat([
-        Buffer.from(encrypted, 'base64'),
+        Buffer.from(encrypted, "base64"),
         authTag,
       ]);
 
       return {
-        encryptedValue: encryptedWithTag.toString('base64'),
-        iv: iv.toString('base64'),
+        encryptedValue: encryptedWithTag.toString("base64"),
+        iv: iv.toString("base64"),
       };
     } catch (error) {
       if (error instanceof Error) {
         throw new Error(`Encryption failed: ${error.message}`);
       }
-      throw new Error('Encryption failed: Unknown error');
+      throw new Error("Encryption failed: Unknown error");
     }
   }
 
@@ -79,28 +79,28 @@ export class EncryptionService {
   async decrypt(
     encryptedValue: string,
     iv: string,
-    masterKey: string
+    masterKey: string,
   ): Promise<string> {
     // Validation
     if (!encryptedValue || encryptedValue.length === 0) {
-      throw new Error('Encrypted value cannot be empty');
+      throw new Error("Encrypted value cannot be empty");
     }
     if (!iv || iv.length === 0) {
-      throw new Error('IV cannot be empty');
+      throw new Error("IV cannot be empty");
     }
     if (!masterKey || masterKey.length === 0) {
-      throw new Error('Master key cannot be empty');
+      throw new Error("Master key cannot be empty");
     }
 
     try {
       // Decode inputs
-      const keyBuffer = Buffer.from(masterKey, 'base64');
-      const ivBuffer = Buffer.from(iv, 'base64');
-      const encryptedBuffer = Buffer.from(encryptedValue, 'base64');
+      const keyBuffer = Buffer.from(masterKey, "base64");
+      const ivBuffer = Buffer.from(iv, "base64");
+      const encryptedBuffer = Buffer.from(encryptedValue, "base64");
 
       // Validate key length
       if (keyBuffer.length !== 32) {
-        throw new Error('Master key must be 32 bytes (256 bits)');
+        throw new Error("Master key must be 32 bytes (256 bits)");
       }
 
       // Split encrypted data and auth tag
@@ -116,20 +116,25 @@ export class EncryptionService {
       decipher.setAuthTag(authTag);
 
       // Decrypt
-      let decrypted = decipher.update(encrypted, undefined, 'utf8');
-      decrypted += decipher.final('utf8');
+      let decrypted = decipher.update(encrypted, undefined, "utf8");
+      decrypted += decipher.final("utf8");
 
       return decrypted;
     } catch (error) {
       if (error instanceof Error) {
         // Authentication failures or tampering will throw here
-        if (error.message.includes('Unsupported state or unable to authenticate data')) {
-          throw new Error('Decryption failed: Invalid key or data has been tampered with');
+        if (
+          error.message.includes(
+            "Unsupported state or unable to authenticate data",
+          )
+        ) {
+          throw new Error(
+            "Decryption failed: Invalid key or data has been tampered with",
+          );
         }
         throw new Error(`Decryption failed: ${error.message}`);
       }
-      throw new Error('Decryption failed: Unknown error');
+      throw new Error("Decryption failed: Unknown error");
     }
   }
 }
-

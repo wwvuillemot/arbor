@@ -1,6 +1,6 @@
 # Makefile for Arbor API Server
 
-.PHONY: help setup install dev build start clean test db-push db-seed db-studio
+.PHONY: help setup install dev build start clean test coverage lint format db-push db-seed db-studio
 
 help:
 	@echo "========================================="
@@ -14,6 +14,9 @@ help:
 	@echo "  make build      - Build for production"
 	@echo "  make start      - Start production server"
 	@echo "  make test       - Run tests"
+	@echo "  make coverage   - Run tests with coverage"
+	@echo "  make lint       - Run linter"
+	@echo "  make format     - Format code (auto-fix)"
 	@echo "  make clean      - Clean build artifacts"
 	@echo ""
 	@echo "Database targets:"
@@ -45,6 +48,19 @@ test:
 	@docker exec arbor-api pnpm run test:unit
 	@docker exec arbor-api pnpm run test:integration || echo "⚠️  No integration tests configured yet"
 
+coverage:
+	@echo "Running API tests with coverage in container..."
+	@docker exec arbor-api pnpm run test:unit --coverage
+	@docker exec arbor-api pnpm run test:integration --coverage || echo "⚠️  No integration tests configured yet"
+
+lint:
+	@echo "Running linter in container..."
+	@docker exec arbor-api pnpm run lint || echo "⚠️  No lint script configured"
+
+format:
+	@echo "Formatting code..."
+	@cd ../.. && pnpm run format
+
 db-push:
 	@echo "Pushing database schema..."
 	@cd ../.. && pnpm run db:push
@@ -61,4 +77,5 @@ clean:
 	@echo "Cleaning build artifacts..."
 	@rm -rf dist
 	@rm -rf node_modules
+	@rm -rf coverage
 

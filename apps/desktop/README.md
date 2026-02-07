@@ -60,6 +60,7 @@ pnpm run dev:desktop
 ```
 
 This will:
+
 1. Start the Tauri development server
 2. Automatically run `make up` to start Docker services
 3. Wait for services to be ready (~10 seconds)
@@ -155,4 +156,3 @@ Once the desktop app is working, you can:
 - [Tauri Documentation](https://tauri.app/)
 - [Tauri v2 Guide](https://v2.tauri.app/start/)
 - [Tauri API Reference](https://v2.tauri.app/reference/)
-

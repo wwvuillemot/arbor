@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useEffect } from "react";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -16,4 +16,3 @@ export default function SettingsPage() {
 
   return null;
 }
-

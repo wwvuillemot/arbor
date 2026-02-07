@@ -1,6 +1,6 @@
-import { getTestDb } from './db';
-import { nodes } from '@server/db/schema';
-import type { NodeType, AuthorType } from '@server/db/schema';
+import { getTestDb } from "./db";
+import { nodes } from "@server/db/schema";
+import type { NodeType, AuthorType } from "@server/db/schema";
 
 export interface CreateNodeParams {
   type: NodeType;
@@ -17,28 +17,31 @@ export interface CreateNodeParams {
  */
 export async function createTestNode(params: CreateNodeParams) {
   const db = getTestDb();
-  
-  const [node] = await db.insert(nodes).values({
-    type: params.type,
-    name: params.name,
-    parentId: params.parentId || null,
-    slug: params.slug,
-    content: params.content,
-    metadata: params.metadata || {},
-    authorType: params.authorType || 'human',
-  }).returning();
-  
+
+  const [node] = await db
+    .insert(nodes)
+    .values({
+      type: params.type,
+      name: params.name,
+      parentId: params.parentId || null,
+      slug: params.slug,
+      content: params.content,
+      metadata: params.metadata || {},
+      authorType: params.authorType || "human",
+    })
+    .returning();
+
   return node;
 }
 
 /**
  * Create a test project
  */
-export async function createTestProject(name: string = 'Test Project') {
+export async function createTestProject(name: string = "Test Project") {
   return createTestNode({
-    type: 'project',
+    type: "project",
     name,
-    slug: name.toLowerCase().replace(/\s+/g, '-'),
+    slug: name.toLowerCase().replace(/\s+/g, "-"),
   });
 }
 
@@ -47,23 +50,27 @@ export async function createTestProject(name: string = 'Test Project') {
  */
 export async function createTestFolder(name: string, parentId: string) {
   return createTestNode({
-    type: 'folder',
+    type: "folder",
     name,
     parentId,
-    slug: name.toLowerCase().replace(/\s+/g, '-'),
+    slug: name.toLowerCase().replace(/\s+/g, "-"),
   });
 }
 
 /**
  * Create a test note
  */
-export async function createTestNote(name: string, parentId: string, content: string = '') {
+export async function createTestNote(
+  name: string,
+  parentId: string,
+  content: string = "",
+) {
   return createTestNode({
-    type: 'note',
+    type: "note",
     name,
     parentId,
     content,
-    slug: name.toLowerCase().replace(/\s+/g, '-'),
+    slug: name.toLowerCase().replace(/\s+/g, "-"),
   });
 }
 
@@ -72,31 +79,34 @@ export async function createTestNote(name: string, parentId: string, content: st
  */
 export async function createTestProjectHierarchy() {
   // Create project
-  const project = await createTestProject('My Fantasy Novel');
-  
+  const project = await createTestProject("My Fantasy Novel");
+
   // Create folders
-  const charactersFolder = await createTestFolder('Characters', project.id);
-  const worldBuildingFolder = await createTestFolder('World Building', project.id);
-  
+  const charactersFolder = await createTestFolder("Characters", project.id);
+  const worldBuildingFolder = await createTestFolder(
+    "World Building",
+    project.id,
+  );
+
   // Create notes
   const protagonist = await createTestNote(
-    'Protagonist: Aria',
+    "Protagonist: Aria",
     charactersFolder.id,
-    'A young mage discovering her powers.'
+    "A young mage discovering her powers.",
   );
-  
+
   const antagonist = await createTestNote(
-    'Antagonist: Lord Malachar',
+    "Antagonist: Lord Malachar",
     charactersFolder.id,
-    'The dark lord seeking to control all magic.'
+    "The dark lord seeking to control all magic.",
   );
-  
+
   const magicSystem = await createTestNote(
-    'Magic System',
+    "Magic System",
     worldBuildingFolder.id,
-    'Magic is drawn from the natural world and requires balance.'
+    "Magic is drawn from the natural world and requires balance.",
   );
-  
+
   return {
     project,
     folders: {
@@ -110,4 +120,3 @@ export async function createTestProjectHierarchy() {
     },
   };
 }
-

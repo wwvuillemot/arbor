@@ -1,4 +1,4 @@
-import { type LucideIcon } from 'lucide-react';
+import { type LucideIcon } from "lucide-react";
 
 export interface Command {
   id: string;
@@ -71,7 +71,7 @@ class CommandRegistry {
    */
   getGroups(): CommandGroup[] {
     return Array.from(this.groups.values()).sort(
-      (a, b) => (b.priority || 0) - (a.priority || 0)
+      (a, b) => (b.priority || 0) - (a.priority || 0),
     );
   }
 
@@ -84,7 +84,7 @@ class CommandRegistry {
       const labelMatch = cmd.label.toLowerCase().includes(lowerQuery);
       const descMatch = cmd.description?.toLowerCase().includes(lowerQuery);
       const keywordMatch = cmd.keywords?.some((kw) =>
-        kw.toLowerCase().includes(lowerQuery)
+        kw.toLowerCase().includes(lowerQuery),
       );
       return labelMatch || descMatch || keywordMatch;
     });
@@ -116,8 +116,19 @@ class CommandRegistry {
 export const commandRegistry = new CommandRegistry();
 
 // Register default groups
-commandRegistry.registerGroup({ id: 'navigation', label: 'Navigation', priority: 100 });
-commandRegistry.registerGroup({ id: 'actions', label: 'Actions', priority: 90 });
-commandRegistry.registerGroup({ id: 'settings', label: 'Settings', priority: 80 });
-commandRegistry.registerGroup({ id: 'help', label: 'Help', priority: 70 });
-
+commandRegistry.registerGroup({
+  id: "navigation",
+  label: "Navigation",
+  priority: 100,
+});
+commandRegistry.registerGroup({
+  id: "actions",
+  label: "Actions",
+  priority: 90,
+});
+commandRegistry.registerGroup({
+  id: "settings",
+  label: "Settings",
+  priority: 80,
+});
+commandRegistry.registerGroup({ id: "help", label: "Help", priority: 70 });
