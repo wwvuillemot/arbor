@@ -85,7 +85,20 @@
       "usingDefault": "デフォルト値を使用中",
       "save": "保存",
       "saved": "保存しました！",
-      "saving": "保存中..."
+      "saving": "保存中...",
+      "encryption": {
+        "title": "暗号化",
+        "masterKey": {
+          "label": "マスター暗号化キー",
+          "description": "このキーは、APIキーなどの機密設定を暗号化するために使用されます。自動的に生成され、データベースに安全に保存されます。",
+          "loading": "読み込み中...",
+          "notGenerated": "未生成",
+          "showKey": "キーを表示",
+          "hideKey": "キーを非表示",
+          "copyToClipboard": "クリップボードにコピー",
+          "warning": "⚠️ このキーは安全に保管してください。紛失した場合、すべての暗号化された設定を再入力する必要があります。"
+        }
+      }
     }
   },
   "commandPalette": {

@@ -3,6 +3,8 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { ConfigInput } from "@/components/config-input";
+import { trpc } from "@/lib/trpc";
+import { Eye, EyeOff, Copy, Check } from "lucide-react";
 
 // TODO: Replace with actual tRPC hooks when available
 // For now, using placeholder hooks
@@ -86,6 +88,14 @@ export default function ConfigurationPage() {
     OLLAMA_BASE_URL: false,
   });
 
+  // Master key state
+  const [showMasterKey, setShowMasterKey] = React.useState(false);
+  const [copiedMasterKey, setCopiedMasterKey] = React.useState(false);
+
+  // Fetch master key from database
+  const { data: masterKeyData, isLoading: isLoadingMasterKey } =
+    trpc.preferences.getMasterKey.useQuery();
+
   // Update local state when config changes
   React.useEffect(() => {
     setDatabaseUrl(config.DATABASE_URL);
@@ -116,6 +126,31 @@ export default function ConfigurationPage() {
       console.error(`Failed to reset ${key}:`, error);
     } finally {
       setSaving((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const handleCopyMasterKey = async () => {
+    if (!masterKeyData?.masterKey) return;
+
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(masterKeyData.masterKey);
+      } else {
+        // Fallback for older browsers or non-secure contexts
+        const textarea = document.createElement("textarea");
+        textarea.value = masterKeyData.masterKey;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedMasterKey(true);
+      setTimeout(() => setCopiedMasterKey(false), 2000);
+    } catch (error) {
+      console.error("Failed to copy to clipboard:", error);
     }
   };
 
@@ -178,6 +213,73 @@ export default function ConfigurationPage() {
             isSaved={saved.OLLAMA_BASE_URL}
             isDefault={!isCustomized.OLLAMA_BASE_URL}
           />
+        </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold mb-4">{t("encryption.title")}</h2>
+        <div className="space-y-4">
+          <div className="border rounded-lg p-4 bg-card">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <h3 className="font-medium">
+                  {t("encryption.masterKey.label")}
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {t("encryption.masterKey.description")}
+                </p>
+              </div>
+            </div>
+
+            {isLoadingMasterKey ? (
+              <div className="mt-4 text-sm text-muted-foreground">
+                {t("encryption.masterKey.loading")}
+              </div>
+            ) : (
+              <div className="mt-4">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 font-mono text-sm bg-muted p-3 rounded border">
+                    {showMasterKey
+                      ? masterKeyData?.masterKey ||
+                        t("encryption.masterKey.notGenerated")
+                      : "••••••••••••••••••••••••••••••••••••••••••"}
+                  </div>
+                  <button
+                    onClick={() => setShowMasterKey(!showMasterKey)}
+                    className="p-2 hover:bg-accent rounded transition-colors"
+                    title={
+                      showMasterKey
+                        ? t("encryption.masterKey.hideKey")
+                        : t("encryption.masterKey.showKey")
+                    }
+                  >
+                    {showMasterKey ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                  <button
+                    onClick={handleCopyMasterKey}
+                    className="p-2 hover:bg-accent rounded transition-colors"
+                    title={t("encryption.masterKey.copyToClipboard")}
+                    disabled={!masterKeyData?.masterKey}
+                  >
+                    {copiedMasterKey ? (
+                      <Check className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+                {masterKeyData?.masterKey && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {t("encryption.masterKey.warning")}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </section>
     </div>

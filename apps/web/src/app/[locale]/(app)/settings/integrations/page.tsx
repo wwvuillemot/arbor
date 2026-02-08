@@ -20,16 +20,17 @@ export default function IntegrationsPage() {
 
   // Load API keys when available
   React.useEffect(() => {
-    const openai = getApiKey("openai_api_key");
-    if (openai) {
-      setOpenaiKey(openai);
-    }
+    // Only update if we're not currently loading
+    if (!isLoading) {
+      const openai = getApiKey("openai_api_key");
+      // Always update state, even if value is empty string
+      // This ensures we show the actual saved value (which might be empty)
+      setOpenaiKey(openai || "");
 
-    const anthropic = getApiKey("anthropic_api_key");
-    if (anthropic) {
-      setAnthropicKey(anthropic);
+      const anthropic = getApiKey("anthropic_api_key");
+      setAnthropicKey(anthropic || "");
     }
-  }, [getApiKey, apiKeys]);
+  }, [getApiKey, apiKeys, isLoading]);
 
   const handleSaveOpenAIKey = async () => {
     setOpenaiSaving(true);

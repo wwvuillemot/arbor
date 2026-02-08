@@ -43,7 +43,7 @@ Build a local-first, AI-powered writing assistant with hierarchical node-based d
 - Docker service with persistent volumes at `data/minio/`
 - Bucket structure: `arbor-media`, `arbor-exports`, `arbor-temp`
 
-### 0.2 Update Node Schema (JSONB + Position)
+### 0.2 Update Node Schema (JSONB + Position) ✅
 
 **Why:** Enable rich content storage and sibling ordering
 
@@ -54,16 +54,214 @@ Build a local-first, AI-powered writing assistant with hierarchical node-based d
 - Add `created_by`/`updated_by` for provenance tracking
 - Add `metadata` JSONB for extensibility
 
+**Status:** Complete
+
+### 0.2.1 Database Migration System ✅
+
+**Why:** Prevent data loss and enable version-controlled schema changes
+
+**Problem:** Using `drizzle-kit push` directly modifies schema and can lose data (e.g., master key was lost when user_preferences table was recreated)
+
+**Solution:** Implement proper migration workflow with Drizzle Kit
+
+**Key Changes:**
+
+- Created migration runner: `apps/api/src/db/migrate.ts`
+- Generated initial migration: `0000_glamorous_warlock.sql`
+- Updated Makefile to use `db:migrate` instead of `db:push`
+- Added safety warnings to `db:push` command
+- Created comprehensive migration documentation
+
+**New Commands:**
+
+```bash
+make db-generate    # Generate migration from schema changes
+make db-migrate     # Apply pending migrations (RECOMMENDED)
+make db-push        # Direct schema push (⚠️ can lose data)
+```
+
+**Benefits:**
+
+- ✅ Version-controlled schema changes
+- ✅ Data preservation during schema updates
+- ✅ Migration history tracking
+- ✅ Team collaboration support
+- ✅ Production-ready deployment
+
+**Documentation:** See `docs/DATABASE_MIGRATIONS.md`
+
+**Status:** Complete - All future schema changes must use migrations
+
 ### 0.3 GraphQL Server Setup
 
-**Why:** Complex graph queries (complement tRPC for mutations)
+**Why:** Enable AI/LLM to efficiently query hierarchical node data for context building
+
+**Problem Statement:**
+
+- AI assistants need to traverse node hierarchies (projects → folders → files → blocks)
+- Need to fetch related data in single query (node + children + tags + metadata)
+- RAG pipeline requires efficient context gathering from graph structure
+- LLMs work better with GraphQL's declarative query language than imperative tRPC calls
 
 **Key Decisions:**
 
-- Use Pothos GraphQL (type-safe, code-first)
-- Use Apollo Server (industry standard)
-- Queries: `node(id)`, `nodes(filter)`, `nodeTree(projectId)`
-- tRPC for mutations, GraphQL for queries
+**Architecture: Hybrid API (tRPC + GraphQL)**
+
+- **tRPC for Mutations** - Type-safe CRUD operations (create, update, delete nodes)
+- **GraphQL for Queries** - Complex graph traversal and AI context building
+- Both share same service layer (NodeService, PreferencesService, etc.)
+- Both run on same Fastify server (different endpoints)
+
+**GraphQL Library: Pothos GraphQL**
+
+- **Why Pothos:** Type-safe, code-first schema builder for TypeScript
+- **Why NOT Prisma:** We use Drizzle ORM, not Prisma
+- **Why NOT TypeGraphQL:** Pothos has better TypeScript inference
+- **Performance:** Runs locally on desktop, no network latency concerns
+
+**GraphQL Server: Apollo Server**
+
+- **Why Apollo:** Industry standard, excellent tooling, mature ecosystem
+- **Why NOT GraphQL Yoga:** Apollo has better integration with Fastify
+- **Why NOT Mercurius:** Apollo's caching and DataLoader support is superior
+
+**Initial Schema:**
+
+```graphql
+type Query {
+  # Single node lookup
+  node(id: ID!): Node
+
+  # Filtered node search
+  nodes(
+    projectId: ID
+    parentId: ID
+    nodeType: String
+    tags: [String!]
+    limit: Int
+    offset: Int
+  ): [Node!]!
+
+  # Full tree traversal (for AI context)
+  nodeTree(projectId: ID!, maxDepth: Int, includeContent: Boolean): NodeTree!
+
+  # Tag-based queries
+  nodesByTags(tags: [String!]!, operator: TagOperator): [Node!]!
+}
+
+type Node {
+  id: ID!
+  name: String!
+  nodeType: String!
+  content: JSON
+  position: Int
+  parentId: ID
+  projectId: ID
+  tags: [String!]!
+  metadata: JSON
+  createdBy: String
+  updatedBy: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relationships (graph traversal)
+  parent: Node
+  children: [Node!]!
+  project: Node
+  ancestors: [Node!]!
+  descendants(maxDepth: Int): [Node!]!
+}
+
+type NodeTree {
+  root: Node!
+  nodes: [Node!]!
+  totalCount: Int!
+}
+
+enum TagOperator {
+  AND # All tags must match
+  OR # Any tag matches
+}
+```
+
+**Use Cases:**
+
+1. **AI Context Building**
+
+   ```graphql
+   query GetProjectContext($projectId: ID!) {
+     nodeTree(projectId: $projectId, maxDepth: 3, includeContent: true) {
+       root {
+         name
+       }
+       nodes {
+         id
+         name
+         nodeType
+         content
+         tags
+         parent {
+           name
+         }
+       }
+     }
+   }
+   ```
+
+2. **Tag-Based Search (for RAG)**
+
+   ```graphql
+   query FindRelatedNotes($tags: [String!]!) {
+     nodesByTags(tags: $tags, operator: OR) {
+       id
+       name
+       content
+       tags
+       ancestors {
+         name
+       }
+     }
+   }
+   ```
+
+3. **Hierarchical Navigation**
+
+   ```graphql
+   query GetNodeWithContext($id: ID!) {
+     node(id: $id) {
+       id
+       name
+       content
+       ancestors {
+         id
+         name
+       }
+       children {
+         id
+         name
+         nodeType
+       }
+       parent {
+         id
+         name
+       }
+     }
+   }
+   ```
+
+**Performance Optimizations:**
+
+- DataLoader for N+1 query prevention
+- Query complexity limits (max depth: 10)
+- Field-level caching with Redis
+- Pagination for large result sets
+
+**Future Extensions:**
+
+- Subscriptions for real-time updates (Phase 4)
+- Vector search integration (Phase 3)
+- Memory queries (Phase 4)
+- Provenance tracking queries (Phase 5)
 
 ### 0.4 MCP Server Scaffold
 
@@ -854,18 +1052,68 @@ CREATE INDEX idx_history_node ON node_history(node_id, version DESC);
 
 **Coverage:** 75.44% → 76.26% (improved) ✅
 
-#### 0.3 GraphQL Server Setup 📋 TODO
+#### 0.3 GraphQL Server Setup � IN PROGRESS
 
-- [ ] Install Pothos GraphQL (`@pothos/core`, `@pothos/plugin-prisma`)
-- [ ] Install Apollo Server (`@apollo/server`)
+**TDD Approach:**
+
+1. Write tests for GraphQL queries (RED)
+2. Implement schema and resolvers (GREEN)
+3. Add DataLoader optimizations (REFACTOR)
+
+**Architecture Note:**
+
+- GraphQL is part of the **API service** (`apps/api`), not a separate service
+- Mounted on same Fastify server as tRPC (different endpoint: `/graphql`)
+- Shares same service layer (NodeService, PreferencesService, etc.)
+- Tests go in `tests/unit/graphql/` and `tests/integration/graphql/`
+- Files structure:
+  - `apps/api/src/graphql/schema.ts` - Pothos schema builder
+  - `apps/api/src/graphql/types/` - Type definitions
+  - `apps/api/src/graphql/resolvers/` - Query/field resolvers
+  - `apps/api/src/graphql/loaders.ts` - DataLoader instances
+  - `apps/api/src/api/index.ts` - Mount Apollo Server (update existing)
+
+**Tasks:**
+
+- [x] Install dependencies ✅ DONE
+  - [x] `@pothos/core` - Type-safe schema builder
+  - [x] `@apollo/server` - GraphQL server
+  - [x] `graphql` - GraphQL.js
+  - [x] `dataloader` - N+1 query prevention
 - [ ] Create GraphQL schema with Pothos
-- [ ] Add basic queries: `node(id)`, `nodes(filter)`, `nodeTree(projectId)`
-- [ ] Add GraphQL endpoint to Fastify server
-- [ ] Add tests for GraphQL queries
-- [ ] Document GraphQL vs tRPC usage patterns
+  - [ ] Define Node type with all fields
+  - [ ] Define NodeTree type
+  - [ ] Define TagOperator enum
+  - [ ] Add `node(id)` query
+  - [ ] Add `nodes(filter)` query with pagination
+  - [ ] Add `nodeTree(projectId)` query with depth limit
+  - [ ] Add `nodesByTags(tags, operator)` query
+- [ ] Implement resolvers
+  - [ ] Node.parent resolver (with DataLoader)
+  - [ ] Node.children resolver (with DataLoader)
+  - [ ] Node.ancestors resolver
+  - [ ] Node.descendants resolver with maxDepth
+  - [ ] Node.project resolver
+- [ ] Add GraphQL endpoint to Fastify
+  - [ ] Mount Apollo Server at `/graphql`
+  - [ ] Add GraphQL Playground (dev only)
+  - [ ] Add query complexity limits
+  - [ ] Add depth limits (max: 10)
+- [ ] Add comprehensive tests
+  - [ ] Test `node(id)` query
+  - [ ] Test `nodes(filter)` with various filters
+  - [ ] Test `nodeTree(projectId)` with depth limits
+  - [ ] Test `nodesByTags` with AND/OR operators
+  - [ ] Test relationship resolvers (parent, children, ancestors)
+  - [ ] Test DataLoader batching (N+1 prevention)
+  - [ ] Test error handling (invalid IDs, missing nodes)
+- [ ] Update documentation
+  - [ ] Add GraphQL usage examples to ARCHITECTURE.md
+  - [ ] Document when to use GraphQL vs tRPC
+  - [ ] Add example queries for AI context building
 - [ ] Run preflight and commit
 
-**Expected Coverage:** Maintain 75%+
+**Expected Coverage:** Maintain 76%+
 
 #### 0.4 MCP Server Scaffold 📋 TODO
 

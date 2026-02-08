@@ -5,7 +5,7 @@ import * as schema from "./schema";
 // Database connection string
 const connectionString =
   process.env.DATABASE_URL ||
-  "postgresql://arbor:local_dev_only@localhost:5432/arbor";
+  "postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor";
 
 // Create postgres client
 const client = postgres(connectionString, {

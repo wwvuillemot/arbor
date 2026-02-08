@@ -31,7 +31,7 @@ install:
 
 up:
 	@echo "Starting web app on host..."
-	@bash -c "cd ../.. && nohup pnpm run dev --turbo > /tmp/arbor-web.log 2>&1 & echo \$$! > /tmp/arbor-web.pid"
+	@bash -c "cd ../.. && nohup pnpm run dev > /tmp/arbor-web.log 2>&1 & echo \$$! > /tmp/arbor-web.pid"
 	@sleep 5
 	@echo "✅ Web app started at http://localhost:3847"
 	@echo "   Logs: tail -f /tmp/arbor-web.log"
@@ -39,7 +39,7 @@ up:
 down:
 	@echo "Stopping web app..."
 	@if [ -f /tmp/arbor-web.pid ]; then kill $$(cat /tmp/arbor-web.pid) 2>/dev/null || true; rm /tmp/arbor-web.pid; fi
-	@pkill -f "pnpm run dev --turbo" 2>/dev/null || true
+	@pkill -f "next dev --turbo --port 3847" 2>/dev/null || true
 	@echo "✅ Web app stopped"
 
 restart: down up

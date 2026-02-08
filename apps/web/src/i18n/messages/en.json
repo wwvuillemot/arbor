@@ -85,7 +85,20 @@
       "usingDefault": "Using default value",
       "save": "Save",
       "saved": "Saved!",
-      "saving": "Saving..."
+      "saving": "Saving...",
+      "encryption": {
+        "title": "Encryption",
+        "masterKey": {
+          "label": "Master Encryption Key",
+          "description": "This key is used to encrypt sensitive settings like API keys. It is automatically generated and stored securely in the database.",
+          "loading": "Loading...",
+          "notGenerated": "Not generated",
+          "showKey": "Show key",
+          "hideKey": "Hide key",
+          "copyToClipboard": "Copy to clipboard",
+          "warning": "⚠️ Keep this key secure. If lost, you will need to re-enter all encrypted settings."
+        }
+      }
     }
   },
   "commandPalette": {

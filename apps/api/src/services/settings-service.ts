@@ -112,12 +112,21 @@ export class SettingsService {
     const decrypted: Record<string, string> = {};
 
     for (const setting of settings) {
-      const value = await this.encryptionService.decrypt(
-        setting.encryptedValue,
-        setting.iv,
-        masterKey,
-      );
-      decrypted[setting.key] = value;
+      try {
+        const value = await this.encryptionService.decrypt(
+          setting.encryptedValue,
+          setting.iv,
+          masterKey,
+        );
+        decrypted[setting.key] = value;
+      } catch (error) {
+        console.error(
+          `Failed to decrypt setting '${setting.key}':`,
+          error instanceof Error ? error.message : error,
+        );
+        // Skip this setting if decryption fails
+        // This prevents one bad setting from breaking all settings
+      }
     }
 
     return decrypted;

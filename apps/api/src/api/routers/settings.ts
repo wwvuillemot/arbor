@@ -44,7 +44,14 @@ export const settingsRouter = router({
       }),
     )
     .query(async ({ input }) => {
-      return await settingsService.getAllSettings(input.masterKey);
+      try {
+        return await settingsService.getAllSettings(input.masterKey);
+      } catch (error) {
+        console.error("Failed to get all settings:", error);
+        // Return empty object on error to prevent UI from breaking
+        // The error will be logged for debugging
+        return {};
+      }
     }),
 
   /**

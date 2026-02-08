@@ -2,6 +2,7 @@ import { db } from "../db/index";
 import { userPreferences } from "../db/schema";
 import { eq } from "drizzle-orm";
 import { createClient } from "redis";
+import { randomBytes } from "crypto";
 
 /**
  * PreferencesService
@@ -23,7 +24,7 @@ export class PreferencesService {
   private async initRedis() {
     try {
       this.redisClient = createClient({
-        url: process.env.REDIS_URL || "redis://arbor-redis:6379",
+        url: process.env.REDIS_URL || "redis://redis.arbor.local:6379",
       });
 
       this.redisClient.on("error", (err) => {
@@ -160,5 +161,76 @@ export class PreferencesService {
     } catch (error) {
       console.error("Error deleting session preference:", error);
     }
+  }
+
+  /**
+   * Convenience aliases for app-scope preferences
+   * (for backward compatibility with existing code)
+   */
+  async getPreference(key: string): Promise<any | null> {
+    return this.getAppPreference(key);
+  }
+
+  async setPreference(key: string, value: any): Promise<void> {
+    return this.setAppPreference(key, value);
+  }
+
+  async deletePreference(key: string): Promise<void> {
+    return this.deleteAppPreference(key);
+  }
+
+  /**
+   * Master Key Management
+   *
+   * The master key is used to encrypt sensitive settings (API keys, tokens, etc.)
+   * It's stored in the database as a base64-encoded 32-byte random value.
+   *
+   * This is a simple approach suitable for single-user deployments.
+   * When multi-user auth is added, this can be upgraded to password-derived keys.
+   */
+
+  /**
+   * Generate a new master key and store it in the database
+   * If a master key already exists, returns the existing key (idempotent)
+   * @returns Base64-encoded 32-byte master key
+   */
+  async generateMasterKey(): Promise<string> {
+    // Check if master key already exists
+    const existing = await this.getPreference("master_key");
+    if (existing) {
+      return existing as string;
+    }
+
+    // Generate a new 32-byte (256-bit) random key
+    const keyBuffer = randomBytes(32);
+    const masterKey = keyBuffer.toString("base64");
+
+    // Store in database
+    await this.setPreference("master_key", masterKey);
+
+    console.log("✅ Generated new master key for encryption");
+    return masterKey;
+  }
+
+  /**
+   * Get the master key from the database
+   * @returns Base64-encoded master key, or null if not found
+   */
+  async getMasterKey(): Promise<string | null> {
+    const masterKey = await this.getPreference("master_key");
+    return masterKey as string | null;
+  }
+
+  /**
+   * Get the master key, or generate one if it doesn't exist
+   * This is the recommended method for most use cases
+   * @returns Base64-encoded 32-byte master key
+   */
+  async getOrGenerateMasterKey(): Promise<string> {
+    const existing = await this.getMasterKey();
+    if (existing) {
+      return existing;
+    }
+    return this.generateMasterKey();
   }
 }

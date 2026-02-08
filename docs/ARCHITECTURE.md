@@ -741,9 +741,11 @@ UI shows:
 
 ### Encryption at Rest
 
-- Sensitive settings encrypted with master key
-- Master key stored in OS keychain (Tauri)
-- AES-256-GCM encryption
+- Sensitive settings encrypted with master key (API keys, tokens, etc.)
+- Master key auto-generated (32-byte random) and stored in database (`user_preferences` table)
+- AES-256-GCM encryption with random IV per encrypted value
+- Master key is base64-encoded for storage
+- **Note:** Master key stored unencrypted in database (local-first, single-user assumption)
 
 ### API Authentication
 
@@ -824,27 +826,268 @@ UI shows:
 
 ### Hybrid Approach: tRPC + GraphQL
 
-```
-┌─────────────────────────────────────────────────┐
-│                  Frontend                        │
-├─────────────────────────────────────────────────┤
-│  tRPC Client          │  GraphQL Client         │
-│  (Mutations)          │  (Queries)              │
-│  - Type-safe          │  - Graph traversal      │
-│  - Simple CRUD        │  - Complex queries      │
-└──────────┬────────────┴──────────┬──────────────┘
-           │                       │
-┌──────────▼────────────┬──────────▼──────────────┐
-│    tRPC Router        │   GraphQL Server        │
-│  - create/update/     │  - Nested queries       │
-│    delete nodes       │  - Relationships        │
-│  - File uploads       │  - AI context building  │
-│  - Preferences        │  - Memory search        │
-└───────────────────────┴─────────────────────────┘
+Arbor uses a **hybrid API architecture** that combines the strengths of both tRPC and GraphQL:
+
+- **tRPC** - Type-safe mutations and simple queries
+- **GraphQL** - Complex graph traversal and AI context building
+
+Both APIs share the same service layer and run on the same Fastify server.
+
+#### Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph Frontend["Frontend (Next.js + React)"]
+        UI[UI Components]
+        tRPCClient[tRPC Client<br/>Mutations & Simple Queries]
+        GQLClient[GraphQL Client<br/>Complex Queries & AI Context]
+    end
+
+    subgraph Backend["Backend (Fastify Server)"]
+        tRPCRouter[tRPC Router<br/>- CRUD Operations<br/>- File Uploads<br/>- Preferences<br/>- Settings]
+        GQLServer[GraphQL Server<br/>Pothos + Apollo<br/>- Graph Traversal<br/>- Nested Queries<br/>- AI Context Building]
+    end
+
+    subgraph Services["Service Layer"]
+        NodeService[NodeService<br/>- CRUD<br/>- Tree Operations]
+        PrefsService[PreferencesService<br/>- User Prefs<br/>- Master Key]
+        SettingsService[SettingsService<br/>- API Keys<br/>- Encryption]
+    end
+
+    subgraph Data["Data Layer"]
+        PG[(PostgreSQL<br/>Nodes, Projects,<br/>Preferences)]
+        Redis[(Redis<br/>Session Cache)]
+        MinIO[(MinIO<br/>Media Storage)]
+    end
+
+    subgraph AI["AI Integration (Future)"]
+        MCP[MCP Server<br/>JSONRPC 2.0<br/>- Tool Calling<br/>- Resources<br/>- Prompts]
+        RAG[RAG Pipeline<br/>- Vector Search<br/>- Context Builder]
+    end
+
+    UI --> tRPCClient
+    UI --> GQLClient
+
+    tRPCClient -->|Type-safe RPC| tRPCRouter
+    GQLClient -->|GraphQL Queries| GQLServer
+
+    tRPCRouter --> NodeService
+    tRPCRouter --> PrefsService
+    tRPCRouter --> SettingsService
+
+    GQLServer --> NodeService
+    GQLServer --> PrefsService
+
+    NodeService --> PG
+    PrefsService --> PG
+    PrefsService --> Redis
+    SettingsService --> PG
+
+    NodeService --> MinIO
+
+    MCP -->|Calls| GQLServer
+    MCP -->|Calls| tRPCRouter
+    RAG -->|Queries| GQLServer
+
+    style Frontend fill:#e1f5ff,stroke:#0277bd,stroke-width:2px,color:#000
+    style Backend fill:#fff4e1,stroke:#f57c00,stroke-width:2px,color:#000
+    style Services fill:#f0f0f0,stroke:#616161,stroke-width:2px,color:#000
+    style Data fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000
+    style AI fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000
+
+    style UI fill:#fff,stroke:#0277bd,color:#000
+    style tRPCClient fill:#fff,stroke:#0277bd,color:#000
+    style GQLClient fill:#fff,stroke:#0277bd,color:#000
+
+    style tRPCRouter fill:#ffd54f,stroke:#f57c00,stroke-width:2px,color:#000
+    style GQLServer fill:#ffd54f,stroke:#f57c00,stroke-width:2px,color:#000
+
+    style NodeService fill:#fff,stroke:#616161,color:#000
+    style PrefsService fill:#fff,stroke:#616161,color:#000
+    style SettingsService fill:#fff,stroke:#616161,color:#000
+
+    style PG fill:#fff,stroke:#388e3c,color:#000
+    style Redis fill:#fff,stroke:#388e3c,color:#000
+    style MinIO fill:#fff,stroke:#388e3c,color:#000
+
+    style MCP fill:#fff,stroke:#c2185b,color:#000
+    style RAG fill:#fff,stroke:#c2185b,color:#000
 ```
 
 ### Why Hybrid?
 
-- **tRPC for Mutations** - Type-safe, simple, fast for CRUD
-- **GraphQL for Queries** - Flexible, powerful for graph traversal
-- **AI-Friendly** - GraphQL perfect for LLM context gathering
+**Problem Statement:**
+
+- AI assistants need to traverse node hierarchies (projects → folders → files → blocks)
+- Need to fetch related data in single query (node + children + tags + metadata)
+- RAG pipeline requires efficient context gathering from graph structure
+- LLMs work better with GraphQL's declarative query language than imperative tRPC calls
+
+**Solution:**
+
+- **tRPC for Mutations** - Type-safe, simple, fast for CRUD operations
+- **GraphQL for Queries** - Flexible, powerful for graph traversal and AI context building
+- **Shared Service Layer** - Both APIs use the same business logic (NodeService, PreferencesService, etc.)
+- **Single Server** - Both run on same Fastify instance (different endpoints)
+
+### Technology Choices
+
+| Component                  | Technology     | Rationale                                              |
+| -------------------------- | -------------- | ------------------------------------------------------ |
+| **GraphQL Schema Builder** | Pothos GraphQL | Type-safe, code-first, best TypeScript inference       |
+| **GraphQL Server**         | Apollo Server  | Industry standard, excellent tooling, mature ecosystem |
+| **N+1 Prevention**         | DataLoader     | Batches and caches database queries                    |
+| **Schema Approach**        | Code-first     | TypeScript types → GraphQL schema (type safety)        |
+
+**Why NOT alternatives:**
+
+- ❌ **Prisma** - We use Drizzle ORM, not Prisma
+- ❌ **TypeGraphQL** - Pothos has better TypeScript inference
+- ❌ **GraphQL Yoga** - Apollo has better Fastify integration
+- ❌ **Mercurius** - Apollo's caching/DataLoader support is superior
+
+### GraphQL Schema
+
+**Core Types:**
+
+```graphql
+type Query {
+  # Single node lookup
+  node(id: ID!): Node
+
+  # Filtered node search
+  nodes(
+    projectId: ID
+    parentId: ID
+    nodeType: String
+    tags: [String!]
+    limit: Int
+    offset: Int
+  ): [Node!]!
+
+  # Full tree traversal (for AI context)
+  nodeTree(projectId: ID!, maxDepth: Int, includeContent: Boolean): NodeTree!
+
+  # Tag-based queries
+  nodesByTags(tags: [String!]!, operator: TagOperator): [Node!]!
+}
+
+type Node {
+  id: ID!
+  name: String!
+  nodeType: String!
+  content: JSON
+  position: Int
+  parentId: ID
+  projectId: ID
+  tags: [String!]!
+  metadata: JSON
+  createdBy: String
+  updatedBy: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  # Relationships (graph traversal)
+  parent: Node
+  children: [Node!]!
+  project: Node
+  ancestors: [Node!]!
+  descendants(maxDepth: Int): [Node!]!
+}
+
+type NodeTree {
+  root: Node!
+  nodes: [Node!]!
+  totalCount: Int!
+}
+
+enum TagOperator {
+  AND # All tags must match
+  OR # Any tag matches
+}
+```
+
+### Use Cases
+
+**1. AI Context Building**
+
+Get full project tree with content for LLM context:
+
+```graphql
+query GetProjectContext($projectId: ID!) {
+  nodeTree(projectId: $projectId, maxDepth: 3, includeContent: true) {
+    root {
+      name
+    }
+    nodes {
+      id
+      name
+      nodeType
+      content
+      tags
+      parent {
+        name
+      }
+    }
+  }
+}
+```
+
+**2. Tag-Based Search (for RAG)**
+
+Find related notes by tags:
+
+```graphql
+query FindRelatedNotes($tags: [String!]!) {
+  nodesByTags(tags: $tags, operator: OR) {
+    id
+    name
+    content
+    tags
+    ancestors {
+      name
+    }
+  }
+}
+```
+
+**3. Hierarchical Navigation**
+
+Get node with full context (ancestors + children):
+
+```graphql
+query GetNodeWithContext($id: ID!) {
+  node(id: $id) {
+    id
+    name
+    content
+    ancestors {
+      id
+      name
+    }
+    children {
+      id
+      name
+      nodeType
+    }
+    parent {
+      id
+      name
+    }
+  }
+}
+```
+
+### When to Use tRPC vs GraphQL
+
+| Use Case            | API     | Reason                                     |
+| ------------------- | ------- | ------------------------------------------ |
+| Create node         | tRPC    | Type-safe mutation, simple validation      |
+| Update node         | tRPC    | Type-safe mutation, optimistic updates     |
+| Delete node         | tRPC    | Type-safe mutation, cascade handling       |
+| Upload file         | tRPC    | Binary data, progress tracking             |
+| Get single node     | Either  | tRPC for simple, GraphQL for relationships |
+| Get node tree       | GraphQL | Graph traversal, nested queries            |
+| Search by tags      | GraphQL | Complex filtering, relationships           |
+| AI context building | GraphQL | Flexible queries, graph traversal          |
+| RAG pipeline        | GraphQL | Vector search + graph traversal            |

@@ -147,6 +147,32 @@ echo -e "${YELLOW}Installing Redis client package...${NC}"
 pnpm add redis
 echo -e "${GREEN}✓ Redis client installed${NC}"
 
+# Configure /etc/hosts for *.arbor.local domains
+echo ""
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}   Configuring Local Domains${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+
+echo -e "${YELLOW}Checking /etc/hosts for Arbor domains...${NC}"
+if ! grep -q "redis.arbor.local" /etc/hosts 2>/dev/null; then
+    echo -e "${YELLOW}Adding *.arbor.local domains to /etc/hosts (requires sudo)...${NC}"
+    echo -e "${YELLOW}This allows you to access services via friendly URLs like:${NC}"
+    echo -e "${YELLOW}  - http://app.arbor.local (Web App)${NC}"
+    echo -e "${YELLOW}  - http://api.arbor.local (API Server)${NC}"
+    echo -e "${YELLOW}  - redis.arbor.local:6379 (Redis)${NC}"
+    echo -e "${YELLOW}  - postgres.arbor.local:5432 (PostgreSQL)${NC}"
+    echo ""
+
+    # Remove old arbor.local entries and add new comprehensive list
+    sudo sed -i.bak '/arbor\.local/d' /etc/hosts
+    echo "127.0.0.1 arbor.local app.arbor.local www.arbor.local admin.arbor.local api.arbor.local pgadmin.arbor.local db.arbor.local cache.arbor.local redis.arbor.local postgres.arbor.local minio.arbor.local minio-console.arbor.local" | sudo tee -a /etc/hosts > /dev/null
+
+    echo -e "${GREEN}✓ /etc/hosts updated with Arbor domains${NC}"
+else
+    echo -e "${GREEN}✓ Arbor domains already configured in /etc/hosts${NC}"
+fi
+
 # Start Docker services
 echo ""
 echo -e "${BLUE}========================================${NC}"
@@ -163,11 +189,14 @@ if [ ! -f .env.local ]; then
     echo ""
     echo -e "${YELLOW}Creating .env.local file...${NC}"
     cat > .env.local << EOF
-# Database
-DATABASE_URL=postgresql://arbor:local_dev_only@localhost:5432/arbor
+# Database (via Traefik proxy)
+DATABASE_URL=postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor
 
-# Redis
-REDIS_URL=redis://localhost:6379
+# Redis (via Traefik proxy)
+REDIS_URL=redis://redis.arbor.local:6379
+
+# API Server
+NEXT_PUBLIC_API_URL=http://api.arbor.local
 
 # OpenAI (required for AI features)
 OPENAI_API_KEY=

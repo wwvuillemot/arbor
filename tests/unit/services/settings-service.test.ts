@@ -167,15 +167,25 @@ describe("SettingsService", () => {
       expect(allSettings).toEqual({});
     });
 
-    it("should throw error if any setting fails to decrypt", async () => {
+    it("should skip settings that fail to decrypt (graceful failure)", async () => {
+      // Save two settings with the correct key
       await settingsService.setSetting(
         "openai_api_key",
         "sk-test-key-123",
         testMasterKey,
       );
+      await settingsService.setSetting(
+        "anthropic_api_key",
+        "sk-ant-test-456",
+        testMasterKey,
+      );
 
+      // Try to decrypt with wrong key - should return empty object
       const wrongKey = "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI=";
-      await expect(settingsService.getAllSettings(wrongKey)).rejects.toThrow();
+      const result = await settingsService.getAllSettings(wrongKey);
+
+      // Should return empty object (all settings failed to decrypt)
+      expect(result).toEqual({});
     });
   });
 

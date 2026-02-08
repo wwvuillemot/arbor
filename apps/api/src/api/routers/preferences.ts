@@ -121,6 +121,22 @@ export const preferencesRouter = router({
     }),
 
   // ============================================
+  // Master Key Management
+  // ============================================
+
+  /**
+   * Get or generate the master encryption key
+   * This key is used to encrypt sensitive settings (API keys, tokens, etc.)
+   *
+   * The key is automatically generated on first access and stored in the database.
+   * Subsequent calls return the same key (idempotent).
+   */
+  getMasterKey: publicProcedure.query(async () => {
+    const masterKey = await preferencesService.getOrGenerateMasterKey();
+    return { masterKey };
+  }),
+
+  // ============================================
   // Batch Operations
   // ============================================
 

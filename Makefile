@@ -1,4 +1,4 @@
-.PHONY: help setup build clean up down logs restart health db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage coverage lint format typecheck audit preflight api-generate api-watch desktop desktop-build backup restore export-md
+.PHONY: help setup build clean up down logs restart health db-migrate db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage coverage lint format typecheck audit preflight api-generate api-watch desktop desktop-build backup restore export-md
 
 # Default target
 .DEFAULT_GOAL := help
@@ -25,8 +25,9 @@ help:
 	@echo "  make health          - Check service health and readiness"
 	@echo ""
 	@echo "Database:"
-	@echo "  make db-push         - Push database schema to PostgreSQL"
-	@echo "  make db-generate     - Generate migration files from schema"
+	@echo "  make db-migrate      - Run pending database migrations (RECOMMENDED)"
+	@echo "  make db-generate     - Generate migration files from schema changes"
+	@echo "  make db-push         - Push schema directly (⚠️  can lose data, use db-migrate instead)"
 	@echo "  make db-studio       - Open Drizzle Studio (database GUI)"
 	@echo "  make seed            - Seed database with example projects"
 	@echo "  make db-reset        - Reset database (⚠️  destroys data)"
@@ -87,31 +88,43 @@ up:
 	@echo ""
 	@echo "Stopping any existing containers..."
 	@docker compose -f apps/api/docker-compose.yml -f apps/key-value-store/docker-compose.yml down --remove-orphans 2>/dev/null || true
-	@echo "Starting Docker services with Traefik..."
+	@echo "Starting Docker services (postgres, redis, minio, pgadmin, proxies)..."
 	@docker compose -f apps/api/docker-compose.yml -f apps/key-value-store/docker-compose.yml -f tmp/traefik/local/arbor-docker-compose.traefik.yml up -d
 	@echo "Waiting for services to be ready..."
 	@sleep 5
 	@echo ""
-	@echo "Setting up database..."
-	@pnpm run db:push 2>/dev/null || echo "⚠️  Schema push failed (may already exist)"
+	@echo "Running database migrations..."
+	@pnpm run db:migrate 2>/dev/null || echo "⚠️  Migrations failed (may already be applied)"
 	@echo ""
 	@echo "Seeding database (idempotent)..."
 	@pnpm run db:seed 2>/dev/null || echo "⚠️  Seeding skipped (data may already exist)"
 	@echo ""
+	@echo "Starting API server on host..."
+	@$(MAKE) -C apps/api up
+	@echo ""
+	@echo "Starting web app on host..."
+	@$(MAKE) -C apps/web up
+	@echo ""
 	@echo "Verifying HTTP endpoints..."
 	@for i in 1 2 3 4 5; do \
-		curl -s -o /dev/null -w "" http://api.arbor.local/trpc/health 2>/dev/null && echo "  ✅ API Server: http://api.arbor.local/trpc/health (HTTP 200)" && break || \
-		([ $$i -eq 5 ] && echo "  ❌ API Server: http://api.arbor.local/trpc/health (not responding)" || sleep 2); \
+		curl -s -o /dev/null -w "" http://api.arbor.local/health 2>/dev/null && echo "  ✅ API Server: http://api.arbor.local/health (HTTP 200)" && break || \
+		([ $$i -eq 5 ] && echo "  ❌ API Server: http://api.arbor.local/health (not responding)" || sleep 2); \
 	done
-	@echo ""
-	@$(MAKE) -C apps/web up
+	@for i in 1 2 3 4 5; do \
+		curl -s -o /dev/null -w "" http://app.arbor.local 2>/dev/null && echo "  ✅ Web App: http://app.arbor.local (HTTP 200)" && break || \
+		([ $$i -eq 5 ] && echo "  ❌ Web App: http://app.arbor.local (not responding)" || sleep 2); \
+	done
 	@echo ""
 	@echo "========================================="
 	@echo "   ✅ Arbor is ready!"
 	@echo "========================================="
 	@echo ""
-	@echo "Services running:"
+	@echo "Docker Services:"
 	@docker ps --filter "name=arbor-" --format "  • {{.Names}}: {{.Status}}"
+	@echo ""
+	@echo "Local Services:"
+	@[ -f /tmp/arbor-api.pid ] && echo "  • API Server: Running (PID $$(cat /tmp/arbor-api.pid))" || echo "  • API Server: Not running"
+	@[ -f /tmp/arbor-web.pid ] && echo "  • Web App: Running (PID $$(cat /tmp/arbor-web.pid))" || echo "  • Web App: Not running"
 	@echo ""
 	@echo "Quick Access:"
 	@echo "  Web App:             http://app.arbor.local"
@@ -120,8 +133,14 @@ up:
 	@echo "  Redis:               redis.arbor.local:6379"
 	@echo "  PostgreSQL:          localhost:5432"
 	@echo ""
+	@echo "Logs:"
+	@echo "  API:  tail -f /tmp/arbor-api.log"
+	@echo "  Web:  tail -f /tmp/arbor-web.log"
+	@echo ""
 
 down:
+	@echo "Stopping local services..."
+	@$(MAKE) -C apps/api down
 	@$(MAKE) -C apps/web down
 	@echo "Stopping Docker services..."
 	@docker compose -f apps/api/docker-compose.yml -f apps/key-value-store/docker-compose.yml down --remove-orphans
@@ -141,17 +160,21 @@ health:
 	@echo "Docker Services:"
 	@docker ps --filter "name=arbor-" --format "  {{.Names}}: {{.Status}}" 2>/dev/null || echo "  ❌ No services running"
 	@echo ""
+	@echo "Local Services:"
+	@[ -f /tmp/arbor-api.pid ] && echo "  ✅ API Server: Running (PID $$(cat /tmp/arbor-api.pid))" || echo "  ❌ API Server: Not running"
+	@[ -f /tmp/arbor-web.pid ] && echo "  ✅ Web App: Running (PID $$(cat /tmp/arbor-web.pid))" || echo "  ❌ Web App: Not running"
+	@echo ""
 	@echo "Service Connectivity:"
 	@docker exec arbor-postgres pg_isready -U arbor > /dev/null 2>&1 && echo "  ✅ PostgreSQL: Ready" || echo "  ❌ PostgreSQL: Not ready"
 	@docker exec arbor-redis redis-cli ping > /dev/null 2>&1 && echo "  ✅ Redis: Ready" || echo "  ❌ Redis: Not ready"
 	@echo ""
 	@echo "HTTP Endpoints:"
 	@curl -s -o /dev/null -w "" http://app.arbor.local 2>/dev/null && echo "  ✅ Web App: http://app.arbor.local (HTTP 200)" || echo "  ❌ Web App: http://app.arbor.local (not responding)"
-	@curl -s -o /dev/null -w "" http://api.arbor.local/trpc/health 2>/dev/null && echo "  ✅ API Server: http://api.arbor.local/trpc/health (HTTP 200)" || echo "  ❌ API Server: http://api.arbor.local/trpc/health (not responding)"
+	@curl -s -o /dev/null -w "" http://api.arbor.local/health 2>/dev/null && echo "  ✅ API Server: http://api.arbor.local/health (HTTP 200)" || echo "  ❌ API Server: http://api.arbor.local/health (not responding)"
 	@curl -s -o /dev/null -w "" http://pgadmin.arbor.local 2>/dev/null && echo "  ✅ pgAdmin: http://pgadmin.arbor.local (HTTP 200)" || echo "  ⚠️  pgAdmin: Not accessible via Traefik"
 	@echo ""
 	@echo "Database Schema:"
-	@docker exec arbor-postgres psql -U arbor -d arbor -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'nodes';" 2>/dev/null | grep -q "1" && echo "  ✅ Schema pushed (nodes table exists)" || echo "  ⚠️  Schema not pushed yet (run: make db-push)"
+	@docker exec arbor-postgres psql -U arbor -d arbor -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'nodes';" 2>/dev/null | grep -q "1" && echo "  ✅ Migrations applied (nodes table exists)" || echo "  ⚠️  Migrations not applied yet (run: make db-migrate)"
 	@echo ""
 	@echo "Quick Access:"
 	@echo "  Web App:             http://app.arbor.local"
@@ -166,11 +189,22 @@ health:
 	@echo ""
 
 # Database
-db-push:
-	@pnpm run db:push
+db-migrate:
+	@echo "Running database migrations..."
+	@pnpm run db:migrate
 
 db-generate:
+	@echo "Generating migration from schema changes..."
 	@pnpm run db:generate
+	@echo ""
+	@echo "⚠️  IMPORTANT: Review the generated migration in apps/api/src/db/migrations/"
+	@echo "   Then run: make db-migrate"
+
+db-push:
+	@echo "⚠️  WARNING: db:push can cause data loss. Use 'make db-migrate' instead."
+	@echo "   Press Ctrl+C to cancel, or wait 5 seconds to continue..."
+	@sleep 5
+	@pnpm run db:push
 
 db-studio:
 	@pnpm run db:studio
@@ -179,9 +213,11 @@ seed:
 	@pnpm run db:seed
 
 db-reset:
+	@echo "⚠️  WARNING: This will DELETE ALL DATA!"
+	@echo "   Press Ctrl+C to cancel, or wait 5 seconds to continue..."
+	@sleep 5
 	@docker compose -f apps/key-value-store/docker-compose.yml -f apps/api/docker-compose.yml -f apps/web/docker-compose.yml down -v
 	@make up
-	@make db-push
 	@make seed
 
 # Testing

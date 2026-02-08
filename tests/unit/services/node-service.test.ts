@@ -207,29 +207,29 @@ describe("NodeService", () => {
     });
   });
 
-  describe('Phase 0.2: New Schema Fields', () => {
-    describe('position field', () => {
-      it('should create node with position', async () => {
+  describe("Phase 0.2: New Schema Fields", () => {
+    describe("position field", () => {
+      it("should create node with position", async () => {
         const node = await nodeService.createNode({
-          type: 'project',
-          name: 'My Novel',
+          type: "project",
+          name: "My Novel",
           position: 10,
         });
 
         expect(node.position).toBe(10);
       });
 
-      it('should default position to 0 if not provided', async () => {
+      it("should default position to 0 if not provided", async () => {
         const node = await nodeService.createNode({
-          type: 'project',
-          name: 'My Novel',
+          type: "project",
+          name: "My Novel",
         });
 
         expect(node.position).toBe(0);
       });
 
-      it('should update node position', async () => {
-        const node = await createTestProject('My Novel');
+      it("should update node position", async () => {
+        const node = await createTestProject("My Novel");
         const updated = await nodeService.updateNode(node.id, {
           position: 20,
         });
@@ -238,83 +238,92 @@ describe("NodeService", () => {
       });
     });
 
-    describe('createdBy and updatedBy fields', () => {
-      it('should create node with createdBy and updatedBy', async () => {
+    describe("createdBy and updatedBy fields", () => {
+      it("should create node with createdBy and updatedBy", async () => {
         const node = await nodeService.createNode({
-          type: 'project',
-          name: 'My Novel',
-          createdBy: 'user:alice',
-          updatedBy: 'user:alice',
+          type: "project",
+          name: "My Novel",
+          createdBy: "user:alice",
+          updatedBy: "user:alice",
         });
 
-        expect(node.createdBy).toBe('user:alice');
-        expect(node.updatedBy).toBe('user:alice');
+        expect(node.createdBy).toBe("user:alice");
+        expect(node.updatedBy).toBe("user:alice");
       });
 
-      it('should default createdBy and updatedBy to user:system', async () => {
+      it("should default createdBy and updatedBy to user:system", async () => {
         const node = await nodeService.createNode({
-          type: 'project',
-          name: 'My Novel',
+          type: "project",
+          name: "My Novel",
         });
 
-        expect(node.createdBy).toBe('user:system');
-        expect(node.updatedBy).toBe('user:system');
+        expect(node.createdBy).toBe("user:system");
+        expect(node.updatedBy).toBe("user:system");
       });
 
-      it('should update updatedBy when updating node', async () => {
-        const node = await createTestProject('My Novel');
+      it("should update updatedBy when updating node", async () => {
+        const node = await createTestProject("My Novel");
         const updated = await nodeService.updateNode(node.id, {
-          name: 'My Fantasy Novel',
-          updatedBy: 'llm:gpt-4o',
+          name: "My Fantasy Novel",
+          updatedBy: "llm:gpt-4o",
         });
 
-        expect(updated.name).toBe('My Fantasy Novel');
-        expect(updated.updatedBy).toBe('llm:gpt-4o');
-        expect(updated.createdBy).toBe('user:system'); // Should not change
+        expect(updated.name).toBe("My Fantasy Novel");
+        expect(updated.updatedBy).toBe("llm:gpt-4o");
+        expect(updated.createdBy).toBe("user:system"); // Should not change
       });
 
-      it('should support LLM provenance format', async () => {
+      it("should support LLM provenance format", async () => {
         const node = await nodeService.createNode({
-          type: 'project',
-          name: 'AI Generated Novel',
-          createdBy: 'llm:claude-3.5-sonnet',
-          updatedBy: 'llm:claude-3.5-sonnet',
+          type: "project",
+          name: "AI Generated Novel",
+          createdBy: "llm:claude-3.5-sonnet",
+          updatedBy: "llm:claude-3.5-sonnet",
         });
 
-        expect(node.createdBy).toBe('llm:claude-3.5-sonnet');
-        expect(node.updatedBy).toBe('llm:claude-3.5-sonnet');
+        expect(node.createdBy).toBe("llm:claude-3.5-sonnet");
+        expect(node.updatedBy).toBe("llm:claude-3.5-sonnet");
       });
     });
 
-    describe('JSONB content field', () => {
-      it('should create node with JSONB content', async () => {
-        const project = await createTestProject('My Novel');
+    describe("JSONB content field", () => {
+      it("should create node with JSONB content", async () => {
+        const project = await createTestProject("My Novel");
         const note = await nodeService.createNode({
-          type: 'note',
-          name: 'Character',
+          type: "note",
+          name: "Character",
           parentId: project.id,
-          content: { text: 'Character description', blocks: [] },
+          content: { text: "Character description", blocks: [] },
         });
 
-        expect(note.content).toEqual({ text: 'Character description', blocks: [] });
+        expect(note.content).toEqual({
+          text: "Character description",
+          blocks: [],
+        });
       });
 
-      it('should update node with JSONB content', async () => {
-        const project = await createTestProject('My Novel');
-        const note = await createTestNote('Character', project.id);
+      it("should update node with JSONB content", async () => {
+        const project = await createTestProject("My Novel");
+        const note = await createTestNote("Character", project.id);
 
         const updated = await nodeService.updateNode(note.id, {
-          content: { text: 'Updated description', blocks: [{ type: 'paragraph' }] },
+          content: {
+            text: "Updated description",
+            blocks: [{ type: "paragraph" }],
+          },
         });
 
-        expect(updated.content).toEqual({ text: 'Updated description', blocks: [{ type: 'paragraph' }] });
+        expect(updated.content).toEqual({
+          text: "Updated description",
+          blocks: [{ type: "paragraph" }],
+        });
       });
 
-      it('should handle null content', async () => {
-        const project = await createTestProject('My Novel');
+      it("should handle null content", async () => {
+        const project = await createTestProject("My Novel");
         const note = await nodeService.createNode({
-          type: 'note',
-          name: 'Empty Note',
+          type: "note",
+          name: "Empty Note",
           parentId: project.id,
           content: null,
         });
