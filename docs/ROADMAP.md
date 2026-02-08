@@ -838,21 +838,21 @@ CREATE INDEX idx_history_node ON node_history(node_id, version DESC);
 - [x] Comprehensive test suite (8 tests passing)
 - [x] Coverage: 64.68% → 75.44% (+10.76%)
 
-#### 0.2 Update Node Schema (JSONB + Position) 🔄 IN PROGRESS
+#### 0.2 Update Node Schema (JSONB + Position) ✅ COMPLETED (Commit: `38e4e51`)
 
-- [ ] Change `content` field from TEXT to JSONB
-- [ ] Add `position` INTEGER field for sibling ordering
-- [ ] Add `created_by` VARCHAR(255) field (user_id or 'llm:model-name')
-- [ ] Add `updated_by` VARCHAR(255) field
-- [ ] Add `metadata` JSONB field for extensibility
-- [ ] Create migration script with backward compatibility
-- [ ] Update `NodeService` to handle JSONB content
-- [ ] Update tRPC routers to support new schema
-- [ ] Add tests for new fields
-- [ ] Update seed data to use new schema
-- [ ] Run preflight and commit
+- [x] Change `content` field from TEXT to JSONB
+- [x] Add `position` INTEGER field for sibling ordering
+- [x] Add `created_by` VARCHAR(255) field (user_id or 'llm:model-name')
+- [x] Add `updated_by` VARCHAR(255) field
+- [x] Add `metadata` JSONB field for extensibility (already existed)
+- [x] Create migration script with backward compatibility (manual SQL migration)
+- [ ] Update `NodeService` to handle JSONB content (deferred to Phase 1)
+- [ ] Update tRPC routers to support new schema (deferred to Phase 1)
+- [x] Add tests for new fields (8 comprehensive tests)
+- [ ] Update seed data to use new schema (deferred to Phase 1)
+- [x] Run preflight and commit
 
-**Expected Coverage:** Maintain 75%+
+**Coverage:** 75.44% → 75.57% (improved) ✅
 
 #### 0.3 GraphQL Server Setup 📋 TODO
 
