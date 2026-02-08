@@ -13,10 +13,11 @@ export function useAppPreferences() {
   const utils = trpc.useUtils();
 
   // Get all app preferences
+  // IMPORTANT: refetchOnMount must be true to load preferences on hard reload
   const { data: preferences, isLoading } =
     trpc.preferences.getAllAppPreferences.useQuery(undefined, {
       refetchOnWindowFocus: false,
-      refetchOnMount: false,
+      refetchOnMount: true, // Changed from false - ensures preferences load on hard reload
       refetchOnReconnect: false,
       staleTime: 5 * 60 * 1000, // 5 minutes
     });
