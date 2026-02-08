@@ -11,6 +11,7 @@ import { useNavigationCommands } from "@/hooks/use-navigation-commands";
 import { useAboutCommand } from "@/hooks/use-about-command";
 import { useCommandGroups } from "@/hooks/use-command-groups";
 import { useSetup } from "@/hooks/use-setup";
+import { useTheme } from "@/hooks/use-theme";
 
 export interface AppLayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,9 @@ export function AppLayout({ children }: AppLayoutProps) {
   const commandPalette = useCommandPalette();
   const aboutDialog = useAboutDialog();
   const setup = useSetup();
+
+  // Apply theme from database (replaces next-themes)
+  useTheme();
 
   // Register command groups with translations
   useCommandGroups();

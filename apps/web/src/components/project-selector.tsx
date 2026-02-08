@@ -95,9 +95,10 @@ export function ProjectSelector({ isCollapsed }: ProjectSelectorProps) {
                   onClick={() => handleSelectProject(project.id)}
                   className={cn(
                     "flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-sm",
-                    "hover:bg-accent hover:text-accent-foreground",
+                    "text-popover-foreground hover:bg-accent hover:text-accent-foreground",
                     "transition-colors",
-                    currentProjectId === project.id && "bg-accent",
+                    currentProjectId === project.id &&
+                      "bg-accent text-accent-foreground",
                   )}
                 >
                   <FolderTree className="h-4 w-4 flex-shrink-0" />
@@ -155,9 +156,10 @@ export function ProjectSelector({ isCollapsed }: ProjectSelectorProps) {
                 onClick={() => handleSelectProject(project.id)}
                 className={cn(
                   "flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-sm",
-                  "hover:bg-accent hover:text-accent-foreground",
+                  "text-popover-foreground hover:bg-accent hover:text-accent-foreground",
                   "transition-colors",
-                  currentProjectId === project.id && "bg-accent",
+                  currentProjectId === project.id &&
+                    "bg-accent text-accent-foreground",
                 )}
               >
                 <FolderTree className="h-4 w-4 flex-shrink-0" />

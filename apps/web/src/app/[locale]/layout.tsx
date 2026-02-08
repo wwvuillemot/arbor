@@ -2,7 +2,6 @@ import { NextIntlClientProvider } from "next-intl";
 import { notFound } from "next/navigation";
 import { locales } from "@/i18n/request";
 import "../../styles/globals.css";
-import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ToastProvider } from "@/contexts/toast-context";
 import { ToastContainer } from "@/components/toast-container";
 
@@ -37,17 +36,10 @@ export default async function LocaleLayout({
     <html lang={locale} suppressHydrationWarning>
       <body>
         <NextIntlClientProvider messages={messages} locale={locale}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            <ToastProvider>
-              {children}
-              <ToastContainer />
-            </ToastProvider>
-          </ThemeProvider>
+          <ToastProvider>
+            {children}
+            <ToastContainer />
+          </ToastProvider>
         </NextIntlClientProvider>
       </body>
     </html>
