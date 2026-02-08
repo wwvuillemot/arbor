@@ -72,9 +72,7 @@ CREATE INDEX idx_nodes_embedding ON nodes USING hnsw (embedding vector_cosine_op
 {
   "type": "paragraph",
   "text": "This is a paragraph with **bold** text",
-  "marks": [
-    {"type": "bold", "start": 25, "end": 29}
-  ]
+  "marks": [{ "type": "bold", "start": 25, "end": 29 }]
 }
 ```
 
@@ -173,7 +171,6 @@ type Node {
   tags: [Tag!]!
   references: [Node!]! # Nodes this node references
   referencedBy: [Node!]! # Nodes that reference this node
-
   # Provenance
   createdAt: DateTime!
   updatedAt: DateTime!
@@ -274,13 +271,13 @@ services:
   minio:
     image: minio/minio:latest
     ports:
-      - "9000:9000"  # API
-      - "9001:9001"  # Console
+      - "9000:9000" # API
+      - "9001:9001" # Console
     environment:
       MINIO_ROOT_USER: arbor
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
     volumes:
-      - ./data/minio:/data  # Persistent local storage
+      - ./data/minio:/data # Persistent local storage
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -551,6 +548,7 @@ LLM Response
 # Context for: {query}
 
 ## Current Document
+
 **Title:** {node.name}
 **Type:** {node.type}
 **Tags:** {node.tags}
@@ -558,20 +556,26 @@ LLM Response
 {node.content}
 
 ## Relevant Memories
+
 ### Character: Alice
+
 - 16-year-old wizard
 - Fire magic, telekinesis
 - Protagonist
 
 ### Plot: Chapter 2
+
 - Alice meets Bob at academy
 - First magic lesson
 
 ## Related Nodes
+
 ### Character Notes: Bob
+
 {content excerpt...}
 
 ### Worldbuilding: Magic System
+
 {content excerpt...}
 ```
 

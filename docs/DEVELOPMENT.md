@@ -12,6 +12,7 @@
 4. **Repeat** - For every feature, bug fix, or change
 
 **Rules:**
+
 - ✅ **No code without tests** - Every feature must have tests
 - ✅ **Write tests before implementation** - TDD, not "tests after"
 - ✅ **If something breaks, write a failing test first** - Then fix it
@@ -22,16 +23,19 @@
 **All commands go through `make`** - Consistent interface for humans and AI
 
 **Never run directly:**
+
 - ❌ `pnpm install`
 - ❌ `pnpm test`
 - ❌ `docker-compose up`
 
 **Always use make:**
+
 - ✅ `make install`
 - ✅ `make test`
 - ✅ `make dev`
 
 **Why?**
+
 - Consistent commands across all services
 - Orchestration logic in one place
 - Easy to add pre/post hooks
@@ -44,12 +48,14 @@
 **Goal:** Meet or exceed Test Coverage Ceiling (TCC) across all systems
 
 **Rules:**
+
 - ✅ **Coverage must improve over time** - Each PR should increase TCC
 - ✅ **New code must be well-tested** - Aim for 80%+ on new features
 - ✅ **No coverage regressions** - CI fails if coverage decreases
 - ✅ **Track coverage per service** - Backend, Web, Desktop, MCP
 
 **Coverage Targets:**
+
 - **Phase 0-1:** Maintain 60%+ (current baseline)
 - **Phase 2-3:** Reach 70%+
 - **Phase 4-5:** Reach 80%+
@@ -59,6 +65,7 @@
 **Commit at logical breakpoints** - After `make preflight` passes
 
 **Workflow:**
+
 ```bash
 # 1. Make changes (TDD: test first, then code)
 # 2. Run preflight checks
@@ -76,6 +83,7 @@ git commit -m "feat: descriptive commit message
 ```
 
 **Commit Message Format:**
+
 ```
 <type>: <short summary>
 
@@ -86,6 +94,7 @@ git commit -m "feat: descriptive commit message
 ```
 
 **Types:**
+
 - `feat:` - New feature
 - `fix:` - Bug fix
 - `refactor:` - Code refactoring (no behavior change)
@@ -97,11 +106,13 @@ git commit -m "feat: descriptive commit message
 ### 5. Preflight Checks
 
 **Before every commit, run:**
+
 ```bash
 make preflight
 ```
 
 **What it does:**
+
 1. `make format` - Auto-format code (Prettier)
 2. `make lint` - Check code quality (ESLint)
 3. `make test` - Run all tests
@@ -194,6 +205,7 @@ my-command:
 ```
 
 **Common commands to add:**
+
 - `make build` - Build for production
 - `make watch` - Watch mode for development
 - `make clean` - Clean build artifacts
@@ -262,7 +274,7 @@ make -C apps/desktop coverage
 ### Coverage Goals
 
 | Service | Current | Phase 1 | Phase 3 | Phase 5 |
-|---------|---------|---------|---------|---------|
+| ------- | ------- | ------- | ------- | ------- |
 | API     | 60%     | 65%     | 75%     | 85%     |
 | Web     | 63%     | 65%     | 75%     | 85%     |
 | Desktop | 60%     | 65%     | 70%     | 80%     |
@@ -324,10 +336,10 @@ jobs:
 ## Questions?
 
 If you're unsure about:
+
 - **What to test?** - Test behavior, not implementation
 - **How much to test?** - Aim for 80%+ on new code
 - **When to commit?** - After `make preflight` passes
 - **What make command?** - Run `make help` or add a new one
 
 **Remember:** Quality over speed. Better to ship slowly with high confidence than quickly with bugs.
-

@@ -50,18 +50,50 @@ Build a local-first, AI-powered writing assistant with hierarchical node-based d
 
 ### 1.3 Media Attachment System
 
-**Storage Strategy:**
+**Storage Strategy: MinIO (S3-Compatible Object Storage)**
 
-- **Option A (Recommended):** Filesystem storage with DB references
-  - Store in `{project_root}/media/{node_id}/{filename}`
-  - DB stores: path, mimeType, size, checksum
-  - Pros: Simple, fast, easy backup
-  - Cons: Need to manage filesystem cleanup
+**Why MinIO:**
 
-- **Option B:** Object storage (S3-compatible)
-  - Use MinIO for local-first
-  - Pros: Scalable, CDN-ready
-  - Cons: More complex, requires additional service
+- ✅ S3-compatible API (easy cloud migration path)
+- ✅ Clean abstraction from filesystem
+- ✅ Built-in versioning, metadata, and access control
+- ✅ Lightweight (runs in Docker)
+- ✅ Local-first with persistent volumes
+- ✅ Future-proof (can swap to AWS S3, Cloudflare R2, etc.)
+
+**Docker Setup:**
+
+```yaml
+# docker-compose.yml
+services:
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Console
+    environment:
+      MINIO_ROOT_USER: arbor
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    volumes:
+      - ./data/minio:/data # Persistent local storage
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+```
+
+**Bucket Structure:**
+
+- `arbor-media` - User-uploaded media (images, PDFs, audio, video)
+- `arbor-exports` - Generated exports (PDFs, backups)
+- `arbor-temp` - Temporary files (auto-cleanup after 24h)
+
+**Object Key Pattern:**
+
+- `{project_id}/{node_id}/{timestamp}_{filename}`
+- Example: `proj-123/node-456/1704067200_screenshot.png`
 
 **Supported Media:**
 
@@ -72,10 +104,42 @@ Build a local-first, AI-powered writing assistant with hierarchical node-based d
 
 **Implementation:**
 
+- MinIO SDK for Node.js (`minio` package)
 - Upload API with multipart form data
-- Image optimization (resize, compress)
-- Thumbnail generation
-- Markdown image syntax: `![alt](media://node_id/filename)`
+- Pre-signed URLs for secure downloads (expire after 1 hour)
+- Image optimization (resize, compress) before upload
+- Thumbnail generation (store as separate object)
+- Metadata: `node_id`, `uploaded_by`, `content_type`, `original_filename`
+- Markdown image syntax: `![alt](minio://bucket/key)` or `![alt](media://node_id/filename)`
+
+**Database Schema:**
+
+```sql
+CREATE TABLE media_attachments (
+  id UUID PRIMARY KEY,
+  node_id UUID REFERENCES nodes(id) ON DELETE CASCADE,
+  bucket VARCHAR(255) NOT NULL,
+  object_key VARCHAR(1024) NOT NULL,
+  filename VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(100) NOT NULL,
+  size_bytes BIGINT NOT NULL,
+  checksum VARCHAR(64), -- SHA-256
+  thumbnail_key VARCHAR(1024), -- For images/videos
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT NOW(),
+  created_by VARCHAR(255) -- user_id or 'system'
+);
+
+CREATE INDEX idx_media_node ON media_attachments(node_id);
+CREATE INDEX idx_media_bucket_key ON media_attachments(bucket, object_key);
+```
+
+**Migration Path:**
+
+- Start with MinIO locally
+- When ready for cloud: swap endpoint to S3/R2
+- No code changes needed (S3-compatible API)
+- Use bucket replication for migration
 
 ### 1.4 File Tree UI Component
 
