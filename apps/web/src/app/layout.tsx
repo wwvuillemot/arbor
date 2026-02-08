@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { TRPCProvider } from "@/components/providers/trpc-provider";
 
 export async function generateMetadata({
   params,
@@ -25,11 +26,17 @@ export async function generateMetadata({
   };
 }
 
-// This is a root layout that just passes through to the locale-specific layout
+/**
+ * Root Layout
+ *
+ * IMPORTANT: TRPCProvider is at the root level to persist across locale changes.
+ * This prevents the QueryClient from being recreated when the user changes languages,
+ * which would otherwise clear all cached data (current project, preferences, API keys).
+ */
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return children;
+  return <TRPCProvider>{children}</TRPCProvider>;
 }

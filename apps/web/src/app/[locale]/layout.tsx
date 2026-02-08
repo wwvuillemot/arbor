@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { locales } from "@/i18n/request";
 import "../../styles/globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
-import { TRPCProvider } from "@/components/providers/trpc-provider";
 import { ToastProvider } from "@/contexts/toast-context";
 import { ToastContainer } from "@/components/toast-container";
 
@@ -38,19 +37,17 @@ export default async function LocaleLayout({
     <html lang={locale} suppressHydrationWarning>
       <body>
         <NextIntlClientProvider messages={messages} locale={locale}>
-          <TRPCProvider>
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              <ToastProvider>
-                {children}
-                <ToastContainer />
-              </ToastProvider>
-            </ThemeProvider>
-          </TRPCProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ToastProvider>
+              {children}
+              <ToastContainer />
+            </ToastProvider>
+          </ThemeProvider>
         </NextIntlClientProvider>
       </body>
     </html>
