@@ -4,6 +4,7 @@ import {
   varchar,
   text,
   jsonb,
+  integer,
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
@@ -60,8 +61,18 @@ export const nodes = pgTable(
     // URL-friendly identifier (optional, for sharing/linking)
     slug: varchar("slug", { length: 255 }),
 
-    // Markdown content (for notes)
-    content: text("content"),
+    // Rich content (JSONB for structured data like TipTap/ProseMirror documents)
+    // Phase 0.2: Changed from TEXT to JSONB for structured content
+    // Examples:
+    // - TipTap: {"type": "doc", "content": [{"type": "paragraph", "content": [...]}]}
+    // - Plain text: {"text": "Simple markdown content"}
+    // - null for folders/projects
+    content: jsonb("content"),
+
+    // Position for sibling ordering (drag-drop reordering)
+    // Phase 0.2: Added for UI ordering within same parent
+    // Lower numbers appear first, gaps are allowed (0, 10, 20, ...)
+    position: integer("position").default(0).notNull(),
 
     // Flexible metadata per node type (JSONB)
     // Examples:
@@ -73,7 +84,23 @@ export const nodes = pgTable(
     // - audio_note: {"duration": 120, "transcription_id": "uuid", "audio_url": "/files/..."}
     metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
 
-    // Track authorship (human, ai, mixed)
+    // Provenance tracking: who created this node
+    // Phase 0.2: Added for LLM attribution
+    // Format: "user:{user_id}" or "llm:{model_name}"
+    // Examples: "user:alice", "llm:gpt-4o", "llm:claude-3.5-sonnet"
+    createdBy: varchar("created_by", { length: 255 })
+      .default("user:system")
+      .notNull(),
+
+    // Provenance tracking: who last updated this node
+    // Phase 0.2: Added for LLM attribution
+    // Format: "user:{user_id}" or "llm:{model_name}"
+    updatedBy: varchar("updated_by", { length: 255 })
+      .default("user:system")
+      .notNull(),
+
+    // Track authorship (human, ai, mixed) - DEPRECATED in favor of createdBy/updatedBy
+    // Keeping for backward compatibility, will remove in future migration
     authorType: varchar("author_type", { length: 20 }).default("human"),
 
     // TODO: Add vector embedding column via migration
