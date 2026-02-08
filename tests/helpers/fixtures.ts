@@ -7,9 +7,12 @@ export interface CreateNodeParams {
   name: string;
   parentId?: string | null;
   slug?: string;
-  content?: string;
+  content?: any; // JSONB content (can be object, string, or null)
   metadata?: Record<string, any>;
   authorType?: AuthorType;
+  position?: number; // Position for ordering siblings
+  createdBy?: string; // Provenance: "user:{id}" or "llm:{model}"
+  updatedBy?: string; // Provenance: "user:{id}" or "llm:{model}"
 }
 
 /**
@@ -28,6 +31,9 @@ export async function createTestNode(params: CreateNodeParams) {
       content: params.content,
       metadata: params.metadata || {},
       authorType: params.authorType || "human",
+      position: params.position ?? 0, // Default to 0 if not provided
+      createdBy: params.createdBy || "user:system", // Default to user:system
+      updatedBy: params.updatedBy || "user:system", // Default to user:system
     })
     .returning();
 

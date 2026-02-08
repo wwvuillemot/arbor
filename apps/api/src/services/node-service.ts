@@ -8,17 +8,22 @@ export interface CreateNodeParams {
   name: string;
   parentId?: string | null;
   slug?: string;
-  content?: string;
+  content?: any; // JSONB content (can be object, string, or null)
   metadata?: Record<string, any>;
-  authorType?: AuthorType;
+  authorType?: AuthorType; // DEPRECATED: Use createdBy/updatedBy instead
+  position?: number; // Position for ordering siblings
+  createdBy?: string; // Provenance: "user:{id}" or "llm:{model}"
+  updatedBy?: string; // Provenance: "user:{id}" or "llm:{model}"
 }
 
 export interface UpdateNodeParams {
   name?: string;
   slug?: string;
-  content?: string;
+  content?: any; // JSONB content (can be object, string, or null)
   metadata?: Record<string, any>;
-  authorType?: AuthorType;
+  authorType?: AuthorType; // DEPRECATED: Use updatedBy instead
+  position?: number; // Position for ordering siblings
+  updatedBy?: string; // Provenance: "user:{id}" or "llm:{model}"
 }
 
 export class NodeService {
@@ -48,7 +53,10 @@ export class NodeService {
         slug,
         content: params.content,
         metadata: params.metadata || {},
-        authorType: params.authorType || "human",
+        authorType: params.authorType || "human", // DEPRECATED
+        position: params.position ?? 0, // Default to 0 if not provided
+        createdBy: params.createdBy || "user:system", // Default to user:system
+        updatedBy: params.updatedBy || "user:system", // Default to user:system
       })
       .returning();
 
@@ -96,6 +104,8 @@ export class NodeService {
       .set({
         ...updates,
         updatedAt: new Date(),
+        // If updatedBy is not provided, keep the existing value
+        // (don't override with default)
       })
       .where(eq(nodes.id, id))
       .returning();

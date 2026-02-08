@@ -137,9 +137,6 @@ describe("Phase 0.2: Node Schema Updates", () => {
         })
         .returning();
 
-
-
-
       // Update position
       const [updated] = await db
         .update(nodes)
