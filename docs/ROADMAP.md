@@ -33,71 +33,49 @@ Build a local-first, AI-powered writing assistant with hierarchical node-based d
 
 **Goal:** Prepare infrastructure for Phase 1 (Node Management & File System)
 
-### 0.1 MinIO Object Storage Setup ✅ COMPLETED
+### 0.1 MinIO Object Storage Setup
 
-**Commit:** `b8b930d`
+**Why:** S3-compatible local object storage for media attachments
 
-- ✅ Added MinIO service to docker-compose.yml
-- ✅ Installed `minio@8.0.6` package
-- ✅ Created `MinioService` with upload/download/delete/list operations
-- ✅ Comprehensive test suite (8 tests passing)
-- ✅ Coverage: 64.68% → 75.44% (+10.76%)
+**Key Decisions:**
 
-### 0.2 Update Node Schema (JSONB + Position) 🔄 IN PROGRESS
+- Use MinIO (not filesystem) for clean abstraction and cloud migration path
+- Docker service with persistent volumes at `data/minio/`
+- Bucket structure: `arbor-media`, `arbor-exports`, `arbor-temp`
 
-**Goal:** Prepare nodes table for rich content and ordering
+### 0.2 Update Node Schema (JSONB + Position)
 
-**Tasks:**
+**Why:** Enable rich content storage and sibling ordering
 
-- [ ] Change `content` field from TEXT to JSONB
-- [ ] Add `position` INTEGER field for sibling ordering
-- [ ] Add `created_by` VARCHAR(255) field (user_id or 'llm:model-name')
-- [ ] Add `updated_by` VARCHAR(255) field
-- [ ] Add `metadata` JSONB field for extensibility
-- [ ] Create migration script with backward compatibility
-- [ ] Update `NodeService` to handle JSONB content
-- [ ] Update tRPC routers to support new schema
-- [ ] Add tests for new fields
-- [ ] Update seed data to use new schema
-- [ ] Run preflight and commit
+**Key Decisions:**
 
-**Expected Coverage:** Maintain 75%+
+- Change `content` from TEXT to JSONB for structured data
+- Add `position` INTEGER for drag-drop reordering
+- Add `created_by`/`updated_by` for provenance tracking
+- Add `metadata` JSONB for extensibility
 
-### 0.3 GraphQL Server Setup 📋 TODO
+### 0.3 GraphQL Server Setup
 
-**Goal:** Add GraphQL for complex graph queries (complement tRPC mutations)
+**Why:** Complex graph queries (complement tRPC for mutations)
 
-**Tasks:**
+**Key Decisions:**
 
-- [ ] Install Pothos GraphQL (`@pothos/core`, `@pothos/plugin-prisma`)
-- [ ] Install Apollo Server (`@apollo/server`)
-- [ ] Create GraphQL schema with Pothos
-- [ ] Add basic queries: `node(id)`, `nodes(filter)`, `nodeTree(projectId)`
-- [ ] Add GraphQL endpoint to Fastify server
-- [ ] Add tests for GraphQL queries
-- [ ] Document GraphQL vs tRPC usage patterns
-- [ ] Run preflight and commit
+- Use Pothos GraphQL (type-safe, code-first)
+- Use Apollo Server (industry standard)
+- Queries: `node(id)`, `nodes(filter)`, `nodeTree(projectId)`
+- tRPC for mutations, GraphQL for queries
 
-**Expected Coverage:** Maintain 75%+
+### 0.4 MCP Server Scaffold
 
-### 0.4 MCP Server Scaffold 📋 TODO
+**Why:** Enable LLM tool calling via Model Context Protocol
 
-**Goal:** Create Model Context Protocol server for LLM integration
+**Key Decisions:**
 
-**Tasks:**
-
-- [ ] Create new service at `apps/mcp-server/`
-- [ ] Install MCP dependencies (`@modelcontextprotocol/sdk`)
-- [ ] Implement JSONRPC 2.0 server
-- [ ] Add basic tools: `create_node`, `update_node`, `search_nodes`
-- [ ] Add resources: `node://`, `project://`
-- [ ] Add prompts: `summarize_project`, `outline_structure`
-- [ ] Add to docker-compose.yml
-- [ ] Add tests for MCP tools
-- [ ] Document MCP integration
-- [ ] Run preflight and commit
-
-**Expected Coverage:** Maintain 75%+
+- Separate service at `apps/mcp-server/` (port 3849)
+- JSONRPC 2.0 protocol
+- Basic tools: `create_node`, `update_node`, `search_nodes`
+- Resources: `node://`, `project://` URIs
+- Prompts: `summarize_project`, `outline_structure`
 
 ---
 
@@ -846,50 +824,113 @@ CREATE INDEX idx_history_node ON node_history(node_id, version DESC);
 
 ---
 
-## Success Metrics
+## Project Progress
 
-### Phase 1
+### Phase 0: Infrastructure Preparation
+
+#### 0.1 MinIO Object Storage Setup ✅ COMPLETED
+
+**Commit:** `b8b930d`
+
+- [x] Added MinIO service to docker-compose.yml
+- [x] Installed `minio@8.0.6` package
+- [x] Created `MinioService` with upload/download/delete/list operations
+- [x] Comprehensive test suite (8 tests passing)
+- [x] Coverage: 64.68% → 75.44% (+10.76%)
+
+#### 0.2 Update Node Schema (JSONB + Position) 🔄 IN PROGRESS
+
+- [ ] Change `content` field from TEXT to JSONB
+- [ ] Add `position` INTEGER field for sibling ordering
+- [ ] Add `created_by` VARCHAR(255) field (user_id or 'llm:model-name')
+- [ ] Add `updated_by` VARCHAR(255) field
+- [ ] Add `metadata` JSONB field for extensibility
+- [ ] Create migration script with backward compatibility
+- [ ] Update `NodeService` to handle JSONB content
+- [ ] Update tRPC routers to support new schema
+- [ ] Add tests for new fields
+- [ ] Update seed data to use new schema
+- [ ] Run preflight and commit
+
+**Expected Coverage:** Maintain 75%+
+
+#### 0.3 GraphQL Server Setup 📋 TODO
+
+- [ ] Install Pothos GraphQL (`@pothos/core`, `@pothos/plugin-prisma`)
+- [ ] Install Apollo Server (`@apollo/server`)
+- [ ] Create GraphQL schema with Pothos
+- [ ] Add basic queries: `node(id)`, `nodes(filter)`, `nodeTree(projectId)`
+- [ ] Add GraphQL endpoint to Fastify server
+- [ ] Add tests for GraphQL queries
+- [ ] Document GraphQL vs tRPC usage patterns
+- [ ] Run preflight and commit
+
+**Expected Coverage:** Maintain 75%+
+
+#### 0.4 MCP Server Scaffold 📋 TODO
+
+- [ ] Create new service at `apps/mcp-server/`
+- [ ] Install MCP dependencies (`@modelcontextprotocol/sdk`)
+- [ ] Implement JSONRPC 2.0 server
+- [ ] Add basic tools: `create_node`, `update_node`, `search_nodes`
+- [ ] Add resources: `node://`, `project://`
+- [ ] Add prompts: `summarize_project`, `outline_structure`
+- [ ] Add to docker-compose.yml
+- [ ] Add tests for MCP tools
+- [ ] Document MCP integration
+- [ ] Run preflight and commit
+
+**Expected Coverage:** Maintain 75%+
+
+---
+
+### Phase 1: Node Management & File System
+
+#### Success Criteria
 
 - [ ] Create/edit markdown files
 - [ ] Upload and embed images
 - [ ] Export project to PDF
 - [ ] File tree with drag-drop
 
-### Phase 2
+---
+
+### Phase 2: Tagging System
+
+#### Success Criteria
 
 - [ ] Create and assign tags
 - [ ] Jump to character nodes
 - [ ] Filter by multiple tags
 
-### Phase 3
+---
+
+### Phase 3: Search & RAG
+
+#### Success Criteria
 
 - [ ] Semantic search finds relevant nodes
 - [ ] Hybrid search outperforms keyword-only
 - [ ] RAG context improves LLM responses
 
-### Phase 4
+---
+
+### Phase 4: Chat & LLM Integration
+
+#### Success Criteria
 
 - [ ] Chat with multiple threads
 - [ ] LLM creates/edits nodes via tools
 - [ ] Switch agent modes mid-conversation
 - [ ] Reasoning models show thinking process
 
-### Phase 5
+---
+
+### Phase 5: Provenance & Version Control
+
+#### Success Criteria
 
 - [ ] View complete change history
 - [ ] Distinguish user vs LLM edits
 - [ ] Rollback to previous version
 - [ ] Export audit report
-
----
-
-## Next Steps
-
-1. **Review this roadmap** - Discuss priorities, adjust scope
-2. **Choose Phase 1 starting point** - Likely 1.1 (schema) or 1.2 (editor)
-3. **Set up project board** - Track tasks, milestones
-4. **Spike on key decisions**:
-   - Markdown editor choice (TipTap vs others)
-   - Media storage strategy
-   - Embedding provider
-5. **Begin Phase 1.1** - Extend node schema for files/folders
