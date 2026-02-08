@@ -230,6 +230,12 @@
       "delete": "Delete Project"
     },
     "lastModified": "Last modified",
-    "items": "items"
+    "items": "items",
+    "createSuccess": "Project created successfully",
+    "createError": "Failed to create project",
+    "updateSuccess": "Project updated successfully",
+    "updateError": "Failed to update project",
+    "deleteSuccess": "Project deleted successfully",
+    "deleteError": "Failed to delete project"
   }
 }

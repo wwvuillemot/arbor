@@ -230,6 +230,12 @@
       "delete": "プロジェクトを削除"
     },
     "lastModified": "最終更新",
-    "items": "項目"
+    "items": "項目",
+    "createSuccess": "プロジェクトを作成しました",
+    "createError": "プロジェクトの作成に失敗しました",
+    "updateSuccess": "プロジェクトを更新しました",
+    "updateError": "プロジェクトの更新に失敗しました",
+    "deleteSuccess": "プロジェクトを削除しました",
+    "deleteError": "プロジェクトの削除に失敗しました"
   }
 }

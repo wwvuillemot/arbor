@@ -173,7 +173,9 @@ describe("useNavigationCommands", () => {
 
     // Set a timeout to prevent the test from hanging forever
     const timeout = setTimeout(() => {
-      throw new Error("Test timed out - infinite loop detected in getKeywords()");
+      throw new Error(
+        "Test timed out - infinite loop detected in getKeywords()",
+      );
     }, 1000);
 
     try {
@@ -191,7 +193,11 @@ describe("useNavigationCommands", () => {
         .find((cmd) => cmd.id === "nav-projects");
 
       expect(projectsCommand).toBeDefined();
-      expect(projectsCommand?.keywords).toEqual(["folders", "files", "projects"]);
+      expect(projectsCommand?.keywords).toEqual([
+        "folders",
+        "files",
+        "projects",
+      ]);
 
       clearTimeout(timeout);
     } catch (error) {

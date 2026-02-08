@@ -6,10 +6,13 @@ import { Plus, FolderTree, Pencil, Trash2, X, Check } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { useCurrentProject } from "@/hooks/use-current-project";
+import { useToast } from "@/contexts/toast-context";
 
 export default function ProjectsPage() {
+  const utils = trpc.useUtils();
   const t = useTranslations("projects");
   const tCommon = useTranslations("common");
+  const { addToast } = useToast();
 
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -33,29 +36,55 @@ export default function ProjectsPage() {
 
   // Mutations
   const createMutation = trpc.nodes.create.useMutation({
-    onSuccess: () => {
-      projectsQuery.refetch();
+    onSuccess: async () => {
+      await utils.nodes.getAllProjects.refetch();
+      addToast(t("createSuccess"), "success");
       setCreateDialogOpen(false);
       setProjectName("");
+    },
+    onError: (error) => {
+      console.error("Error creating project:", error);
+      addToast(t("createError"), "error");
     },
   });
 
   const updateMutation = trpc.nodes.update.useMutation({
-    onSuccess: () => {
-      projectsQuery.refetch();
+    onSuccess: async () => {
+      await utils.nodes.getAllProjects.refetch();
+      addToast(t("updateSuccess"), "success");
       setEditDialogOpen(false);
       setSelectedProject(null);
       setProjectName("");
+    },
+    onError: (error) => {
+      console.error("Error updating project:", error);
+      addToast(t("updateError"), "error");
     },
   });
 
   const deleteMutation = trpc.nodes.delete.useMutation({
     onSuccess: async () => {
-      // If we deleted the currently selected project, clear the selection
-      if (selectedProject && selectedProject.id === currentProjectId) {
-        await setCurrentProject(null);
+      try {
+        // If we deleted the currently selected project, clear the selection
+        if (selectedProject && selectedProject.id === currentProjectId) {
+          await setCurrentProject(null);
+        }
+        // Force refetch to update the UI immediately
+        await utils.nodes.getAllProjects.refetch();
+        addToast(t("deleteSuccess"), "success");
+      } catch (error) {
+        console.error("Error in delete onSuccess:", error);
+        addToast(t("deleteError"), "error");
+      } finally {
+        // Always close the dialog and clear selection
+        setDeleteDialogOpen(false);
+        setSelectedProject(null);
       }
-      projectsQuery.refetch();
+    },
+    onError: (error) => {
+      console.error("Error deleting project:", error);
+      addToast(t("deleteError"), "error");
+      // Still close the dialog on error
       setDeleteDialogOpen(false);
       setSelectedProject(null);
     },
@@ -136,7 +165,7 @@ export default function ProjectsPage() {
                 className={cn(
                   "group relative rounded-lg border bg-card p-6 hover:shadow-md transition-shadow cursor-pointer",
                   isSelected &&
-                  "border-green-500 bg-green-50 dark:bg-green-950",
+                    "border-green-500 bg-green-50 dark:bg-green-950",
                 )}
               >
                 {/* Checkmark in upper-right corner */}

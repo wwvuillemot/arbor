@@ -10,8 +10,13 @@ import { useAppPreferences } from "./use-app-preferences";
  * and persists across sessions.
  */
 export function useCurrentProject() {
-  const { getPreference, setPreference, isLoading, isUpdating } =
-    useAppPreferences();
+  const {
+    getPreference,
+    setPreference,
+    deletePreference,
+    isLoading,
+    isUpdating,
+  } = useAppPreferences();
 
   // Get current project ID from preferences
   const currentProjectId = getPreference("currentProjectId", null) as
@@ -21,9 +26,15 @@ export function useCurrentProject() {
   // Set current project
   const setCurrentProject = React.useCallback(
     async (projectId: string | null) => {
-      await setPreference("currentProjectId", projectId);
+      if (projectId === null) {
+        // Delete the preference instead of setting it to null
+        // (user_preferences.value has NOT NULL constraint)
+        await deletePreference("currentProjectId");
+      } else {
+        await setPreference("currentProjectId", projectId);
+      }
     },
-    [setPreference],
+    [setPreference, deletePreference],
   );
 
   return {

@@ -4,6 +4,8 @@ import { locales } from "@/i18n/request";
 import "../../styles/globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { TRPCProvider } from "@/components/providers/trpc-provider";
+import { ToastProvider } from "@/contexts/toast-context";
+import { ToastContainer } from "@/components/toast-container";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -43,7 +45,10 @@ export default async function LocaleLayout({
               enableSystem
               disableTransitionOnChange
             >
-              {children}
+              <ToastProvider>
+                {children}
+                <ToastContainer />
+              </ToastProvider>
             </ThemeProvider>
           </TRPCProvider>
         </NextIntlClientProvider>
