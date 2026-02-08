@@ -3,11 +3,11 @@ import postgres from "postgres";
 import * as schema from "@server/db/schema";
 import { sql } from "drizzle-orm";
 
-// Use a separate test database or the same database with a test schema
+// CRITICAL: Use a separate test database to avoid wiping production data!
+// Tests run resetTestDb() before each test which DELETES ALL DATA
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ||
-  process.env.DATABASE_URL ||
-  "postgresql://arbor:local_dev_only@localhost:5432/arbor";
+  "postgresql://arbor:local_dev_only@localhost:5432/arbor_test";
 
 let testClient: postgres.Sql | null = null;
 let testDb: ReturnType<typeof drizzle> | null = null;
