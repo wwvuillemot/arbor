@@ -39,6 +39,9 @@ export async function seed(closeConnectionAfter = false) {
       .values({
         type: "project",
         name: "My Fantasy Novel",
+        position: 0,
+        createdBy: "user:system",
+        updatedBy: "user:system",
         metadata: {
           description:
             "An epic fantasy story about a young mage discovering her powers",
@@ -56,6 +59,9 @@ export async function seed(closeConnectionAfter = false) {
         type: "folder",
         name: "Characters",
         parentId: projectA.id,
+        position: 0,
+        createdBy: "user:system",
+        updatedBy: "user:system",
         metadata: { color: "#3b82f6", icon: "users" },
       })
       .returning();
@@ -67,6 +73,9 @@ export async function seed(closeConnectionAfter = false) {
         type: "folder",
         name: "World Building",
         parentId: projectA.id,
+        position: 10,
+        createdBy: "user:system",
+        updatedBy: "user:system",
         metadata: { color: "#10b981", icon: "globe" },
       })
       .returning();
@@ -78,10 +87,14 @@ export async function seed(closeConnectionAfter = false) {
         type: "note",
         name: "Protagonist: Aria",
         parentId: charactersFolder.id,
-        content: `# Aria Stormweaver
+        position: 0,
+        createdBy: "user:system",
+        updatedBy: "user:system",
+        content: {
+          text: `# Aria Stormweaver
 
-**Age**: 17  
-**Role**: Protagonist  
+**Age**: 17
+**Role**: Protagonist
 **Powers**: Lightning magic, weather manipulation
 
 ## Background
@@ -92,6 +105,7 @@ Aria grew up in a small coastal village, unaware of her magical heritage...
 - Learns to control her abilities
 - Confronts her destiny as the last Stormweaver
 `,
+        },
         metadata: {
           tags: ["character", "protagonist", "magic"],
           word_count: 45,
@@ -102,10 +116,14 @@ Aria grew up in a small coastal village, unaware of her magical heritage...
         type: "note",
         name: "Antagonist: Lord Malachar",
         parentId: charactersFolder.id,
-        content: `# Lord Malachar
+        position: 10,
+        createdBy: "user:system",
+        updatedBy: "user:system",
+        content: {
+          text: `# Lord Malachar
 
-**Age**: Unknown (appears 40s)  
-**Role**: Antagonist  
+**Age**: Unknown (appears 40s)
+**Role**: Antagonist
 **Powers**: Dark magic, necromancy
 
 ## Background
@@ -114,6 +132,7 @@ Once a respected court mage, Malachar turned to forbidden magic after losing his
 ## Motivation
 Seeks to resurrect his loved ones, regardless of the cost to the world.
 `,
+        },
         metadata: {
           tags: ["character", "antagonist", "dark-magic"],
           word_count: 38,
@@ -128,7 +147,11 @@ Seeks to resurrect his loved ones, regardless of the cost to the world.
       type: "note",
       name: "Magic System",
       parentId: worldBuildingFolder.id,
-      content: `# Magic System
+      position: 0,
+      createdBy: "user:system",
+      updatedBy: "user:system",
+      content: {
+        text: `# Magic System
 
 ## Types of Magic
 1. **Elemental Magic**: Fire, Water, Earth, Air, Lightning
@@ -141,6 +164,7 @@ Seeks to resurrect his loved ones, regardless of the cost to the world.
 - Dark magic corrupts the user over time
 - Each mage typically specializes in one element
 `,
+      },
       metadata: {
         tags: ["worldbuilding", "magic", "rules"],
         word_count: 62,
@@ -155,6 +179,9 @@ Seeks to resurrect his loved ones, regardless of the cost to the world.
       .values({
         type: "project",
         name: "D&D Campaign: Lost Mines of Phandelver",
+        position: 10,
+        createdBy: "user:system",
+        updatedBy: "user:system",
         metadata: {
           description: "A classic D&D 5e adventure with custom modifications",
           status: "active",
@@ -172,6 +199,9 @@ Seeks to resurrect his loved ones, regardless of the cost to the world.
         type: "folder",
         name: "Session Notes",
         parentId: projectB.id,
+        position: 0,
+        createdBy: "user:system",
+        updatedBy: "user:system",
         metadata: { color: "#f59e0b", icon: "book" },
       })
       .returning();
@@ -182,8 +212,12 @@ Seeks to resurrect his loved ones, regardless of the cost to the world.
       type: "note",
       name: "Session 1: The Goblin Ambush",
       parentId: sessionNotesFolder.id,
-      content: `# Session 1: The Goblin Ambush
-**Date**: February 3, 2024  
+      position: 0,
+      createdBy: "user:system",
+      updatedBy: "user:system",
+      content: {
+        text: `# Session 1: The Goblin Ambush
+**Date**: February 3, 2024
 **Players**: Alice, Bob, Charlie, Diana
 
 ## Summary
@@ -203,6 +237,7 @@ The party was hired to escort a wagon to Phandalin. On the road, they encountere
 ## Next Session
 Head to Phandalin and investigate Gundren's disappearance
 `,
+      },
       metadata: {
         tags: ["session-notes", "combat", "rescue"],
         word_count: 95,
