@@ -169,6 +169,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                         key={command.id}
                         value={command.id}
                         onSelect={() => handleSelect(command)}
+                        onClick={() => handleSelect(command)}
                         className={cn(
                           "relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none",
                           "aria-selected:bg-accent aria-selected:text-accent-foreground",

@@ -1,14 +1,14 @@
 #!/usr/bin/env tsx
 /**
  * Database Migration Runner
- * 
+ *
  * Runs all pending migrations in the migrations directory.
  * This is the proper way to update the database schema in production.
- * 
+ *
  * Usage:
  *   pnpm run db:migrate        # Run all pending migrations
  *   pnpm run db:migrate:up     # Same as above
- * 
+ *
  * To create a new migration:
  *   pnpm run db:generate       # Generates migration from schema changes
  */
@@ -24,7 +24,9 @@ async function runMigrations() {
     "postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor";
 
   console.log("🔄 Running database migrations...");
-  console.log(`📍 Connection: ${connectionString.replace(/:[^:@]+@/, ':****@')}`);
+  console.log(
+    `📍 Connection: ${connectionString.replace(/:[^:@]+@/, ":****@")}`,
+  );
 
   // Create postgres connection for migrations
   const migrationClient = postgres(connectionString, { max: 1 });
@@ -46,4 +48,3 @@ async function runMigrations() {
 }
 
 runMigrations();
-

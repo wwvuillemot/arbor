@@ -31,6 +31,7 @@ This creates a new migration file in this directory with a timestamp and descrip
 **IMPORTANT:** Always review the generated SQL before applying it!
 
 Check the new `.sql` file in this directory to ensure:
+
 - The changes match your intent
 - No data will be lost unintentionally
 - Indexes are created appropriately
@@ -56,6 +57,7 @@ git commit -m "feat: add new_column to nodes table"
 ## Migration Files
 
 Each migration consists of:
+
 - `XXXX_description.sql` - The SQL migration file
 - `meta/XXXX_snapshot.json` - Schema snapshot for that migration
 - `meta/_journal.json` - Migration history journal
@@ -63,6 +65,7 @@ Each migration consists of:
 ## Best Practices
 
 ### ✅ DO:
+
 - **Always use migrations** for schema changes in production
 - **Review generated SQL** before applying
 - **Test migrations** on a copy of production data
@@ -71,6 +74,7 @@ Each migration consists of:
 - **Run migrations** as part of deployment process
 
 ### ❌ DON'T:
+
 - **Don't use `db:push`** in production (it can lose data)
 - **Don't edit** existing migration files after they've been applied
 - **Don't delete** migration files
@@ -84,6 +88,7 @@ Drizzle doesn't have built-in rollback. To rollback:
 2. **Or restore** from database backup
 
 Example rollback migration:
+
 ```bash
 # Generate a new migration that removes the column
 pnpm run db:generate
@@ -107,6 +112,7 @@ make db-reset  # ⚠️ Destroys all data!
 ### Migration conflicts
 
 If multiple developers create migrations simultaneously:
+
 1. Pull latest migrations from git
 2. Regenerate your migration
 3. Review and resolve conflicts
@@ -114,10 +120,9 @@ If multiple developers create migrations simultaneously:
 
 ## Migration vs Push
 
-| Command | Use Case | Safety |
-|---------|----------|--------|
+| Command           | Use Case                              | Safety                   |
+| ----------------- | ------------------------------------- | ------------------------ |
 | `make db-migrate` | Production, staging, team development | ✅ Safe - preserves data |
-| `make db-push` | Local development only, prototyping | ⚠️ Can lose data |
+| `make db-push`    | Local development only, prototyping   | ⚠️ Can lose data         |
 
 **Default:** Always use `make db-migrate` unless you're prototyping and don't care about data.
-

@@ -21,6 +21,7 @@ make seed
 ## Why Migrations?
 
 ### ✅ Benefits of Migrations:
+
 - **Version Control**: Schema changes are tracked in git
 - **Data Safety**: Migrations preserve existing data
 - **Rollback**: Can revert changes if needed
@@ -28,6 +29,7 @@ make seed
 - **Production Ready**: Safe to run in production
 
 ### ❌ Problems with `db:push`:
+
 - **Data Loss**: Can drop and recreate tables
 - **No History**: No record of what changed
 - **No Rollback**: Can't undo changes
@@ -58,6 +60,7 @@ make db-generate
 ```
 
 This creates a new file in `apps/api/src/db/migrations/` like:
+
 - `0001_cool_name.sql` - The SQL migration
 - `meta/0001_snapshot.json` - Schema snapshot
 - Updates `meta/_journal.json` - Migration history
@@ -71,6 +74,7 @@ cat apps/api/src/db/migrations/0001_*.sql
 ```
 
 Check for:
+
 - ✅ Correct column types
 - ✅ Proper indexes
 - ✅ Foreign key constraints
@@ -113,11 +117,15 @@ make db-migrate   # Applies migration
 
 ```typescript
 // schema.ts
-export const nodes = pgTable("nodes", {
-  // ... columns ...
-}, (table) => ({
-  nameIdx: index("idx_nodes_name").on(table.name),
-}));
+export const nodes = pgTable(
+  "nodes",
+  {
+    // ... columns ...
+  },
+  (table) => ({
+    nameIdx: index("idx_nodes_name").on(table.name),
+  }),
+);
 ```
 
 ### Renaming a Column
@@ -128,9 +136,11 @@ Instead, do it manually:
 
 1. Generate empty migration: `make db-generate`
 2. Edit the SQL file:
+
 ```sql
 ALTER TABLE nodes RENAME COLUMN old_name TO new_name;
 ```
+
 3. Update schema.ts to match
 4. Apply: `make db-migrate`
 
@@ -202,6 +212,7 @@ make db-migrate
 ### "relation already exists"
 
 Migration was already applied. Check:
+
 ```bash
 docker exec arbor-postgres psql -U arbor -d arbor -c "SELECT * FROM drizzle.__drizzle_migrations;"
 ```
@@ -231,4 +242,3 @@ Drizzle runs migrations in a transaction, so partial failures rollback automatic
 - [Drizzle Migrations Docs](https://orm.drizzle.team/docs/migrations)
 - [Migration Files](../apps/api/src/db/migrations/)
 - [Schema Definition](../apps/api/src/db/schema.ts)
-

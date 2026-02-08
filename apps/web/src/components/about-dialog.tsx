@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { X, Github, Code2 } from "lucide-react";
+import { X, Github, Code2, Database } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 
 export interface AboutDialogProps {
   open: boolean;
@@ -12,6 +13,11 @@ export interface AboutDialogProps {
 
 export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
   const t = useTranslations("about");
+
+  // Get system info including database version
+  const { data: systemInfo } = trpc.system.getInfo.useQuery(undefined, {
+    enabled: open,
+  });
 
   // Handle keyboard shortcuts
   React.useEffect(() => {
@@ -62,7 +68,16 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{t("version")}</span>
-                <span className="font-mono">0.1.0</span>
+                <span className="font-mono">{systemInfo?.version || "0.1.0"}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <Database className="h-3 w-3" />
+                  Database
+                </span>
+                <span className="font-mono text-xs">
+                  {systemInfo?.database?.version || "Loading..."}
+                </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{t("license")}</span>
@@ -91,11 +106,14 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
                 {[
                   "Next.js 15",
                   "React 19",
-                  "Tauri v2",
                   "TypeScript",
                   "PostgreSQL",
                   "Redis",
+                  "MinIO",
                   "tRPC",
+                  "GraphQL",
+                  "Drizzle ORM",
+                  "Fastify",
                 ].map((tech) => (
                   <span
                     key={tech}
