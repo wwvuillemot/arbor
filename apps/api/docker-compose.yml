@@ -47,9 +47,10 @@ services:
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+      interval: 5s # Check every 5 seconds
+      timeout: 3s # 3 second timeout per check
+      retries: 3 # Retry 3 times before marking unhealthy
+      start_period: 5s # Wait 5s before first check (gives MinIO time to start)
     restart: unless-stopped
 
   api:
