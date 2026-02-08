@@ -33,6 +33,25 @@ services:
       - postgres
     restart: unless-stopped
 
+  minio:
+    image: minio/minio:latest
+    container_name: arbor-minio
+    ports:
+      - "9000:9000" # API
+      - "9001:9001" # Console
+    environment:
+      MINIO_ROOT_USER: arbor
+      MINIO_ROOT_PASSWORD: local_dev_only
+    volumes:
+      - ../../data/minio:/data # Persistent local storage
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
   api:
     build:
       context: ../..
@@ -41,6 +60,10 @@ services:
     container_name: arbor-api
     environment:
       DATABASE_URL: postgresql://arbor:local_dev_only@postgres:5432/arbor
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: arbor
+      MINIO_SECRET_KEY: local_dev_only
+      MINIO_USE_SSL: "false"
       API_PORT: 3001
       API_HOST: 0.0.0.0
       CORS_ORIGIN: http://app.arbor.local
@@ -49,6 +72,8 @@ services:
       - /app/node_modules
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     restart: unless-stopped
 
