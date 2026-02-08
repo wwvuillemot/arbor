@@ -14,10 +14,90 @@ Build a local-first, AI-powered writing assistant with hierarchical node-based d
 - Settings UI with API key management
 - Toast notification system
 - Theme & language support (EN/JA)
-- Command palette (CMD-K)
-- Docker infrastructure (PostgreSQL, Redis, Traefik)
+- Command palette (CMD-K) with global shortcuts (g+d, g+p, etc.)
+- Docker infrastructure (PostgreSQL, Redis, MinIO)
 - Tauri v2 desktop app
-- Test coverage: 62.95%
+- Test coverage: 75.44%
+- MinIO object storage service (Phase 0.1 ✅)
+
+**Recent Bug Fixes:**
+
+- ✅ Language change preserves tRPC cache (current project, API keys, preferences)
+- ✅ Theme persistence across reloads (removed next-themes conflict)
+- ✅ Hard reload (CMD-ALT-R) preserves all preferences
+- ✅ Light mode visibility for projects
+
+---
+
+## Phase 0: Infrastructure Preparation
+
+**Goal:** Prepare infrastructure for Phase 1 (Node Management & File System)
+
+### 0.1 MinIO Object Storage Setup ✅ COMPLETED
+
+**Commit:** `b8b930d`
+
+- ✅ Added MinIO service to docker-compose.yml
+- ✅ Installed `minio@8.0.6` package
+- ✅ Created `MinioService` with upload/download/delete/list operations
+- ✅ Comprehensive test suite (8 tests passing)
+- ✅ Coverage: 64.68% → 75.44% (+10.76%)
+
+### 0.2 Update Node Schema (JSONB + Position) 🔄 IN PROGRESS
+
+**Goal:** Prepare nodes table for rich content and ordering
+
+**Tasks:**
+
+- [ ] Change `content` field from TEXT to JSONB
+- [ ] Add `position` INTEGER field for sibling ordering
+- [ ] Add `created_by` VARCHAR(255) field (user_id or 'llm:model-name')
+- [ ] Add `updated_by` VARCHAR(255) field
+- [ ] Add `metadata` JSONB field for extensibility
+- [ ] Create migration script with backward compatibility
+- [ ] Update `NodeService` to handle JSONB content
+- [ ] Update tRPC routers to support new schema
+- [ ] Add tests for new fields
+- [ ] Update seed data to use new schema
+- [ ] Run preflight and commit
+
+**Expected Coverage:** Maintain 75%+
+
+### 0.3 GraphQL Server Setup 📋 TODO
+
+**Goal:** Add GraphQL for complex graph queries (complement tRPC mutations)
+
+**Tasks:**
+
+- [ ] Install Pothos GraphQL (`@pothos/core`, `@pothos/plugin-prisma`)
+- [ ] Install Apollo Server (`@apollo/server`)
+- [ ] Create GraphQL schema with Pothos
+- [ ] Add basic queries: `node(id)`, `nodes(filter)`, `nodeTree(projectId)`
+- [ ] Add GraphQL endpoint to Fastify server
+- [ ] Add tests for GraphQL queries
+- [ ] Document GraphQL vs tRPC usage patterns
+- [ ] Run preflight and commit
+
+**Expected Coverage:** Maintain 75%+
+
+### 0.4 MCP Server Scaffold 📋 TODO
+
+**Goal:** Create Model Context Protocol server for LLM integration
+
+**Tasks:**
+
+- [ ] Create new service at `apps/mcp-server/`
+- [ ] Install MCP dependencies (`@modelcontextprotocol/sdk`)
+- [ ] Implement JSONRPC 2.0 server
+- [ ] Add basic tools: `create_node`, `update_node`, `search_nodes`
+- [ ] Add resources: `node://`, `project://`
+- [ ] Add prompts: `summarize_project`, `outline_structure`
+- [ ] Add to docker-compose.yml
+- [ ] Add tests for MCP tools
+- [ ] Document MCP integration
+- [ ] Run preflight and commit
+
+**Expected Coverage:** Maintain 75%+
 
 ---
 
