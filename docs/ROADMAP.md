@@ -838,7 +838,7 @@ CREATE INDEX idx_history_node ON node_history(node_id, version DESC);
 - [x] Comprehensive test suite (8 tests passing)
 - [x] Coverage: 64.68% → 75.44% (+10.76%)
 
-#### 0.2 Update Node Schema (JSONB + Position) ✅ COMPLETED (Commit: `38e4e51`)
+#### 0.2 Update Node Schema (JSONB + Position) ✅ COMPLETED (Commits: `38e4e51`, `5b63c46`, `9d53c2b`, `174706a`)
 
 - [x] Change `content` field from TEXT to JSONB
 - [x] Add `position` INTEGER field for sibling ordering
@@ -846,13 +846,13 @@ CREATE INDEX idx_history_node ON node_history(node_id, version DESC);
 - [x] Add `updated_by` VARCHAR(255) field
 - [x] Add `metadata` JSONB field for extensibility (already existed)
 - [x] Create migration script with backward compatibility (manual SQL migration)
-- [ ] Update `NodeService` to handle JSONB content (deferred to Phase 1)
-- [ ] Update tRPC routers to support new schema (deferred to Phase 1)
-- [x] Add tests for new fields (8 comprehensive tests)
-- [ ] Update seed data to use new schema (deferred to Phase 1)
+- [x] Update `NodeService` to handle JSONB content (Commit: `9d53c2b`)
+- [x] Update tRPC routers to support new schema (Commit: `174706a`)
+- [x] Add tests for new fields (18 comprehensive tests: 8 schema + 10 service)
+- [x] Update seed data to use new schema (Commit: `5b63c46`)
 - [x] Run preflight and commit
 
-**Coverage:** 75.44% → 75.57% (improved) ✅
+**Coverage:** 75.44% → 76.26% (improved) ✅
 
 #### 0.3 GraphQL Server Setup 📋 TODO
 
