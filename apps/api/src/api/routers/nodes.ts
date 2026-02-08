@@ -13,24 +13,35 @@ const nodeTypeSchema = z.enum([
   "ai_suggestion",
   "audio_note",
 ]);
-const authorTypeSchema = z.enum(["human", "ai", "mixed"]);
+const authorTypeSchema = z.enum(["human", "ai", "mixed"]); // DEPRECATED
+
+// Provenance format: "user:{id}" or "llm:{model}"
+// Examples: "user:alice", "llm:gpt-4o", "llm:claude-3.5-sonnet"
+const provenanceSchema = z
+  .string()
+  .regex(/^(user|llm):.+$/, "Must be in format 'user:{id}' or 'llm:{model}'");
 
 const createNodeSchema = z.object({
   type: nodeTypeSchema,
   name: z.string().min(1),
   parentId: z.string().uuid().optional().nullable(),
   slug: z.string().optional(),
-  content: z.string().optional(),
+  content: z.any().optional(), // JSONB content (can be object, string, or null)
   metadata: z.record(z.any()).optional(),
-  authorType: authorTypeSchema.optional(),
+  authorType: authorTypeSchema.optional(), // DEPRECATED: Use createdBy/updatedBy instead
+  position: z.number().int().optional(), // Position for ordering siblings
+  createdBy: provenanceSchema.optional(), // Defaults to "user:system"
+  updatedBy: provenanceSchema.optional(), // Defaults to "user:system"
 });
 
 const updateNodeSchema = z.object({
   name: z.string().min(1).optional(),
   slug: z.string().optional(),
-  content: z.string().optional(),
+  content: z.any().optional(), // JSONB content (can be object, string, or null)
   metadata: z.record(z.any()).optional(),
-  authorType: authorTypeSchema.optional(),
+  authorType: authorTypeSchema.optional(), // DEPRECATED: Use updatedBy instead
+  position: z.number().int().optional(), // Position for ordering siblings
+  updatedBy: provenanceSchema.optional(), // Who last updated this node
 });
 
 export const nodesRouter = router({
@@ -68,7 +79,10 @@ export const nodesRouter = router({
         slug: input.slug,
         content: input.content,
         metadata: input.metadata,
-        authorType: input.authorType,
+        authorType: input.authorType, // DEPRECATED
+        position: input.position,
+        createdBy: input.createdBy,
+        updatedBy: input.updatedBy,
       });
     }),
 
