@@ -380,6 +380,15 @@
     "entityLinkError": "エンティティページのリンクに失敗しました",
     "entityUnlinkError": "エンティティページのリンク解除に失敗しました",
     "unlinkEntity": "エンティティページのリンクを解除",
-    "entityTag": "エンティティタグ"
+    "entityTag": "エンティティタグ",
+    "browser": {
+      "cloudView": "クラウド表示",
+      "listView": "リスト表示",
+      "filtered": "タグでフィルター中",
+      "clear": "クリア",
+      "loading": "読み込み中...",
+      "noResults": "一致するノードがありません",
+      "related": "関連タグ"
+    }
   }
 }

@@ -55,6 +55,30 @@ const mockTagsData = [
   },
 ];
 
+const mockTagsWithCounts = [
+  { ...mockTagsData[0], nodeCount: 5 },
+  { ...mockTagsData[1], nodeCount: 3 },
+];
+
+const mockFilteredNodes = [
+  { id: "node-1", name: "Chapter 1", type: "note" },
+  { id: "node-2", name: "Chapter 2", type: "note" },
+];
+
+const mockRelatedTags = [
+  {
+    id: "tag-3",
+    name: "Event",
+    color: "#f59e0b",
+    icon: null,
+    type: "event",
+    entityNodeId: null,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    sharedCount: 2,
+  },
+];
+
 // Mock tRPC
 vi.mock("@/lib/trpc", () => {
   const makeMutation = (mutateFn: any) => ({
@@ -137,6 +161,27 @@ vi.mock("@/lib/trpc", () => {
           return mut;
         }),
       },
+      getTagsWithCounts: {
+        useQuery: vi.fn(() => ({
+          data: mockTagsWithCounts,
+          isLoading: false,
+          error: null,
+        })),
+      },
+      getNodesByTags: {
+        useQuery: vi.fn(() => ({
+          data: mockFilteredNodes,
+          isLoading: false,
+          error: null,
+        })),
+      },
+      getRelatedTags: {
+        useQuery: vi.fn(() => ({
+          data: mockRelatedTags,
+          isLoading: false,
+          error: null,
+        })),
+      },
     },
     useUtils: vi.fn(() => ({
       tags: {
@@ -152,6 +197,8 @@ vi.mock("@/lib/trpc", () => {
 import { TagBadge, type TagBadgeTag } from "@/components/tags/tag-badge";
 import { TagManager } from "@/components/tags/tag-manager";
 import { TagPicker } from "@/components/tags/tag-picker";
+import { TagCloud, type TagCloudTag } from "@/components/tags/tag-cloud";
+import { TagBrowser } from "@/components/tags/tag-browser";
 
 // === TagBadge Tests ===
 
@@ -627,5 +674,229 @@ describe("TagPicker", () => {
     fireEvent.click(screen.getByTestId("tag-picker-create-entity-tag-2"));
     expect(mockAddToast).toHaveBeenCalledWith("entityNodeCreated", "success");
     expect(mockNavigate).toHaveBeenCalledWith("new-entity-node");
+  });
+});
+
+// === TagCloud Tests ===
+
+describe("TagCloud", () => {
+  const cloudTags: TagCloudTag[] = [
+    {
+      id: "tag-1",
+      name: "Character",
+      color: "#6366f1",
+      icon: null,
+      type: "character",
+      nodeCount: 10,
+    },
+    {
+      id: "tag-2",
+      name: "Location",
+      color: "#10b981",
+      icon: "📍",
+      type: "location",
+      nodeCount: 3,
+    },
+    {
+      id: "tag-3",
+      name: "Unused",
+      color: null,
+      icon: null,
+      type: "general",
+      nodeCount: 1,
+    },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should render nothing when tags array is empty", () => {
+    const { container } = render(<TagCloud tags={[]} />);
+    expect(container.querySelector("[data-testid='tag-cloud']")).toBeNull();
+  });
+
+  it("should render all tags", () => {
+    render(<TagCloud tags={cloudTags} />);
+    expect(screen.getByText("Character")).toBeInTheDocument();
+    expect(screen.getByText("Location")).toBeInTheDocument();
+    expect(screen.getByText("Unused")).toBeInTheDocument();
+  });
+
+  it("should render tag cloud container", () => {
+    render(<TagCloud tags={cloudTags} />);
+    expect(screen.getByTestId("tag-cloud")).toBeInTheDocument();
+  });
+
+  it("should apply larger size class for higher-count tags", () => {
+    render(<TagCloud tags={cloudTags} />);
+    const highCountTag = screen.getByTestId("tag-cloud-item-tag-1");
+    const lowCountTag = screen.getByTestId("tag-cloud-item-tag-3");
+    // Tag with count 10 (max) should have text-2xl
+    expect(highCountTag.className).toContain("text-2xl");
+    // Tag with count 1 (min) should have text-sm
+    expect(lowCountTag.className).toContain("text-sm");
+  });
+
+  it("should call onTagClick when a tag is clicked", () => {
+    const handleClick = vi.fn();
+    render(<TagCloud tags={cloudTags} onTagClick={handleClick} />);
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-2"));
+    expect(handleClick).toHaveBeenCalledWith(cloudTags[1]);
+  });
+
+  it("should highlight selected tags with ring styling", () => {
+    render(<TagCloud tags={cloudTags} selectedTagIds={["tag-1"]} />);
+    const selectedTag = screen.getByTestId("tag-cloud-item-tag-1");
+    expect(selectedTag.className).toContain("ring-2");
+    const unselectedTag = screen.getByTestId("tag-cloud-item-tag-2");
+    expect(unselectedTag.className).not.toContain("ring-2");
+  });
+
+  it("should show tag icon when present", () => {
+    render(<TagCloud tags={cloudTags} />);
+    expect(screen.getByText("📍")).toBeInTheDocument();
+  });
+
+  it("should show node count in title tooltip", () => {
+    render(<TagCloud tags={cloudTags} />);
+    const tag = screen.getByTestId("tag-cloud-item-tag-1");
+    expect(tag.getAttribute("title")).toBe("Character (10)");
+  });
+});
+
+// === TagBrowser Tests ===
+
+describe("TagBrowser", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should render tag browser container", () => {
+    render(<TagBrowser />);
+    expect(screen.getByTestId("tag-browser")).toBeInTheDocument();
+  });
+
+  it("should render search input", () => {
+    render(<TagBrowser />);
+    expect(screen.getByTestId("tag-browser-search")).toBeInTheDocument();
+  });
+
+  it("should render type filter dropdown", () => {
+    render(<TagBrowser />);
+    expect(screen.getByTestId("tag-browser-type-filter")).toBeInTheDocument();
+  });
+
+  it("should render view toggle button", () => {
+    render(<TagBrowser />);
+    expect(screen.getByTestId("tag-browser-view-toggle")).toBeInTheDocument();
+  });
+
+  it("should show tag cloud by default", () => {
+    render(<TagBrowser />);
+    expect(screen.getByTestId("tag-cloud")).toBeInTheDocument();
+  });
+
+  it("should switch to list view when toggle is clicked", () => {
+    render(<TagBrowser />);
+    fireEvent.click(screen.getByTestId("tag-browser-view-toggle"));
+    expect(screen.getByTestId("tag-browser-list")).toBeInTheDocument();
+  });
+
+  it("should filter tags by search input", () => {
+    render(<TagBrowser />);
+    const searchInput = screen.getByTestId("tag-browser-search");
+    fireEvent.change(searchInput, { target: { value: "Char" } });
+    // Character should be visible
+    expect(screen.getByText("Character")).toBeInTheDocument();
+    // Location should not be visible (filtered out by search)
+    expect(screen.queryByText("Location")).toBeNull();
+  });
+
+  it("should filter tags by type selection", () => {
+    render(<TagBrowser />);
+    const typeFilter = screen.getByTestId("tag-browser-type-filter");
+    fireEvent.change(typeFilter, { target: { value: "character" } });
+    // Only character tags should be shown
+    expect(screen.getByText("Character")).toBeInTheDocument();
+    expect(screen.queryByText("Location")).toBeNull();
+  });
+
+  it("should show selection panel when a tag is clicked in cloud view", () => {
+    render(<TagBrowser />);
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    expect(screen.getByTestId("tag-browser-selection")).toBeInTheDocument();
+    expect(screen.getByTestId("tag-browser-clear")).toBeInTheDocument();
+  });
+
+  it("should show filtered nodes when tags are selected", () => {
+    render(<TagBrowser />);
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    expect(screen.getByTestId("tag-browser-node-node-1")).toBeInTheDocument();
+    expect(screen.getByTestId("tag-browser-node-node-2")).toBeInTheDocument();
+  });
+
+  it("should call onSelectNode when a filtered node is clicked", () => {
+    const handleSelectNode = vi.fn();
+    render(<TagBrowser onSelectNode={handleSelectNode} />);
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    fireEvent.click(screen.getByTestId("tag-browser-node-node-1"));
+    expect(handleSelectNode).toHaveBeenCalledWith("node-1");
+  });
+
+  it("should clear selection when clear button is clicked", () => {
+    render(<TagBrowser />);
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    expect(screen.getByTestId("tag-browser-selection")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("tag-browser-clear"));
+    expect(screen.queryByTestId("tag-browser-selection")).toBeNull();
+  });
+
+  it("should show related tags when single tag is selected", () => {
+    render(<TagBrowser />);
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    expect(screen.getByTestId("tag-browser-related")).toBeInTheDocument();
+    expect(screen.getByText("Event")).toBeInTheDocument();
+  });
+
+  it("should show AND/OR toggle when multiple tags selected", () => {
+    render(<TagBrowser />);
+    // Select two tags
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-2"));
+    expect(
+      screen.getByTestId("tag-browser-operator-toggle"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("OR")).toBeInTheDocument();
+  });
+
+  it("should toggle operator between AND and OR", () => {
+    render(<TagBrowser />);
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-2"));
+    const toggle = screen.getByTestId("tag-browser-operator-toggle");
+    expect(screen.getByText("OR")).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(screen.getByText("AND")).toBeInTheDocument();
+  });
+
+  it("should deselect a tag when clicked again in cloud view", () => {
+    render(<TagBrowser />);
+    // Select
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    expect(screen.getByTestId("tag-browser-selection")).toBeInTheDocument();
+    // Deselect
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
+    expect(screen.queryByTestId("tag-browser-selection")).toBeNull();
+  });
+
+  it("should work in list view mode", () => {
+    render(<TagBrowser />);
+    // Switch to list view
+    fireEvent.click(screen.getByTestId("tag-browser-view-toggle"));
+    expect(screen.getByTestId("tag-browser-list")).toBeInTheDocument();
+    // Select tag in list view
+    fireEvent.click(screen.getByTestId("tag-browser-list-item-tag-1"));
+    expect(screen.getByTestId("tag-browser-selection")).toBeInTheDocument();
   });
 });

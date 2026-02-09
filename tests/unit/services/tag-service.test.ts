@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TagService } from "@/services/tag-service";
+import { NodeService } from "@/services/node-service";
 import { createTestProject, createTestNote } from "@tests/helpers/fixtures";
 
 describe("TagService", () => {
@@ -568,6 +569,219 @@ describe("TagService", () => {
           "00000000-0000-0000-0000-000000000001",
         ),
       ).rejects.toThrow("Tag not found");
+    });
+  });
+
+  // ─── getNodesByTags ───────────────────────────────────────────────────
+
+  describe("getNodesByTags", () => {
+    it("should return empty array for empty tagIds", async () => {
+      const result = await tagService.getNodesByTags([]);
+      expect(result).toEqual([]);
+    });
+
+    it("should find nodes with ANY matching tag (OR)", async () => {
+      const project = await createTestProject("Project");
+      const tagA = await tagService.createTag({ name: "TagA" });
+      const tagB = await tagService.createTag({ name: "TagB" });
+      const tagC = await tagService.createTag({ name: "TagC" });
+
+      const nodeService = new NodeService();
+      const note1 = await nodeService.createNode({
+        type: "note",
+        name: "Note1",
+        parentId: project.id,
+      });
+      const note2 = await nodeService.createNode({
+        type: "note",
+        name: "Note2",
+        parentId: project.id,
+      });
+      const note3 = await nodeService.createNode({
+        type: "note",
+        name: "Note3",
+        parentId: project.id,
+      });
+
+      await tagService.addTagToNode(note1.id, tagA.id);
+      await tagService.addTagToNode(note2.id, tagB.id);
+      await tagService.addTagToNode(note3.id, tagC.id);
+
+      const result = await tagService.getNodesByTags([tagA.id, tagB.id], "OR");
+      expect(result).toHaveLength(2);
+      const names = result.map((n) => n.name).sort();
+      expect(names).toEqual(["Note1", "Note2"]);
+    });
+
+    it("should find nodes with ALL matching tags (AND)", async () => {
+      const project = await createTestProject("Project");
+      const tagA = await tagService.createTag({ name: "TagA" });
+      const tagB = await tagService.createTag({ name: "TagB" });
+
+      const nodeService = new NodeService();
+      const note1 = await nodeService.createNode({
+        type: "note",
+        name: "Note1",
+        parentId: project.id,
+      });
+      const note2 = await nodeService.createNode({
+        type: "note",
+        name: "Note2",
+        parentId: project.id,
+      });
+
+      // note1 has both tags, note2 has only tagA
+      await tagService.addTagToNode(note1.id, tagA.id);
+      await tagService.addTagToNode(note1.id, tagB.id);
+      await tagService.addTagToNode(note2.id, tagA.id);
+
+      const result = await tagService.getNodesByTags([tagA.id, tagB.id], "AND");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("Note1");
+    });
+
+    it("should default to OR operator", async () => {
+      const project = await createTestProject("Project");
+      const tagA = await tagService.createTag({ name: "TagA" });
+
+      const nodeService = new NodeService();
+      const note1 = await nodeService.createNode({
+        type: "note",
+        name: "Note1",
+        parentId: project.id,
+      });
+
+      await tagService.addTagToNode(note1.id, tagA.id);
+
+      const result = await tagService.getNodesByTags([tagA.id]);
+      expect(result).toHaveLength(1);
+    });
+  });
+
+  // ─── getTagsWithCounts ────────────────────────────────────────────────
+
+  describe("getTagsWithCounts", () => {
+    it("should return tags with zero counts when no nodes assigned", async () => {
+      await tagService.createTag({ name: "EmptyTag" });
+      const result = await tagService.getTagsWithCounts();
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("EmptyTag");
+      expect(result[0].nodeCount).toBe(0);
+    });
+
+    it("should return correct node counts for each tag", async () => {
+      const project = await createTestProject("Project");
+      const tagA = await tagService.createTag({ name: "TagA" });
+      const tagB = await tagService.createTag({ name: "TagB" });
+
+      const nodeService = new NodeService();
+      const note1 = await nodeService.createNode({
+        type: "note",
+        name: "Note1",
+        parentId: project.id,
+      });
+      const note2 = await nodeService.createNode({
+        type: "note",
+        name: "Note2",
+        parentId: project.id,
+      });
+
+      await tagService.addTagToNode(note1.id, tagA.id);
+      await tagService.addTagToNode(note2.id, tagA.id);
+      await tagService.addTagToNode(note1.id, tagB.id);
+
+      const result = await tagService.getTagsWithCounts();
+      const tagAResult = result.find((t) => t.name === "TagA");
+      const tagBResult = result.find((t) => t.name === "TagB");
+      expect(tagAResult?.nodeCount).toBe(2);
+      expect(tagBResult?.nodeCount).toBe(1);
+    });
+  });
+
+  // ─── getRelatedTags ───────────────────────────────────────────────────
+
+  describe("getRelatedTags", () => {
+    it("should return empty array when tag has no nodes", async () => {
+      const tag = await tagService.createTag({ name: "Lonely" });
+      const result = await tagService.getRelatedTags(tag.id);
+      expect(result).toEqual([]);
+    });
+
+    it("should return co-occurring tags ordered by shared count", async () => {
+      const project = await createTestProject("Project");
+      const tagA = await tagService.createTag({ name: "TagA" });
+      const tagB = await tagService.createTag({ name: "TagB" });
+      const tagC = await tagService.createTag({ name: "TagC" });
+
+      const nodeService = new NodeService();
+      const note1 = await nodeService.createNode({
+        type: "note",
+        name: "Note1",
+        parentId: project.id,
+      });
+      const note2 = await nodeService.createNode({
+        type: "note",
+        name: "Note2",
+        parentId: project.id,
+      });
+
+      // note1: tagA + tagB + tagC
+      // note2: tagA + tagB
+      await tagService.addTagToNode(note1.id, tagA.id);
+      await tagService.addTagToNode(note1.id, tagB.id);
+      await tagService.addTagToNode(note1.id, tagC.id);
+      await tagService.addTagToNode(note2.id, tagA.id);
+      await tagService.addTagToNode(note2.id, tagB.id);
+
+      const related = await tagService.getRelatedTags(tagA.id);
+      expect(related).toHaveLength(2);
+      // tagB shares 2 nodes with tagA, tagC shares 1
+      expect(related[0].name).toBe("TagB");
+      expect(related[0].sharedCount).toBe(2);
+      expect(related[1].name).toBe("TagC");
+      expect(related[1].sharedCount).toBe(1);
+    });
+
+    it("should respect the limit parameter", async () => {
+      const project = await createTestProject("Project");
+      const tagA = await tagService.createTag({ name: "TagA" });
+      const tagB = await tagService.createTag({ name: "TagB" });
+      const tagC = await tagService.createTag({ name: "TagC" });
+
+      const nodeService = new NodeService();
+      const note1 = await nodeService.createNode({
+        type: "note",
+        name: "Note1",
+        parentId: project.id,
+      });
+
+      await tagService.addTagToNode(note1.id, tagA.id);
+      await tagService.addTagToNode(note1.id, tagB.id);
+      await tagService.addTagToNode(note1.id, tagC.id);
+
+      const related = await tagService.getRelatedTags(tagA.id, 1);
+      expect(related).toHaveLength(1);
+    });
+
+    it("should not include the queried tag itself", async () => {
+      const project = await createTestProject("Project");
+      const tagA = await tagService.createTag({ name: "TagA" });
+      const tagB = await tagService.createTag({ name: "TagB" });
+
+      const nodeService = new NodeService();
+      const note1 = await nodeService.createNode({
+        type: "note",
+        name: "Note1",
+        parentId: project.id,
+      });
+
+      await tagService.addTagToNode(note1.id, tagA.id);
+      await tagService.addTagToNode(note1.id, tagB.id);
+
+      const related = await tagService.getRelatedTags(tagA.id);
+      const tagIds = related.map((t) => t.id);
+      expect(tagIds).not.toContain(tagA.id);
+      expect(tagIds).toContain(tagB.id);
     });
   });
 });

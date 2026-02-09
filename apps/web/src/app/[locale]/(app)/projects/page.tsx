@@ -27,7 +27,7 @@ import {
   type DropPosition,
 } from "@/components/file-tree";
 import { TiptapEditor, ImageUpload } from "@/components/editor";
-import { TagManager, TagPicker } from "@/components/tags";
+import { TagManager, TagPicker, TagBrowser } from "@/components/tags";
 import type { Editor } from "@tiptap/react";
 
 export default function ProjectsPage() {
@@ -84,6 +84,12 @@ export default function ProjectsPage() {
   const [showImageUpload, setShowImageUpload] = React.useState(false);
   const [showExportMenu, setShowExportMenu] = React.useState(false);
   const exportMenuRef = React.useRef<HTMLDivElement>(null);
+
+  // Sidebar tab state: "manage" = TagManager, "browse" = TagBrowser
+  const [sidebarTagTab, setSidebarTagTab] = React.useState<"manage" | "browse">(
+    "browse",
+  );
+  const tTags = useTranslations("tags");
 
   // Inline title editing state
   const [isTitleEditing, setIsTitleEditing] = React.useState(false);
@@ -546,8 +552,42 @@ export default function ProjectsPage() {
             onMoveNode={handleMoveNode}
             className="flex-1 min-h-0"
           />
-          <div className="border-t px-3 py-2 overflow-y-auto max-h-48">
-            <TagManager />
+          <div className="border-t flex flex-col">
+            <div className="flex border-b" data-testid="sidebar-tag-tabs">
+              <button
+                onClick={() => setSidebarTagTab("browse")}
+                className={cn(
+                  "flex-1 px-2 py-1.5 text-xs font-medium transition-colors",
+                  sidebarTagTab === "browse"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                data-testid="sidebar-tab-browse"
+              >
+                {tTags("browser.filtered").replace(" by tags", "")}
+              </button>
+              <button
+                onClick={() => setSidebarTagTab("manage")}
+                className={cn(
+                  "flex-1 px-2 py-1.5 text-xs font-medium transition-colors",
+                  sidebarTagTab === "manage"
+                    ? "border-b-2 border-primary text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                data-testid="sidebar-tab-manage"
+              >
+                {tTags("title")}
+              </button>
+            </div>
+            <div className="px-3 py-2 overflow-y-auto max-h-64">
+              {sidebarTagTab === "browse" ? (
+                <TagBrowser
+                  onSelectNode={(nodeId) => setSelectedNodeId(nodeId)}
+                />
+              ) : (
+                <TagManager />
+              )}
+            </div>
           </div>
         </div>
 

@@ -140,6 +140,41 @@ export const tagsRouter = router({
     }),
 
   /**
+   * Get nodes filtered by multiple tags with AND/OR logic
+   */
+  getNodesByTags: publicProcedure
+    .input(
+      z.object({
+        tagIds: z.array(z.string().uuid()).min(1),
+        operator: z.enum(["AND", "OR"]).optional().default("OR"),
+      }),
+    )
+    .query(async ({ input }) => {
+      return await tagService.getNodesByTags(input.tagIds, input.operator);
+    }),
+
+  /**
+   * Get all tags with their node usage counts (for tag cloud)
+   */
+  getTagsWithCounts: publicProcedure.query(async () => {
+    return await tagService.getTagsWithCounts();
+  }),
+
+  /**
+   * Get tags that co-occur with a given tag (related tags suggestions)
+   */
+  getRelatedTags: publicProcedure
+    .input(
+      z.object({
+        tagId: z.string().uuid(),
+        limit: z.number().int().min(1).max(50).optional().default(10),
+      }),
+    )
+    .query(async ({ input }) => {
+      return await tagService.getRelatedTags(input.tagId, input.limit);
+    }),
+
+  /**
    * Link an entity-type tag to an existing node
    */
   linkEntityNode: publicProcedure

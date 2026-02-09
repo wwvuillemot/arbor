@@ -380,6 +380,15 @@
     "entityLinkError": "Failed to link entity page",
     "entityUnlinkError": "Failed to unlink entity page",
     "unlinkEntity": "Unlink entity page",
-    "entityTag": "Entity tag"
+    "entityTag": "Entity tag",
+    "browser": {
+      "cloudView": "Cloud view",
+      "listView": "List view",
+      "filtered": "Filtered by tags",
+      "clear": "Clear",
+      "loading": "Loading...",
+      "noResults": "No matching nodes",
+      "related": "Related tags"
+    }
   }
 }

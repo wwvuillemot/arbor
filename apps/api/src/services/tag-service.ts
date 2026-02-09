@@ -1,7 +1,7 @@
 import { db } from "../db/index";
 import { tags, nodeTags, nodes } from "../db/schema";
 import type { Tag, TagType } from "../db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql, count } from "drizzle-orm";
 
 export interface CreateTagParams {
   name: string;
@@ -146,6 +146,120 @@ export class TagService {
       .where(eq(nodeTags.tagId, tagId));
 
     return results.map((r) => r.node);
+  }
+
+  // ─── Tag Navigation Methods ─────────────────────────────────────────────
+
+  /**
+   * Get nodes that have ALL (AND) or ANY (OR) of the specified tag IDs.
+   */
+  async getNodesByTags(
+    tagIds: string[],
+    operator: "AND" | "OR" = "OR",
+  ): Promise<(typeof nodes.$inferSelect)[]> {
+    if (tagIds.length === 0) return [];
+
+    if (operator === "OR") {
+      // Get distinct node IDs that have any of the specified tags
+      const nodeIdRows = await db
+        .selectDistinct({ nodeId: nodeTags.nodeId })
+        .from(nodeTags)
+        .where(inArray(nodeTags.tagId, tagIds));
+
+      if (nodeIdRows.length === 0) return [];
+
+      const nodeIds = nodeIdRows.map((r) => r.nodeId);
+      return await db.select().from(nodes).where(inArray(nodes.id, nodeIds));
+    }
+
+    // AND: all tags must match — get node IDs that have ALL specified tags
+    const nodeIdRows = await db
+      .select({ nodeId: nodeTags.nodeId })
+      .from(nodeTags)
+      .where(inArray(nodeTags.tagId, tagIds))
+      .groupBy(nodeTags.nodeId)
+      .having(sql`count(distinct ${nodeTags.tagId}) = ${tagIds.length}`);
+
+    if (nodeIdRows.length === 0) return [];
+
+    const nodeIds = nodeIdRows.map((r) => r.nodeId);
+    return await db.select().from(nodes).where(inArray(nodes.id, nodeIds));
+  }
+
+  /**
+   * Get all tags with their node usage count (for tag cloud).
+   */
+  async getTagsWithCounts(): Promise<(Tag & { nodeCount: number })[]> {
+    const results = await db
+      .select({
+        tag: tags,
+        nodeCount: count(nodeTags.nodeId),
+      })
+      .from(tags)
+      .leftJoin(nodeTags, eq(tags.id, nodeTags.tagId))
+      .groupBy(
+        tags.id,
+        tags.name,
+        tags.color,
+        tags.icon,
+        tags.type,
+        tags.entityNodeId,
+        tags.createdAt,
+        tags.updatedAt,
+      );
+
+    return results.map((r) => ({
+      ...r.tag,
+      nodeCount: Number(r.nodeCount),
+    }));
+  }
+
+  /**
+   * Get tags that co-occur with a given tag (related tags).
+   * Returns tags that share at least one node with the given tag,
+   * ordered by the number of shared nodes (descending).
+   */
+  async getRelatedTags(
+    tagId: string,
+    limit = 10,
+  ): Promise<(Tag & { sharedCount: number })[]> {
+    // Find all nodes that have the given tag
+    const taggedNodeIds = db
+      .select({ nodeId: nodeTags.nodeId })
+      .from(nodeTags)
+      .where(eq(nodeTags.tagId, tagId));
+
+    // Find other tags on those same nodes
+    const results = await db
+      .select({
+        tag: tags,
+        sharedCount: count(nodeTags.nodeId),
+      })
+      .from(nodeTags)
+      .innerJoin(tags, eq(nodeTags.tagId, tags.id))
+      .where(
+        and(
+          inArray(nodeTags.nodeId, taggedNodeIds),
+          sql`${nodeTags.tagId} != ${tagId}`,
+        ),
+      )
+      .groupBy(
+        tags.id,
+        tags.name,
+        tags.color,
+        tags.icon,
+        tags.type,
+        tags.entityNodeId,
+        tags.createdAt,
+        tags.updatedAt,
+      )
+      .orderBy(sql`count(${nodeTags.nodeId}) desc`)
+      .limit(limit);
+
+    return results.map((r) => ({
+      ...r.tag,
+      sharedCount: Number(r.sharedCount),
+    }));
   }
 
   // ─── Entity Node Methods ───────────────────────────────────────────────
