@@ -233,6 +233,9 @@ test:
 	@echo "🔧 API Tests..."
 	@cd apps/api && $(MAKE) test
 	@echo ""
+	@echo "🤖 MCP Server Tests..."
+	@cd apps/mcp-server && $(MAKE) test
+	@echo ""
 	@echo "🌐 Web Tests..."
 	@cd apps/web && $(MAKE) test
 	@echo ""

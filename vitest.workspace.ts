@@ -5,6 +5,8 @@ export default defineWorkspace([
   "./vitest.config.ts",
   // API integration tests
   "./vitest.integration.config.ts",
+  // MCP server unit tests
+  "./vitest.mcp.config.ts",
   // Web app tests
   "./apps/web/vitest.config.ts",
 ]);

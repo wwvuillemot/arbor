@@ -25,6 +25,8 @@ export default defineConfig({
       "**/.next/**",
       // Exclude integration tests from unit test runs
       "tests/integration/**",
+      // Exclude MCP tests (run under mcp-unit project)
+      "tests/unit/mcp/**",
     ],
     // Run tests sequentially to avoid database conflicts
     pool: "forks",

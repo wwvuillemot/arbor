@@ -27,15 +27,15 @@ Arbor uses a **hybrid deployment model**:
 
 ### Port Allocation
 
-| Service | Local Port | Domain | Access Method |
-|---------|-----------|--------|---------------|
-| Web App | 3847 | `app.arbor.local` | HTTP via arbor-proxy |
-| API Server | 3848 | `api.arbor.local` | HTTP via arbor-proxy |
-| PostgreSQL | 5432 | `postgres.arbor.local:5432` | TCP via arbor-proxy |
-| Redis | 6379 | `redis.arbor.local:6379` | TCP via arbor-proxy |
-| MinIO API | 9000 | `minio.arbor.local:9000` | TCP via arbor-proxy |
-| MinIO Console | 9001 | `minio-console.arbor.local` | HTTP via arbor-proxy |
-| pgAdmin | 5050 | `pgadmin.arbor.local` | HTTP via arbor-proxy |
+| Service       | Local Port | Domain                      | Access Method        |
+| ------------- | ---------- | --------------------------- | -------------------- |
+| Web App       | 3847       | `app.arbor.local`           | HTTP via arbor-proxy |
+| API Server    | 3848       | `api.arbor.local`           | HTTP via arbor-proxy |
+| PostgreSQL    | 5432       | `postgres.arbor.local:5432` | TCP via arbor-proxy  |
+| Redis         | 6379       | `redis.arbor.local:6379`    | TCP via arbor-proxy  |
+| MinIO API     | 9000       | `minio.arbor.local:9000`    | TCP via arbor-proxy  |
+| MinIO Console | 9001       | `minio-console.arbor.local` | HTTP via arbor-proxy |
+| pgAdmin       | 5050       | `pgadmin.arbor.local`       | HTTP via arbor-proxy |
 
 ### Database Configuration
 
