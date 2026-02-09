@@ -60,12 +60,12 @@ start:
 
 test:
 	@echo "Running API tests locally..."
-	@cd ../.. && pnpm run test:unit
+	@cd ../.. && pnpm vitest run --project api-unit
 
 coverage:
 	@echo "Running API tests with coverage locally..."
 	@cd ../.. && rm -rf coverage/api-unit
-	@cd ../.. && pnpm run test:unit --coverage
+	@cd ../.. && pnpm vitest run --project api-unit --coverage
 
 lint:
 	@echo "Running linter..."
