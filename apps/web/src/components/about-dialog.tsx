@@ -68,7 +68,9 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{t("version")}</span>
-                <span className="font-mono">{systemInfo?.version || "0.1.0"}</span>
+                <span className="font-mono">
+                  {systemInfo?.version || "0.1.0"}
+                </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground flex items-center gap-1">

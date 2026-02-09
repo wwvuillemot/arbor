@@ -3,9 +3,10 @@ import postgres from "postgres";
 import * as schema from "./schema";
 
 // Database connection string
+// Default to arbor_dev for local development
 const connectionString =
   process.env.DATABASE_URL ||
-  "postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor";
+  "postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor_dev";
 
 // Create postgres client
 const client = postgres(connectionString, {

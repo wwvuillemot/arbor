@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "cd apps/web && next dev --turbo --port 3847",
-    "dev:api": "API_PORT=3848 REDIS_URL=redis://redis.arbor.local:6379 DATABASE_URL=postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor CORS_ORIGIN=http://app.arbor.local tsx watch apps/api/src/api/index.ts",
+    "dev:api": "API_PORT=3848 REDIS_URL=redis://redis.arbor.local:6379 DATABASE_URL=postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor_dev CORS_ORIGIN=http://app.arbor.local tsx watch apps/api/src/api/index.ts",
     "dev:server": "tsx watch apps/api/src/index.ts",
     "dev:desktop": "tauri dev",
     "build": "cd apps/web && next build",

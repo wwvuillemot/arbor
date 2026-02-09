@@ -9,7 +9,7 @@ export default defineConfig({
     port: parseInt(process.env.DB_PORT || "5432"),
     user: process.env.DB_USER || "arbor",
     password: process.env.DB_PASSWORD || "local_dev_only",
-    database: process.env.DB_NAME || "arbor",
+    database: process.env.DB_NAME || "arbor_dev",
   },
   verbose: true,
   strict: true,

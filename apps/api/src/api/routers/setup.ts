@@ -4,8 +4,10 @@ import { db } from "../../db";
 import { userPreferences } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import { createClient } from "redis";
+import { PreferencesService } from "../../services/preferences-service";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
+const preferencesService = new PreferencesService();
 
 /**
  * Setup Router
@@ -126,6 +128,20 @@ export const setupRouter = router({
     } catch (error) {
       console.error("Database schema check failed:", error);
       return { initialized: false };
+    }
+  }),
+
+  /**
+   * Generate master encryption key
+   * This should be called during setup to create the master key for encrypting sensitive data
+   */
+  generateMasterKey: publicProcedure.mutation(async () => {
+    try {
+      const masterKey = await preferencesService.generateMasterKey();
+      return { success: true, masterKey };
+    } catch (error) {
+      console.error("Failed to generate master key:", error);
+      throw new Error(`Failed to generate master key: ${error}`);
     }
   }),
 });
