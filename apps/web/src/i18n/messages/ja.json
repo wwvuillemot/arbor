@@ -250,5 +250,45 @@
     "updateError": "プロジェクトの更新に失敗しました",
     "deleteSuccess": "プロジェクトを削除しました",
     "deleteError": "プロジェクトの削除に失敗しました"
+  },
+  "fileTree": {
+    "newFolder": "新しいフォルダ",
+    "newNote": "新しいノート",
+    "rename": "名前を変更",
+    "delete": "削除",
+    "confirmDelete": "「{name}」を削除してもよろしいですか？この操作は元に戻せません。",
+    "confirmDeleteWithChildren": "「{name}」とそのすべての内容を削除してもよろしいですか？この操作は元に戻せません。",
+    "untitled": "無題",
+    "emptyProject": "このプロジェクトは空です。フォルダまたはノートを作成して始めましょう。",
+    "createFolder": {
+      "title": "フォルダを作成",
+      "description": "ノートを整理するための新しいフォルダを作成します。",
+      "name": "フォルダ名",
+      "namePlaceholder": "第1章",
+      "creating": "作成中...",
+      "create": "フォルダを作成"
+    },
+    "createNote": {
+      "title": "ノートを作成",
+      "description": "新しいノートを作成します。",
+      "name": "ノート名",
+      "namePlaceholder": "シーン1",
+      "creating": "作成中...",
+      "create": "ノートを作成"
+    },
+    "renameDialog": {
+      "title": "名前を変更",
+      "name": "名前",
+      "saving": "保存中...",
+      "save": "名前を変更"
+    },
+    "nodeTypes": {
+      "project": "プロジェクト",
+      "folder": "フォルダ",
+      "note": "ノート",
+      "link": "リンク",
+      "ai_suggestion": "AI提案",
+      "audio_note": "音声ノート"
+    }
   }
 }

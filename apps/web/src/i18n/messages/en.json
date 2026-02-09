@@ -250,5 +250,45 @@
     "updateError": "Failed to update project",
     "deleteSuccess": "Project deleted successfully",
     "deleteError": "Failed to delete project"
+  },
+  "fileTree": {
+    "newFolder": "New Folder",
+    "newNote": "New Note",
+    "rename": "Rename",
+    "delete": "Delete",
+    "confirmDelete": "Are you sure you want to delete \"{name}\"? This cannot be undone.",
+    "confirmDeleteWithChildren": "Are you sure you want to delete \"{name}\" and all its contents? This cannot be undone.",
+    "untitled": "Untitled",
+    "emptyProject": "This project is empty. Create a folder or note to get started.",
+    "createFolder": {
+      "title": "Create Folder",
+      "description": "Create a new folder to organize your notes.",
+      "name": "Folder Name",
+      "namePlaceholder": "Chapter 1",
+      "creating": "Creating...",
+      "create": "Create Folder"
+    },
+    "createNote": {
+      "title": "Create Note",
+      "description": "Create a new note.",
+      "name": "Note Name",
+      "namePlaceholder": "Scene 1",
+      "creating": "Creating...",
+      "create": "Create Note"
+    },
+    "renameDialog": {
+      "title": "Rename",
+      "name": "Name",
+      "saving": "Saving...",
+      "save": "Rename"
+    },
+    "nodeTypes": {
+      "project": "Project",
+      "folder": "Folder",
+      "note": "Note",
+      "link": "Link",
+      "ai_suggestion": "AI Suggestion",
+      "audio_note": "Audio Note"
+    }
   }
 }
