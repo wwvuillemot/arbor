@@ -374,3 +374,123 @@ export const nodeTags = pgTable(
 // Type inference for TypeScript
 export type NodeTag = typeof nodeTags.$inferSelect;
 export type NewNodeTag = typeof nodeTags.$inferInsert;
+
+/**
+ * Chat Thread Agent Modes
+ *
+ * Different modes change the AI behavior and available tools:
+ * - assistant: General-purpose helper with all tools
+ * - planner: Focus on structure and organization
+ * - editor: Content refinement and improvement
+ * - researcher: Information gathering and synthesis
+ */
+export const agentModeEnum = [
+  "assistant",
+  "planner",
+  "editor",
+  "researcher",
+] as const;
+export type AgentMode = (typeof agentModeEnum)[number];
+
+/**
+ * Chat Message Roles
+ *
+ * Standard message roles for LLM conversation:
+ * - user: Messages from the human user
+ * - assistant: Messages from the AI model
+ * - system: System prompt / instructions
+ * - tool: Tool call results
+ */
+export const chatRoleEnum = ["user", "assistant", "system", "tool"] as const;
+export type ChatRole = (typeof chatRoleEnum)[number];
+
+/**
+ * Chat Threads Table
+ *
+ * Stores conversation threads linked to projects.
+ * Each thread maintains its own agent mode and message history.
+ */
+export const chatThreads = pgTable(
+  "chat_threads",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // The project this chat thread belongs to (optional)
+    projectId: uuid("project_id").references(() => nodes.id, {
+      onDelete: "cascade",
+    }),
+
+    // Thread display name
+    name: varchar("name", { length: 255 }).notNull(),
+
+    // Agent mode for this thread
+    agentMode: varchar("agent_mode", { length: 50 })
+      .default("assistant")
+      .notNull(),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Index for finding threads by project
+    projectIdIdx: index("idx_chat_threads_project").on(table.projectId),
+    // Index for sorting by updated time
+    updatedAtIdx: index("idx_chat_threads_updated").on(table.updatedAt),
+  }),
+);
+
+// Type inference for TypeScript
+export type ChatThread = typeof chatThreads.$inferSelect;
+export type NewChatThread = typeof chatThreads.$inferInsert;
+
+/**
+ * Chat Messages Table
+ *
+ * Stores individual messages within a thread.
+ * Supports user, assistant, system, and tool message roles.
+ * Tracks model used, token usage, and tool calls.
+ */
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // The thread this message belongs to
+    threadId: uuid("thread_id")
+      .references(() => chatThreads.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Message role: user, assistant, system, tool
+    role: varchar("role", { length: 20 }).notNull(),
+
+    // Message content (text)
+    content: text("content"),
+
+    // LLM model used (e.g., "gpt-4o", "claude-3.5-sonnet")
+    model: varchar("model", { length: 100 }),
+
+    // Number of tokens used for this message
+    tokensUsed: integer("tokens_used"),
+
+    // Tool/function calls made by the assistant (JSONB array)
+    toolCalls: jsonb("tool_calls"),
+
+    // Additional metadata (reasoning steps, etc.)
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+
+    // Timestamp
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Composite index for thread + time ordering (most common query)
+    threadCreatedIdx: index("idx_chat_messages_thread_created").on(
+      table.threadId,
+      table.createdAt,
+    ),
+  }),
+);
+
+// Type inference for TypeScript
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type NewChatMessage = typeof chatMessages.$inferInsert;

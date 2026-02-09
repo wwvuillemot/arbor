@@ -9,6 +9,7 @@ import { mediaRouter } from "./routers/media";
 import { tagsRouter } from "./routers/tags";
 import { searchRouter } from "./routers/search";
 import { ragRouter } from "./routers/rag";
+import { chatRouter } from "./routers/chat";
 
 /**
  * Main application router
@@ -25,6 +26,7 @@ export const appRouter = router({
   tags: tagsRouter,
   search: searchRouter,
   rag: ragRouter,
+  chat: chatRouter,
 
   // Health check endpoint
   health: publicProcedure.query(() => ({

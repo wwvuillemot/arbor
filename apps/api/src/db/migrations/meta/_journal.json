@@ -36,6 +36,13 @@
       "when": 1770666084250,
       "tag": "0004_blue_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1770677421528,
+      "tag": "0005_worthless_zodiak",
+      "breakpoints": true
     }
   ]
 }
