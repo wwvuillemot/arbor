@@ -330,5 +330,36 @@
       "ai_suggestion": "AI Suggestion",
       "audio_note": "Audio Note"
     }
+  },
+  "tags": {
+    "title": "Tags",
+    "create": "Create Tag",
+    "edit": "Edit Tag",
+    "delete": "Delete Tag",
+    "name": "Tag Name",
+    "namePlaceholder": "e.g. Character, Location",
+    "color": "Color",
+    "icon": "Icon",
+    "type": "Type",
+    "types": {
+      "general": "General",
+      "character": "Character",
+      "location": "Location",
+      "event": "Event",
+      "concept": "Concept"
+    },
+    "createSuccess": "Tag created successfully",
+    "updateSuccess": "Tag updated successfully",
+    "deleteSuccess": "Tag deleted successfully",
+    "createError": "Failed to create tag",
+    "updateError": "Failed to update tag",
+    "deleteError": "Failed to delete tag",
+    "confirmDelete": "Are you sure you want to delete the tag \"{name}\"?",
+    "noTags": "No tags yet",
+    "filterByType": "Filter by type",
+    "allTypes": "All types",
+    "saving": "Saving...",
+    "creating": "Creating...",
+    "deleting": "Deleting..."
   }
 }

@@ -66,6 +66,11 @@ vi.mock("@/components/editor", () => ({
   ImageUpload: () => null,
 }));
 
+// Mock TagManager
+vi.mock("@/components/tags", () => ({
+  TagManager: () => <div data-testid="tag-manager" />,
+}));
+
 // Mock FileTree component - calls onSelectNode on mount to simulate selecting a node
 vi.mock("@/components/file-tree", () => ({
   FileTree: React.forwardRef(

@@ -330,5 +330,36 @@
       "ai_suggestion": "AI提案",
       "audio_note": "音声ノート"
     }
+  },
+  "tags": {
+    "title": "タグ",
+    "create": "タグを作成",
+    "edit": "タグを編集",
+    "delete": "タグを削除",
+    "name": "タグ名",
+    "namePlaceholder": "例：キャラクター、場所",
+    "color": "カラー",
+    "icon": "アイコン",
+    "type": "タイプ",
+    "types": {
+      "general": "一般",
+      "character": "キャラクター",
+      "location": "場所",
+      "event": "イベント",
+      "concept": "コンセプト"
+    },
+    "createSuccess": "タグを作成しました",
+    "updateSuccess": "タグを更新しました",
+    "deleteSuccess": "タグを削除しました",
+    "createError": "タグの作成に失敗しました",
+    "updateError": "タグの更新に失敗しました",
+    "deleteError": "タグの削除に失敗しました",
+    "confirmDelete": "タグ「{name}」を削除してもよろしいですか？",
+    "noTags": "タグがありません",
+    "filterByType": "タイプでフィルター",
+    "allTypes": "すべてのタイプ",
+    "saving": "保存中...",
+    "creating": "作成中...",
+    "deleting": "削除中..."
   }
 }

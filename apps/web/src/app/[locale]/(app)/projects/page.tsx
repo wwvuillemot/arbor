@@ -27,6 +27,7 @@ import {
   type DropPosition,
 } from "@/components/file-tree";
 import { TiptapEditor, ImageUpload } from "@/components/editor";
+import { TagManager } from "@/components/tags";
 import type { Editor } from "@tiptap/react";
 
 export default function ProjectsPage() {
@@ -543,8 +544,11 @@ export default function ProjectsPage() {
             }
             onRenameNode={handleNodeRename}
             onMoveNode={handleMoveNode}
-            className="flex-1"
+            className="flex-1 min-h-0"
           />
+          <div className="border-t px-3 py-2 overflow-y-auto max-h-48">
+            <TagManager />
+          </div>
         </div>
 
         {/* Right panel: Content */}
