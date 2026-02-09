@@ -66,9 +66,10 @@ vi.mock("@/components/editor", () => ({
   ImageUpload: () => null,
 }));
 
-// Mock TagManager
+// Mock tag components
 vi.mock("@/components/tags", () => ({
   TagManager: () => <div data-testid="tag-manager" />,
+  TagPicker: () => <div data-testid="tag-picker" />,
 }));
 
 // Mock FileTree component - calls onSelectNode on mount to simulate selecting a node

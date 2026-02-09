@@ -28,6 +28,8 @@ vi.mock("@/contexts/toast-context", () => ({
 const mockCreateMutate = vi.fn();
 const mockUpdateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
+const mockAddToNodeMutate = vi.fn();
+const mockRemoveFromNodeMutate = vi.fn();
 
 const mockTagsData = [
   {
@@ -97,10 +99,37 @@ vi.mock("@/lib/trpc", () => {
           return mut;
         }),
       },
+      getNodeTags: {
+        useQuery: vi.fn(() => ({
+          data: [mockTagsData[0]],
+          isLoading: false,
+          error: null,
+          refetch: vi.fn(),
+        })),
+      },
+      addToNode: {
+        useMutation: vi.fn((opts: any) => {
+          const mut = makeMutation((...args: any[]) => {
+            mockAddToNodeMutate(...args);
+            opts?.onSuccess?.();
+          });
+          return mut;
+        }),
+      },
+      removeFromNode: {
+        useMutation: vi.fn((opts: any) => {
+          const mut = makeMutation((...args: any[]) => {
+            mockRemoveFromNodeMutate(...args);
+            opts?.onSuccess?.();
+          });
+          return mut;
+        }),
+      },
     },
     useUtils: vi.fn(() => ({
       tags: {
         getAll: { invalidate: vi.fn() },
+        getNodeTags: { invalidate: vi.fn() },
       },
     })),
   };
@@ -110,6 +139,7 @@ vi.mock("@/lib/trpc", () => {
 
 import { TagBadge, type TagBadgeTag } from "@/components/tags/tag-badge";
 import { TagManager } from "@/components/tags/tag-manager";
+import { TagPicker } from "@/components/tags/tag-picker";
 
 // === TagBadge Tests ===
 
@@ -362,5 +392,103 @@ describe("TagManager", () => {
     fireEvent.change(nameInput, { target: { value: "Toast Tag" } });
     fireEvent.click(screen.getByTestId("tag-form-submit"));
     expect(mockAddToast).toHaveBeenCalledWith("createSuccess", "success");
+  });
+});
+
+// === TagPicker Tests ===
+
+describe("TagPicker", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should render tag picker container", () => {
+    render(<TagPicker nodeId="node-1" />);
+    expect(screen.getByTestId("tag-picker")).toBeInTheDocument();
+  });
+
+  it("should render assigned tag badges", () => {
+    render(<TagPicker nodeId="node-1" />);
+    // nodeTagsQuery returns [mockTagsData[0]] = Character tag
+    expect(screen.getByTestId("tag-badge-tag-1")).toBeInTheDocument();
+    expect(screen.getByText("Character")).toBeInTheDocument();
+  });
+
+  it("should show remove button on assigned tags", () => {
+    render(<TagPicker nodeId="node-1" />);
+    expect(screen.getByTestId("tag-badge-remove-tag-1")).toBeInTheDocument();
+  });
+
+  it("should call removeFromNode when remove is clicked", () => {
+    render(<TagPicker nodeId="node-1" />);
+    fireEvent.click(screen.getByTestId("tag-badge-remove-tag-1"));
+    expect(mockRemoveFromNodeMutate).toHaveBeenCalledWith({
+      nodeId: "node-1",
+      tagId: "tag-1",
+    });
+  });
+
+  it("should show add tag button", () => {
+    render(<TagPicker nodeId="node-1" />);
+    expect(screen.getByTestId("tag-picker-add-button")).toBeInTheDocument();
+  });
+
+  it("should open dropdown when add button is clicked", () => {
+    render(<TagPicker nodeId="node-1" />);
+    fireEvent.click(screen.getByTestId("tag-picker-add-button"));
+    expect(screen.getByTestId("tag-picker-dropdown")).toBeInTheDocument();
+    expect(screen.getByTestId("tag-picker-search")).toBeInTheDocument();
+  });
+
+  it("should show unassigned tags in dropdown", () => {
+    render(<TagPicker nodeId="node-1" />);
+    fireEvent.click(screen.getByTestId("tag-picker-add-button"));
+    // tag-2 (Location) is not assigned, so it should appear
+    expect(screen.getByTestId("tag-picker-option-tag-2")).toBeInTheDocument();
+    expect(screen.getByText("Location")).toBeInTheDocument();
+    // tag-1 (Character) is already assigned, so it should NOT appear
+    expect(
+      screen.queryByTestId("tag-picker-option-tag-1"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should call addToNode when dropdown option is clicked", () => {
+    render(<TagPicker nodeId="node-1" />);
+    fireEvent.click(screen.getByTestId("tag-picker-add-button"));
+    fireEvent.click(screen.getByTestId("tag-picker-option-tag-2"));
+    expect(mockAddToNodeMutate).toHaveBeenCalledWith({
+      nodeId: "node-1",
+      tagId: "tag-2",
+    });
+  });
+
+  it("should filter tags by search", () => {
+    render(<TagPicker nodeId="node-1" />);
+    fireEvent.click(screen.getByTestId("tag-picker-add-button"));
+    const searchInput = screen.getByTestId("tag-picker-search");
+    fireEvent.change(searchInput, { target: { value: "zzz" } });
+    // No matches
+    expect(screen.getByTestId("tag-picker-empty")).toBeInTheDocument();
+  });
+
+  it("should show toast on successful add", () => {
+    render(<TagPicker nodeId="node-1" />);
+    fireEvent.click(screen.getByTestId("tag-picker-add-button"));
+    fireEvent.click(screen.getByTestId("tag-picker-option-tag-2"));
+    expect(mockAddToast).toHaveBeenCalledWith("tagAdded", "success");
+  });
+
+  it("should show toast on successful remove", () => {
+    render(<TagPicker nodeId="node-1" />);
+    fireEvent.click(screen.getByTestId("tag-badge-remove-tag-1"));
+    expect(mockAddToast).toHaveBeenCalledWith("tagRemoved", "success");
+  });
+
+  it("should close dropdown when add button is clicked again", () => {
+    render(<TagPicker nodeId="node-1" />);
+    fireEvent.click(screen.getByTestId("tag-picker-add-button"));
+    expect(screen.getByTestId("tag-picker-dropdown")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("tag-picker-add-button"));
+    expect(screen.queryByTestId("tag-picker-dropdown")).not.toBeInTheDocument();
   });
 });

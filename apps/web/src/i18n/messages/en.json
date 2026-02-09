@@ -360,6 +360,15 @@
     "allTypes": "All types",
     "saving": "Saving...",
     "creating": "Creating...",
-    "deleting": "Deleting..."
+    "deleting": "Deleting...",
+    "addTag": "Add Tag",
+    "removeTag": "Remove Tag",
+    "assignedTags": "Tags",
+    "searchTags": "Search tags...",
+    "noTagsAssigned": "No tags assigned",
+    "tagAdded": "Tag added",
+    "tagRemoved": "Tag removed",
+    "tagAddError": "Failed to add tag",
+    "tagRemoveError": "Failed to remove tag"
   }
 }

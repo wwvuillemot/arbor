@@ -27,7 +27,7 @@ import {
   type DropPosition,
 } from "@/components/file-tree";
 import { TiptapEditor, ImageUpload } from "@/components/editor";
-import { TagManager } from "@/components/tags";
+import { TagManager, TagPicker } from "@/components/tags";
 import type { Editor } from "@tiptap/react";
 
 export default function ProjectsPage() {
@@ -672,6 +672,9 @@ export default function ProjectsPage() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
+              </div>
+              <div className="mb-4" data-testid="node-tag-picker">
+                <TagPicker nodeId={selectedNodeQuery.data.id} />
               </div>
               {selectedNodeQuery.data.type === "note" ? (
                 <>

@@ -360,6 +360,15 @@
     "allTypes": "すべてのタイプ",
     "saving": "保存中...",
     "creating": "作成中...",
-    "deleting": "削除中..."
+    "deleting": "削除中...",
+    "addTag": "タグを追加",
+    "removeTag": "タグを削除",
+    "assignedTags": "タグ",
+    "searchTags": "タグを検索...",
+    "noTagsAssigned": "タグが割り当てられていません",
+    "tagAdded": "タグを追加しました",
+    "tagRemoved": "タグを削除しました",
+    "tagAddError": "タグの追加に失敗しました",
+    "tagRemoveError": "タグの削除に失敗しました"
   }
 }
