@@ -17,7 +17,8 @@ import {
   type TreeNode,
   type ContextMenuAction,
 } from "@/components/file-tree";
-import { TiptapEditor } from "@/components/editor";
+import { TiptapEditor, ImageUpload } from "@/components/editor";
+import type { Editor } from "@tiptap/react";
 
 export default function ProjectsPage() {
   const utils = trpc.useUtils();
@@ -69,6 +70,8 @@ export default function ProjectsPage() {
     unknown
   > | null>(null);
   const tEditor = useTranslations("editor");
+  const editorInstanceRef = React.useRef<Editor | null>(null);
+  const [showImageUpload, setShowImageUpload] = React.useState(false);
 
   // Inline title editing state
   const [isTitleEditing, setIsTitleEditing] = React.useState(false);
@@ -223,6 +226,48 @@ export default function ProjectsPage() {
       setNodeDeleteConfirm({ open: false, node: null });
     },
   });
+
+  // Media upload mutation
+  const mediaUploadMutation = trpc.media.upload.useMutation();
+  const mediaGetDownloadUrlMutation = trpc.media.getDownloadUrl.useMutation();
+
+  const handleImageUpload = React.useCallback(
+    async (params: {
+      nodeId: string;
+      projectId: string;
+      filename: string;
+      mimeType: string;
+      data: string;
+    }) => {
+      return await mediaUploadMutation.mutateAsync(params);
+    },
+    [mediaUploadMutation],
+  );
+
+  const handleGetDownloadUrl = React.useCallback(
+    async (params: { id: string }) => {
+      return await mediaGetDownloadUrlMutation.mutateAsync(params);
+    },
+    [mediaGetDownloadUrlMutation],
+  );
+
+  const handleImageUploadComplete = React.useCallback(
+    (_attachmentId: string, downloadUrl: string) => {
+      const editor = editorInstanceRef.current;
+      if (editor) {
+        editor.chain().focus().setImage({ src: downloadUrl }).run();
+      }
+      setShowImageUpload(false);
+    },
+    [],
+  );
+
+  const handleImageUploadError = React.useCallback(
+    (error: string) => {
+      addToast(error, "error");
+    },
+    [addToast],
+  );
 
   // Auto-save for editor content
   const handleAutoSave = React.useCallback(
@@ -468,15 +513,32 @@ export default function ProjectsPage() {
                 </div>
               </div>
               {selectedNodeQuery.data.type === "note" ? (
-                <TiptapEditor
-                  content={
-                    (selectedNodeQuery.data.content as Record<
-                      string,
-                      unknown
-                    >) ?? null
-                  }
-                  onChange={setEditorContent}
-                />
+                <>
+                  <TiptapEditor
+                    content={
+                      (selectedNodeQuery.data.content as Record<
+                        string,
+                        unknown
+                      >) ?? null
+                    }
+                    onChange={setEditorContent}
+                    editorRef={editorInstanceRef}
+                    onInsertImage={() => setShowImageUpload((prev) => !prev)}
+                  />
+                  {showImageUpload && currentProjectId && (
+                    <div className="mt-4" data-testid="image-upload-section">
+                      <ImageUpload
+                        nodeId={selectedNodeQuery.data.id}
+                        projectId={currentProjectId}
+                        onUpload={handleImageUpload}
+                        onGetDownloadUrl={handleGetDownloadUrl}
+                        onUploadComplete={handleImageUploadComplete}
+                        onUploadError={handleImageUploadError}
+                        isUploading={mediaUploadMutation.isPending}
+                      />
+                    </div>
+                  )}
+                </>
               ) : (
                 <p className="text-muted-foreground">
                   Select a note from the tree to view its content.

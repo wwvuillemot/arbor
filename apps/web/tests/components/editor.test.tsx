@@ -39,6 +39,7 @@ const mockEditor = {
       toggleOrderedList: vi.fn().mockReturnValue({ run: vi.fn() }),
       toggleBlockquote: vi.fn().mockReturnValue({ run: vi.fn() }),
       setHorizontalRule: vi.fn().mockReturnValue({ run: vi.fn() }),
+      setImage: vi.fn().mockReturnValue({ run: vi.fn() }),
       undo: vi.fn().mockReturnValue({ run: vi.fn() }),
       redo: vi.fn().mockReturnValue({ run: vi.fn() }),
       clearNodes: vi.fn().mockReturnValue({
@@ -80,8 +81,19 @@ vi.mock("@tiptap/extension-placeholder", () => ({
   },
 }));
 
+vi.mock("@tiptap/extension-image", () => ({
+  default: {
+    configure: vi.fn().mockReturnValue({}),
+  },
+}));
+
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { TiptapEditor } from "@/components/editor/tiptap-editor";
+import {
+  ImageUpload,
+  ACCEPTED_IMAGE_TYPES,
+  MAX_FILE_SIZE,
+} from "@/components/editor/image-upload";
 import { useAutoSave, type AutoSaveStatus } from "@/hooks/use-auto-save";
 
 describe("EditorToolbar", () => {
@@ -152,6 +164,34 @@ describe("EditorToolbar", () => {
     const clearButton = screen.getByTitle("clearFormatting");
     fireEvent.click(clearButton);
     expect(mockEditor.chain).toHaveBeenCalled();
+  });
+
+  it("should not render image button when onInsertImage is not provided", () => {
+    render(<EditorToolbar editor={mockEditor as any} />);
+    expect(screen.queryByTitle("insertImage")).not.toBeInTheDocument();
+  });
+
+  it("should render image button when onInsertImage is provided", () => {
+    const onInsertImage = vi.fn();
+    render(
+      <EditorToolbar
+        editor={mockEditor as any}
+        onInsertImage={onInsertImage}
+      />,
+    );
+    expect(screen.getByTitle("insertImage")).toBeInTheDocument();
+  });
+
+  it("should call onInsertImage when image button clicked", () => {
+    const onInsertImage = vi.fn();
+    render(
+      <EditorToolbar
+        editor={mockEditor as any}
+        onInsertImage={onInsertImage}
+      />,
+    );
+    fireEvent.click(screen.getByTitle("insertImage"));
+    expect(onInsertImage).toHaveBeenCalledOnce();
   });
 });
 
@@ -379,5 +419,216 @@ describe("useAutoSave", () => {
     );
 
     expect(screen.getByTestId("status").textContent).toBe("idle");
+  });
+});
+
+describe("ImageUpload", () => {
+  const defaultProps = {
+    nodeId: "node-1",
+    projectId: "project-1",
+    onUploadComplete: vi.fn(),
+    onUploadError: vi.fn(),
+    onUpload: vi.fn().mockResolvedValue({ id: "attachment-1" }),
+    onGetDownloadUrl: vi
+      .fn()
+      .mockResolvedValue({ url: "https://example.com/image.png" }),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // jsdom File doesn't have arrayBuffer method, polyfill it
+    if (!File.prototype.arrayBuffer) {
+      File.prototype.arrayBuffer = function () {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.readAsArrayBuffer(this);
+        });
+      };
+    }
+  });
+
+  it("should render the dropzone", () => {
+    render(<ImageUpload {...defaultProps} />);
+    expect(screen.getByTestId("image-upload-dropzone")).toBeInTheDocument();
+  });
+
+  it("should render drop-or-click text", () => {
+    render(<ImageUpload {...defaultProps} />);
+    expect(screen.getByText("imageUpload.dropOrClick")).toBeInTheDocument();
+  });
+
+  it("should render supported formats text", () => {
+    render(<ImageUpload {...defaultProps} />);
+    expect(
+      screen.getByText("imageUpload.supportedFormats"),
+    ).toBeInTheDocument();
+  });
+
+  it("should render uploading state", () => {
+    render(<ImageUpload {...defaultProps} isUploading={true} />);
+    expect(screen.getByText("imageUpload.uploading")).toBeInTheDocument();
+    expect(
+      screen.queryByText("imageUpload.dropOrClick"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should have a hidden file input", () => {
+    render(<ImageUpload {...defaultProps} />);
+    const input = screen.getByTestId("image-upload-input");
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveClass("hidden");
+  });
+
+  it("should accept only image types", () => {
+    render(<ImageUpload {...defaultProps} />);
+    const input = screen.getByTestId("image-upload-input") as HTMLInputElement;
+    expect(input.accept).toBe(ACCEPTED_IMAGE_TYPES.join(","));
+  });
+
+  it("should trigger file input on click", () => {
+    render(<ImageUpload {...defaultProps} />);
+    const dropzone = screen.getByTestId("image-upload-dropzone");
+    const input = screen.getByTestId("image-upload-input") as HTMLInputElement;
+    const clickSpy = vi.spyOn(input, "click");
+    fireEvent.click(dropzone);
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it("should trigger file input on Enter key", () => {
+    render(<ImageUpload {...defaultProps} />);
+    const dropzone = screen.getByTestId("image-upload-dropzone");
+    const input = screen.getByTestId("image-upload-input") as HTMLInputElement;
+    const clickSpy = vi.spyOn(input, "click");
+    fireEvent.keyDown(dropzone, { key: "Enter" });
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it("should trigger file input on Space key", () => {
+    render(<ImageUpload {...defaultProps} />);
+    const dropzone = screen.getByTestId("image-upload-dropzone");
+    const input = screen.getByTestId("image-upload-input") as HTMLInputElement;
+    const clickSpy = vi.spyOn(input, "click");
+    fireEvent.keyDown(dropzone, { key: " " });
+    expect(clickSpy).toHaveBeenCalled();
+  });
+
+  it("should call onUploadError for invalid file type", async () => {
+    render(<ImageUpload {...defaultProps} />);
+    const input = screen.getByTestId("image-upload-input");
+    const invalidFile = new File(["test"], "test.txt", { type: "text/plain" });
+    fireEvent.change(input, { target: { files: [invalidFile] } });
+    await waitFor(() => {
+      expect(defaultProps.onUploadError).toHaveBeenCalledWith(
+        "imageUpload.invalidType",
+      );
+    });
+  });
+
+  it("should call onUploadError for file too large", async () => {
+    render(<ImageUpload {...defaultProps} />);
+    const input = screen.getByTestId("image-upload-input");
+    // Create a file that exceeds MAX_FILE_SIZE
+    const largeContent = new ArrayBuffer(MAX_FILE_SIZE + 1);
+    const largeFile = new File([largeContent], "large.png", {
+      type: "image/png",
+    });
+    fireEvent.change(input, { target: { files: [largeFile] } });
+    await waitFor(() => {
+      expect(defaultProps.onUploadError).toHaveBeenCalledWith(
+        "imageUpload.fileTooLarge",
+      );
+    });
+  });
+
+  it("should upload valid file and call onUploadComplete", async () => {
+    render(<ImageUpload {...defaultProps} />);
+    const input = screen.getByTestId("image-upload-input");
+    const validFile = new File(["imagedata"], "photo.png", {
+      type: "image/png",
+    });
+    fireEvent.change(input, { target: { files: [validFile] } });
+    await waitFor(() => {
+      expect(defaultProps.onUpload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nodeId: "node-1",
+          projectId: "project-1",
+          filename: "photo.png",
+          mimeType: "image/png",
+        }),
+      );
+    });
+    await waitFor(() => {
+      expect(defaultProps.onGetDownloadUrl).toHaveBeenCalledWith({
+        id: "attachment-1",
+      });
+    });
+    await waitFor(() => {
+      expect(defaultProps.onUploadComplete).toHaveBeenCalledWith(
+        "attachment-1",
+        "https://example.com/image.png",
+      );
+    });
+  });
+
+  it("should call onUploadError when upload fails", async () => {
+    const errorProps = {
+      ...defaultProps,
+      onUpload: vi.fn().mockRejectedValue(new Error("Upload network error")),
+    };
+    render(<ImageUpload {...errorProps} />);
+    const input = screen.getByTestId("image-upload-input");
+    const validFile = new File(["imagedata"], "photo.png", {
+      type: "image/png",
+    });
+    fireEvent.change(input, { target: { files: [validFile] } });
+    await waitFor(() => {
+      expect(errorProps.onUploadError).toHaveBeenCalledWith(
+        "Upload network error",
+      );
+    });
+  });
+
+  it("should handle drag over by adding visual feedback", () => {
+    render(<ImageUpload {...defaultProps} />);
+    const dropzone = screen.getByTestId("image-upload-dropzone");
+    fireEvent.dragOver(dropzone);
+    expect(dropzone.className).toContain("border-accent");
+  });
+
+  it("should handle drag leave by removing visual feedback", () => {
+    render(<ImageUpload {...defaultProps} />);
+    const dropzone = screen.getByTestId("image-upload-dropzone");
+    fireEvent.dragOver(dropzone);
+    fireEvent.dragLeave(dropzone);
+    expect(dropzone.className).not.toContain("border-accent bg-accent/10");
+  });
+
+  it("should process dropped image files", async () => {
+    render(<ImageUpload {...defaultProps} />);
+    const dropzone = screen.getByTestId("image-upload-dropzone");
+    const validFile = new File(["imagedata"], "dropped.png", {
+      type: "image/png",
+    });
+    fireEvent.drop(dropzone, {
+      dataTransfer: { files: [validFile] },
+    });
+    await waitFor(() => {
+      expect(defaultProps.onUpload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filename: "dropped.png",
+          mimeType: "image/png",
+        }),
+      );
+    });
+  });
+
+  it("should export ACCEPTED_IMAGE_TYPES and MAX_FILE_SIZE", () => {
+    expect(ACCEPTED_IMAGE_TYPES).toContain("image/png");
+    expect(ACCEPTED_IMAGE_TYPES).toContain("image/jpeg");
+    expect(ACCEPTED_IMAGE_TYPES).toContain("image/gif");
+    expect(ACCEPTED_IMAGE_TYPES).toContain("image/webp");
+    expect(ACCEPTED_IMAGE_TYPES).toContain("image/svg+xml");
+    expect(MAX_FILE_SIZE).toBe(10 * 1024 * 1024);
   });
 });

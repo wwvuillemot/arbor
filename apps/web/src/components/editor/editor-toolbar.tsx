@@ -18,10 +18,12 @@ import {
   Undo,
   Redo,
   RemoveFormatting,
+  ImagePlus,
 } from "lucide-react";
 
 interface EditorToolbarProps {
   editor: Editor | null;
+  onInsertImage?: () => void;
 }
 
 interface ToolbarButtonProps {
@@ -60,7 +62,7 @@ function ToolbarDivider() {
   return <div className="w-px h-6 bg-border mx-1" />;
 }
 
-export function EditorToolbar({ editor }: EditorToolbarProps) {
+export function EditorToolbar({ editor, onInsertImage }: EditorToolbarProps) {
   const t = useTranslations("editor");
 
   if (!editor) return null;
@@ -188,6 +190,15 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       >
         <RemoveFormatting size={iconSize} />
       </ToolbarButton>
+
+      {onInsertImage && (
+        <>
+          <ToolbarDivider />
+          <ToolbarButton onClick={onInsertImage} title={t("insertImage")}>
+            <ImagePlus size={iconSize} />
+          </ToolbarButton>
+        </>
+      )}
     </div>
   );
 }

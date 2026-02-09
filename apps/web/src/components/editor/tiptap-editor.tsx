@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import Image from "@tiptap/extension-image";
 import { EditorToolbar } from "./editor-toolbar";
 
 interface TiptapEditorProps {
@@ -12,6 +13,8 @@ interface TiptapEditorProps {
   onChange?: (content: Record<string, unknown>) => void;
   placeholder?: string;
   editable?: boolean;
+  onInsertImage?: () => void;
+  editorRef?: React.MutableRefObject<Editor | null>;
 }
 
 export function TiptapEditor({
@@ -19,6 +22,8 @@ export function TiptapEditor({
   onChange,
   placeholder,
   editable = true,
+  onInsertImage,
+  editorRef,
 }: TiptapEditorProps) {
   const t = useTranslations("editor");
   const placeholderText = placeholder ?? t("placeholder");
@@ -30,6 +35,10 @@ export function TiptapEditor({
       Placeholder.configure({
         placeholder: placeholderText,
       }),
+      Image.configure({
+        inline: false,
+        allowBase64: false,
+      }),
     ],
     content: content ?? undefined,
     editable,
@@ -39,6 +48,13 @@ export function TiptapEditor({
       }
     },
   });
+
+  // Expose editor instance to parent via ref
+  React.useEffect(() => {
+    if (editorRef) {
+      editorRef.current = editor;
+    }
+  }, [editor, editorRef]);
 
   // Sync content when it changes externally (e.g. selecting a different node)
   const contentRef = React.useRef(content);
@@ -67,7 +83,7 @@ export function TiptapEditor({
       className="flex flex-col rounded-md overflow-hidden"
       data-testid="tiptap-editor"
     >
-      <EditorToolbar editor={editor} />
+      <EditorToolbar editor={editor} onInsertImage={onInsertImage} />
       <EditorContent
         editor={editor}
         className="prose dark:prose-invert max-w-none p-4 min-h-[300px] outline-none ring-0 border-0 focus:outline-none focus:ring-0 focus:border-0 focus-within:outline-none focus-within:ring-0 focus-within:border-0 [&_.tiptap]:outline-none [&_.tiptap]:ring-0 [&_.tiptap]:border-0 [&_.tiptap]:shadow-none [&_.tiptap:focus]:outline-none [&_.tiptap:focus]:ring-0 [&_.tiptap:focus]:border-0 [&_.tiptap]:min-h-[280px] [&_*:focus]:outline-none [&_*:focus]:ring-0 [&_.tiptap_p.is-editor-empty:first-child::before]:text-muted-foreground [&_.tiptap_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.tiptap_p.is-editor-empty:first-child::before]:float-left [&_.tiptap_p.is-editor-empty:first-child::before]:h-0 [&_.tiptap_p.is-editor-empty:first-child::before]:pointer-events-none"

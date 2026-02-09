@@ -270,7 +270,16 @@
     "placeholder": "Start writing...",
     "saving": "Saving...",
     "saved": "Saved",
-    "saveFailed": "Save failed"
+    "saveFailed": "Save failed",
+    "insertImage": "Insert image",
+    "imageUpload": {
+      "uploading": "Uploading image...",
+      "dropOrClick": "Drop an image here or click to select",
+      "supportedFormats": "PNG, JPG, GIF, WebP, SVG (max 10MB)",
+      "invalidType": "Invalid file type. Please upload an image.",
+      "fileTooLarge": "File is too large. Maximum size is 10MB.",
+      "uploadFailed": "Failed to upload image"
+    }
   },
   "fileTree": {
     "newFolder": "New Folder",

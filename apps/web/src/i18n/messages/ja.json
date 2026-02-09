@@ -270,7 +270,16 @@
     "placeholder": "書き始める...",
     "saving": "保存中...",
     "saved": "保存済み",
-    "saveFailed": "保存に失敗しました"
+    "saveFailed": "保存に失敗しました",
+    "insertImage": "画像を挿入",
+    "imageUpload": {
+      "uploading": "画像をアップロード中...",
+      "dropOrClick": "画像をドロップするかクリックして選択",
+      "supportedFormats": "PNG、JPG、GIF、WebP、SVG（最大10MB）",
+      "invalidType": "無効なファイル形式です。画像をアップロードしてください。",
+      "fileTooLarge": "ファイルが大きすぎます。最大サイズは10MBです。",
+      "uploadFailed": "画像のアップロードに失敗しました"
+    }
   },
   "fileTree": {
     "newFolder": "新しいフォルダ",
