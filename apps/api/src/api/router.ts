@@ -5,6 +5,7 @@ import { settingsRouter } from "./routers/settings";
 import { configurationRouter } from "./routers/configuration";
 import { setupRouter } from "./routers/setup";
 import { systemRouter } from "./routers/system";
+import { mediaRouter } from "./routers/media";
 
 /**
  * Main application router
@@ -17,6 +18,7 @@ export const appRouter = router({
   configuration: configurationRouter,
   setup: setupRouter,
   system: systemRouter,
+  media: mediaRouter,
 
   // Health check endpoint
   health: publicProcedure.query(() => ({

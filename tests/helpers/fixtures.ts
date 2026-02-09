@@ -1,5 +1,5 @@
 import { getTestDb } from "./db";
-import { nodes } from "@server/db/schema";
+import { nodes, mediaAttachments } from "@server/db/schema";
 import type { NodeType, AuthorType } from "@server/db/schema";
 
 export interface CreateNodeParams {
@@ -125,4 +125,40 @@ export async function createTestProjectHierarchy() {
       magicSystem,
     },
   };
+}
+
+export interface CreateMediaAttachmentParams {
+  nodeId: string;
+  bucket?: string;
+  objectKey: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  metadata?: Record<string, any>;
+  createdBy?: string;
+}
+
+/**
+ * Create a test media attachment in the database
+ */
+export async function createTestMediaAttachment(
+  params: CreateMediaAttachmentParams,
+) {
+  const db = getTestDb();
+
+  const [attachment] = await db
+    .insert(mediaAttachments)
+    .values({
+      nodeId: params.nodeId,
+      bucket: params.bucket || "arbor-test",
+      objectKey: params.objectKey,
+      filename: params.filename,
+      mimeType: params.mimeType,
+      size: params.size,
+      metadata: params.metadata || {},
+      createdBy: params.createdBy || "user:system",
+    })
+    .returning();
+
+  return attachment;
 }

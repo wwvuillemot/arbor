@@ -5,6 +5,7 @@ import {
   text,
   jsonb,
   integer,
+  bigint,
   timestamp,
   index,
 } from "drizzle-orm/pg-core";
@@ -203,3 +204,66 @@ export const appSettings = pgTable(
 // Type inference for TypeScript
 export type AppSetting = typeof appSettings.$inferSelect;
 export type NewAppSetting = typeof appSettings.$inferInsert;
+
+/**
+ * Media Attachments Table
+ *
+ * Tracks media files stored in MinIO (S3-compatible object storage).
+ * Each attachment is linked to a node (e.g., images in a note, audio for audio_note).
+ *
+ * Storage strategy:
+ * - Object key format: {project_id}/{node_id}/{timestamp}_{filename}
+ * - Bucket: "arbor-media" for all media
+ * - Pre-signed URLs for secure download (expire after 1 hour)
+ */
+export const mediaAttachments = pgTable(
+  "media_attachments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // The node this attachment belongs to
+    nodeId: uuid("node_id")
+      .references(() => nodes.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // MinIO bucket name (e.g., "arbor-media")
+    bucket: varchar("bucket", { length: 255 }).notNull(),
+
+    // MinIO object key (e.g., "{project_id}/{node_id}/{timestamp}_{filename}")
+    objectKey: varchar("object_key", { length: 1024 }).notNull(),
+
+    // Original filename as uploaded by the user
+    filename: varchar("filename", { length: 255 }).notNull(),
+
+    // MIME type (e.g., "image/png", "audio/mp3", "application/pdf")
+    mimeType: varchar("mime_type", { length: 255 }).notNull(),
+
+    // File size in bytes
+    size: bigint("size", { mode: "number" }).notNull(),
+
+    // Flexible metadata (e.g., dimensions, duration, thumbnail key)
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+
+    // Provenance: who uploaded this attachment
+    // Format: "user:{id}" or "llm:{model}"
+    createdBy: varchar("created_by", { length: 255 })
+      .default("user:system")
+      .notNull(),
+  },
+  (table) => ({
+    // Index for fast lookup by node
+    nodeIdIdx: index("idx_media_node").on(table.nodeId),
+    // Index for fast lookup by bucket + object key
+    bucketKeyIdx: index("idx_media_bucket_key").on(
+      table.bucket,
+      table.objectKey,
+    ),
+  }),
+);
+
+// Type inference for TypeScript
+export type MediaAttachment = typeof mediaAttachments.$inferSelect;
+export type NewMediaAttachment = typeof mediaAttachments.$inferInsert;

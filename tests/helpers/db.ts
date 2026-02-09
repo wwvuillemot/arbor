@@ -61,25 +61,32 @@ export async function resetTestDb() {
     // Use raw SQL to truncate all tables
     // TRUNCATE is faster than DELETE and resets auto-increment sequences
     // CASCADE ensures that dependent rows in other tables are also deleted
-    await testClient!`TRUNCATE TABLE nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`;
+    await testClient!`TRUNCATE TABLE media_attachments, nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`;
 
     // Verify the truncate worked
     const counts = await testClient!`
       SELECT
         (SELECT COUNT(*) FROM nodes) as nodes_count,
         (SELECT COUNT(*) FROM user_preferences) as prefs_count,
-        (SELECT COUNT(*) FROM app_settings) as settings_count
+        (SELECT COUNT(*) FROM app_settings) as settings_count,
+        (SELECT COUNT(*) FROM media_attachments) as media_count
     `;
-    const { nodes_count, prefs_count, settings_count } = counts[0];
-    if (nodes_count !== "0" || prefs_count !== "0" || settings_count !== "0") {
+    const { nodes_count, prefs_count, settings_count, media_count } = counts[0];
+    if (
+      nodes_count !== "0" ||
+      prefs_count !== "0" ||
+      settings_count !== "0" ||
+      media_count !== "0"
+    ) {
       console.error(
-        `⚠️  TRUNCATE did not clear all data! nodes=${nodes_count}, prefs=${prefs_count}, settings=${settings_count}`,
+        `⚠️  TRUNCATE did not clear all data! nodes=${nodes_count}, prefs=${prefs_count}, settings=${settings_count}, media=${media_count}`,
       );
     }
   } catch (error) {
     // If TRUNCATE fails (e.g., tables don't exist yet), fall back to DELETE
     const db = getTestDb();
     try {
+      await db.delete(schema.mediaAttachments);
       await db.delete(schema.nodes);
       await db.delete(schema.userPreferences);
       await db.delete(schema.appSettings);
