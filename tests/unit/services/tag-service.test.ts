@@ -398,4 +398,176 @@ describe("TagService", () => {
       expect(nodesWithTag1[0].name).toBe("Tagged Node");
     });
   });
+
+  // ─── linkEntityNode ──────────────────────────────────────────────────
+
+  describe("linkEntityNode", () => {
+    it("should link a character tag to an entity node", async () => {
+      const project = await createTestProject("Entity Project");
+      const note = await createTestNote("Character Sheet", project.id);
+      const tag = await tagService.createTag({
+        name: "Aria",
+        type: "character",
+      });
+
+      const updated = await tagService.linkEntityNode(tag.id, note.id);
+      expect(updated.entityNodeId).toBe(note.id);
+    });
+
+    it("should link other entity types", async () => {
+      const project = await createTestProject("Entity Project");
+      const note = await createTestNote("Location Page", project.id);
+      const tag = await tagService.createTag({
+        name: "Castle",
+        type: "location",
+      });
+
+      const updated = await tagService.linkEntityNode(tag.id, note.id);
+      expect(updated.entityNodeId).toBe(note.id);
+    });
+
+    it("should reject linking general tags", async () => {
+      const project = await createTestProject("General Project");
+      const note = await createTestNote("Some Note", project.id);
+      const tag = await tagService.createTag({
+        name: "misc",
+        type: "general",
+      });
+
+      await expect(tagService.linkEntityNode(tag.id, note.id)).rejects.toThrow(
+        "Only entity-type tags",
+      );
+    });
+
+    it("should throw if tag not found", async () => {
+      await expect(
+        tagService.linkEntityNode(
+          "00000000-0000-0000-0000-000000000000",
+          "00000000-0000-0000-0000-000000000001",
+        ),
+      ).rejects.toThrow("Tag not found");
+    });
+
+    it("should throw if node not found", async () => {
+      const tag = await tagService.createTag({
+        name: "Ghost",
+        type: "character",
+      });
+
+      await expect(
+        tagService.linkEntityNode(
+          tag.id,
+          "00000000-0000-0000-0000-000000000001",
+        ),
+      ).rejects.toThrow("Node not found");
+    });
+  });
+
+  // ─── unlinkEntityNode ────────────────────────────────────────────────
+
+  describe("unlinkEntityNode", () => {
+    it("should unlink a tag from its entity node", async () => {
+      const project = await createTestProject("Unlink Project");
+      const note = await createTestNote("Entity Page", project.id);
+      const tag = await tagService.createTag({
+        name: "Hero",
+        type: "character",
+      });
+
+      await tagService.linkEntityNode(tag.id, note.id);
+      const unlinked = await tagService.unlinkEntityNode(tag.id);
+      expect(unlinked.entityNodeId).toBeNull();
+    });
+
+    it("should throw if tag not found", async () => {
+      await expect(
+        tagService.unlinkEntityNode("00000000-0000-0000-0000-000000000000"),
+      ).rejects.toThrow("Tag not found");
+    });
+  });
+
+  // ─── createEntityNode ────────────────────────────────────────────────
+
+  describe("createEntityNode", () => {
+    it("should create an entity node and link it to the tag", async () => {
+      const project = await createTestProject("Entity Create Project");
+      const tag = await tagService.createTag({
+        name: "Villain",
+        type: "character",
+      });
+
+      const result = await tagService.createEntityNode(tag.id, project.id);
+      expect(result.tag.entityNodeId).toBe(result.node.id);
+      expect(result.node.name).toBe("Villain");
+      expect(result.node.type).toBe("note");
+      expect(result.node.parentId).toBe(project.id);
+      expect(
+        (result.node.metadata as Record<string, unknown>).entityTagId,
+      ).toBe(tag.id);
+      expect((result.node.metadata as Record<string, unknown>).entityType).toBe(
+        "character",
+      );
+    });
+
+    it("should create entity nodes for location type", async () => {
+      const project = await createTestProject("Loc Project");
+      const tag = await tagService.createTag({
+        name: "Dark Forest",
+        type: "location",
+      });
+
+      const result = await tagService.createEntityNode(tag.id, project.id);
+      expect(result.node.name).toBe("Dark Forest");
+      expect(result.node.slug).toBe("dark-forest");
+    });
+
+    it("should reject creating entity node for general tags", async () => {
+      const project = await createTestProject("No Entity");
+      const tag = await tagService.createTag({
+        name: "misc",
+        type: "general",
+      });
+
+      await expect(
+        tagService.createEntityNode(tag.id, project.id),
+      ).rejects.toThrow("Only entity-type tags");
+    });
+
+    it("should reject if tag already has an entity node", async () => {
+      const project = await createTestProject("Duplicate Entity");
+      const tag = await tagService.createTag({
+        name: "Duplicate",
+        type: "character",
+      });
+
+      await tagService.createEntityNode(tag.id, project.id);
+
+      await expect(
+        tagService.createEntityNode(tag.id, project.id),
+      ).rejects.toThrow("already has an entity node");
+    });
+
+    it("should throw if parent not found", async () => {
+      const tag = await tagService.createTag({
+        name: "Orphan",
+        type: "event",
+      });
+
+      await expect(
+        tagService.createEntityNode(
+          tag.id,
+          "00000000-0000-0000-0000-000000000001",
+        ),
+      ).rejects.toThrow("Parent node not found");
+    });
+
+    it("should throw if tag not found", async () => {
+      await expect(
+        tagService.createEntityNode(
+          "00000000-0000-0000-0000-000000000000",
+          "00000000-0000-0000-0000-000000000001",
+        ),
+      ).rejects.toThrow("Tag not found");
+    });
+  });
 });

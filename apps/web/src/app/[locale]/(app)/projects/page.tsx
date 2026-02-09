@@ -674,7 +674,11 @@ export default function ProjectsPage() {
                 </div>
               </div>
               <div className="mb-4" data-testid="node-tag-picker">
-                <TagPicker nodeId={selectedNodeQuery.data.id} />
+                <TagPicker
+                  nodeId={selectedNodeQuery.data.id}
+                  projectId={currentProjectId}
+                  onNavigateToNode={(nodeId) => setSelectedNodeId(nodeId)}
+                />
               </div>
               {selectedNodeQuery.data.type === "note" ? (
                 <>

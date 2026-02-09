@@ -8,8 +8,12 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/contexts/toast-context";
 import { TagBadge, type TagBadgeTag } from "./tag-badge";
 
+const ENTITY_TYPES = ["character", "location", "event", "concept"];
+
 export interface TagPickerProps {
   nodeId: string;
+  projectId?: string;
+  onNavigateToNode?: (nodeId: string) => void;
   className?: string;
 }
 
@@ -19,7 +23,12 @@ export interface TagPickerProps {
  * Shows currently assigned tags as badges with remove buttons,
  * and a dropdown to add more tags from the full tag list.
  */
-export function TagPicker({ nodeId, className }: TagPickerProps) {
+export function TagPicker({
+  nodeId,
+  projectId,
+  onNavigateToNode,
+  className,
+}: TagPickerProps) {
   const t = useTranslations("tags");
   const { addToast } = useToast();
 
@@ -50,6 +59,20 @@ export function TagPicker({ nodeId, className }: TagPickerProps) {
     },
     onError: () => {
       addToast(t("tagRemoveError"), "error");
+    },
+  });
+
+  const createEntityNodeMutation = trpc.tags.createEntityNode.useMutation({
+    onSuccess: (data) => {
+      utils.tags.getNodeTags.invalidate({ nodeId });
+      utils.tags.getAll.invalidate();
+      addToast(t("entityNodeCreated"), "success");
+      if (onNavigateToNode) {
+        onNavigateToNode(data.node.id);
+      }
+    },
+    onError: () => {
+      addToast(t("entityNodeCreateError"), "error");
     },
   });
 
@@ -92,15 +115,54 @@ export function TagPicker({ nodeId, className }: TagPickerProps) {
     removeMutation.mutate({ nodeId, tagId: tag.id });
   }
 
+  function handleEntityClick(tag: TagBadgeTag) {
+    if (tag.entityNodeId && onNavigateToNode) {
+      onNavigateToNode(tag.entityNodeId);
+    }
+  }
+
+  function handleCreateEntityNode(tag: TagBadgeTag) {
+    if (!projectId) return;
+    createEntityNodeMutation.mutate({ tagId: tag.id, parentId: projectId });
+  }
+
   return (
     <div
       className={cn("flex flex-wrap items-center gap-1.5", className)}
       data-testid="tag-picker"
     >
       {/* Assigned tags as badges */}
-      {assignedTags.map((tag) => (
-        <TagBadge key={tag.id} tag={tag} size="sm" onRemove={handleRemoveTag} />
-      ))}
+      {assignedTags.map((tag) => {
+        const isEntityTag = ENTITY_TYPES.includes(tag.type);
+        const hasEntityNode = isEntityTag && !!tag.entityNodeId;
+        const canCreateEntity = isEntityTag && !tag.entityNodeId && !!projectId;
+
+        return (
+          <span
+            key={tag.id}
+            className="inline-flex items-center gap-0.5"
+            data-testid={`tag-picker-tag-${tag.id}`}
+          >
+            <TagBadge
+              tag={tag}
+              size="sm"
+              onRemove={handleRemoveTag}
+              onEntityClick={hasEntityNode ? handleEntityClick : undefined}
+            />
+            {canCreateEntity && (
+              <button
+                onClick={() => handleCreateEntityNode(tag)}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded"
+                data-testid={`tag-picker-create-entity-${tag.id}`}
+                aria-label={t("createEntityNode")}
+                title={t("createEntityNode")}
+              >
+                +📄
+              </button>
+            )}
+          </span>
+        );
+      })}
 
       {/* Add tag button + dropdown */}
       <div className="relative" ref={dropdownRef}>

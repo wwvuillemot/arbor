@@ -369,6 +369,17 @@
     "tagAdded": "タグを追加しました",
     "tagRemoved": "タグを削除しました",
     "tagAddError": "タグの追加に失敗しました",
-    "tagRemoveError": "タグの削除に失敗しました"
+    "tagRemoveError": "タグの削除に失敗しました",
+    "jumpToEntity": "エンティティページへ移動",
+    "createEntityNode": "エンティティページを作成",
+    "entityNodeCreated": "エンティティページを作成しました",
+    "entityNodeCreateError": "エンティティページの作成に失敗しました",
+    "noEntityNode": "エンティティページが未リンク",
+    "entityLinked": "エンティティページをリンクしました",
+    "entityUnlinked": "エンティティページのリンクを解除しました",
+    "entityLinkError": "エンティティページのリンクに失敗しました",
+    "entityUnlinkError": "エンティティページのリンク解除に失敗しました",
+    "unlinkEntity": "エンティティページのリンクを解除",
+    "entityTag": "エンティティタグ"
   }
 }

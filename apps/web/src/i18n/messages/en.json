@@ -369,6 +369,17 @@
     "tagAdded": "Tag added",
     "tagRemoved": "Tag removed",
     "tagAddError": "Failed to add tag",
-    "tagRemoveError": "Failed to remove tag"
+    "tagRemoveError": "Failed to remove tag",
+    "jumpToEntity": "Go to entity page",
+    "createEntityNode": "Create entity page",
+    "entityNodeCreated": "Entity page created",
+    "entityNodeCreateError": "Failed to create entity page",
+    "noEntityNode": "No entity page linked",
+    "entityLinked": "Entity page linked",
+    "entityUnlinked": "Entity page unlinked",
+    "entityLinkError": "Failed to link entity page",
+    "entityUnlinkError": "Failed to unlink entity page",
+    "unlinkEntity": "Unlink entity page",
+    "entityTag": "Entity tag"
   }
 }

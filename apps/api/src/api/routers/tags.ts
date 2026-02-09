@@ -138,4 +138,41 @@ export const tagsRouter = router({
     .query(async ({ input }) => {
       return await tagService.getNodesByTag(input.tagId);
     }),
+
+  /**
+   * Link an entity-type tag to an existing node
+   */
+  linkEntityNode: publicProcedure
+    .input(
+      z.object({
+        tagId: z.string().uuid(),
+        entityNodeId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await tagService.linkEntityNode(input.tagId, input.entityNodeId);
+    }),
+
+  /**
+   * Unlink an entity-type tag from its entity node
+   */
+  unlinkEntityNode: publicProcedure
+    .input(z.object({ tagId: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      return await tagService.unlinkEntityNode(input.tagId);
+    }),
+
+  /**
+   * Create a new entity node for a tag and link it
+   */
+  createEntityNode: publicProcedure
+    .input(
+      z.object({
+        tagId: z.string().uuid(),
+        parentId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await tagService.createEntityNode(input.tagId, input.parentId);
+    }),
 });

@@ -9,13 +9,17 @@ export interface TagBadgeTag {
   color?: string | null;
   icon?: string | null;
   type: string;
+  entityNodeId?: string | null;
 }
+
+const ENTITY_TYPES = ["character", "location", "event", "concept"];
 
 export interface TagBadgeProps {
   tag: TagBadgeTag;
   size?: "sm" | "md";
   onClick?: (tag: TagBadgeTag) => void;
   onRemove?: (tag: TagBadgeTag) => void;
+  onEntityClick?: (tag: TagBadgeTag) => void;
   className?: string;
 }
 
@@ -24,15 +28,19 @@ export interface TagBadgeProps {
  *
  * Shows the tag name with its color as the background.
  * Supports optional onClick and onRemove handlers.
+ * Entity-type tags show a navigation indicator when they have a linked entity node.
  */
 export function TagBadge({
   tag,
   size = "sm",
   onClick,
   onRemove,
+  onEntityClick,
   className,
 }: TagBadgeProps) {
   const hasColor = tag.color && /^#[0-9a-fA-F]{6}$/.test(tag.color);
+  const isEntityType = ENTITY_TYPES.includes(tag.type);
+  const hasEntityNode = isEntityType && !!tag.entityNodeId;
 
   const badgeStyle: React.CSSProperties = hasColor
     ? {
@@ -70,6 +78,19 @@ export function TagBadge({
     >
       {tag.icon && <span className="leading-none">{tag.icon}</span>}
       {tag.name}
+      {hasEntityNode && onEntityClick && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onEntityClick(tag);
+          }}
+          className="ml-0.5 rounded-full hover:bg-foreground/10 p-0.5 leading-none"
+          data-testid={`tag-badge-entity-${tag.id}`}
+          aria-label={`Go to ${tag.name}`}
+        >
+          →
+        </button>
+      )}
       {onRemove && (
         <button
           onClick={(e) => {

@@ -302,6 +302,12 @@ export const tags = pgTable(
     // Tag type for categorization
     type: varchar("type", { length: 50 }).default("general").notNull(),
 
+    // Optional reference to a dedicated entity node (character sheet, location page, etc.)
+    // Only meaningful for entity-type tags: character, location, event, concept
+    entityNodeId: uuid("entity_node_id").references(() => nodes.id, {
+      onDelete: "set null",
+    }),
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -311,6 +317,8 @@ export const tags = pgTable(
     nameIdx: index("idx_tags_name").on(table.name),
     // Index for filtering tags by type
     typeIdx: index("idx_tags_type").on(table.type),
+    // Index for looking up entity node links
+    entityNodeIdx: index("idx_tags_entity_node").on(table.entityNodeId),
   }),
 );
 

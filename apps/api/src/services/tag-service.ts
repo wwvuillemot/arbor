@@ -15,6 +15,7 @@ export interface UpdateTagParams {
   color?: string | null;
   icon?: string | null;
   type?: TagType;
+  entityNodeId?: string | null;
 }
 
 /**
@@ -145,5 +146,128 @@ export class TagService {
       .where(eq(nodeTags.tagId, tagId));
 
     return results.map((r) => r.node);
+  }
+
+  // ─── Entity Node Methods ───────────────────────────────────────────────
+
+  /**
+   * Entity tag types that can have dedicated entity nodes
+   */
+  private static ENTITY_TYPES: readonly string[] = [
+    "character",
+    "location",
+    "event",
+    "concept",
+  ];
+
+  /**
+   * Link a tag to an existing entity node
+   */
+  async linkEntityNode(tagId: string, entityNodeId: string): Promise<Tag> {
+    const tag = await this.getTagById(tagId);
+    if (!tag) {
+      throw new Error(`Tag not found: ${tagId}`);
+    }
+
+    if (!TagService.ENTITY_TYPES.includes(tag.type)) {
+      throw new Error(
+        `Only entity-type tags (character, location, event, concept) can be linked to nodes`,
+      );
+    }
+
+    // Verify node exists
+    const [node] = await db
+      .select()
+      .from(nodes)
+      .where(eq(nodes.id, entityNodeId));
+    if (!node) {
+      throw new Error(`Node not found: ${entityNodeId}`);
+    }
+
+    const [updated] = await db
+      .update(tags)
+      .set({ entityNodeId, updatedAt: new Date() })
+      .where(eq(tags.id, tagId))
+      .returning();
+
+    return updated;
+  }
+
+  /**
+   * Unlink a tag from its entity node
+   */
+  async unlinkEntityNode(tagId: string): Promise<Tag> {
+    const tag = await this.getTagById(tagId);
+    if (!tag) {
+      throw new Error(`Tag not found: ${tagId}`);
+    }
+
+    const [updated] = await db
+      .update(tags)
+      .set({ entityNodeId: null, updatedAt: new Date() })
+      .where(eq(tags.id, tagId))
+      .returning();
+
+    return updated;
+  }
+
+  /**
+   * Create a new entity node for a tag and link it.
+   * The entity node is created as a "note" type child of the given parent project/folder.
+   */
+  async createEntityNode(
+    tagId: string,
+    parentId: string,
+  ): Promise<{ tag: Tag; node: typeof nodes.$inferSelect }> {
+    const tag = await this.getTagById(tagId);
+    if (!tag) {
+      throw new Error(`Tag not found: ${tagId}`);
+    }
+
+    if (!TagService.ENTITY_TYPES.includes(tag.type)) {
+      throw new Error(
+        `Only entity-type tags (character, location, event, concept) can have entity nodes`,
+      );
+    }
+
+    if (tag.entityNodeId) {
+      throw new Error(`Tag "${tag.name}" already has an entity node`);
+    }
+
+    // Verify parent exists
+    const [parent] = await db
+      .select()
+      .from(nodes)
+      .where(eq(nodes.id, parentId));
+    if (!parent) {
+      throw new Error(`Parent node not found: ${parentId}`);
+    }
+
+    // Create the entity node as a note
+    const slug = tag.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const [entityNode] = await db
+      .insert(nodes)
+      .values({
+        type: "note",
+        name: tag.name,
+        parentId,
+        slug,
+        content: {},
+        metadata: { entityTagId: tagId, entityType: tag.type },
+        authorType: "human",
+        position: 0,
+        createdBy: "user:system",
+        updatedBy: "user:system",
+      })
+      .returning();
+
+    // Link the tag to the new node
+    const [updatedTag] = await db
+      .update(tags)
+      .set({ entityNodeId: entityNode.id, updatedAt: new Date() })
+      .where(eq(tags.id, tagId))
+      .returning();
+
+    return { tag: updatedTag, node: entityNode };
   }
 }
