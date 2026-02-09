@@ -18,12 +18,12 @@ export default defineConfig({
     ],
     // Run tests sequentially to avoid database conflicts
     pool: "forks",
-    fileParallelism: false,
-    server: {
-      deps: {
-        external: ["graphql"],
+    poolOptions: {
+      forks: {
+        singleFork: true,
       },
     },
+    fileParallelism: false,
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "lcov"],
@@ -60,6 +60,7 @@ export default defineConfig({
       "@server": path.resolve(__dirname, "./apps/api/src"),
       "@tests": path.resolve(__dirname, "./tests"),
     },
+    dedupe: ["graphql"],
   },
   optimizeDeps: {
     include: ["graphql", "@pothos/core"],

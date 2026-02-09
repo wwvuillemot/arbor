@@ -241,7 +241,7 @@ export default function ConfigurationPage() {
                   <div className="flex-1 font-mono text-sm bg-muted p-3 rounded border">
                     {showMasterKey
                       ? masterKeyData?.masterKey ||
-                      t("encryption.masterKey.notGenerated")
+                        t("encryption.masterKey.notGenerated")
                       : "••••••••••••••••••••••••••••••••••••••••••"}
                   </div>
                   <button

@@ -44,7 +44,7 @@ describe("Configuration Page Translations", () => {
       "Database URL",
     );
     expect(messages.settings.configuration.databaseUrl.placeholder).toBe(
-      "postgres://arbor:arbor@localhost:5432/arbor",
+      "postgres://arbor:local_dev_only@localhost:5432/arbor_dev",
     );
     expect(messages.settings.configuration.databaseUrl.description).toContain(
       "PostgreSQL",

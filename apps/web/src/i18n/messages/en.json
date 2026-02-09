@@ -116,56 +116,34 @@
       "dashboard": {
         "label": "Go to Dashboard",
         "description": "View your dashboard",
-        "keywords": [
-          "home",
-          "overview"
-        ]
+        "keywords": ["home", "overview"]
       },
       "search": {
         "label": "Go to Search",
         "description": "Search your content",
-        "keywords": [
-          "find",
-          "lookup"
-        ]
+        "keywords": ["find", "lookup"]
       },
       "projects": {
         "label": "Go to Projects",
         "description": "Browse your projects",
-        "keywords": [
-          "folders",
-          "files",
-          "projects"
-        ]
+        "keywords": ["folders", "files", "projects"]
       },
       "chat": {
         "label": "Go to AI Chat",
         "description": "Chat with AI assistant",
-        "keywords": [
-          "ai",
-          "assistant",
-          "help"
-        ]
+        "keywords": ["ai", "assistant", "help"]
       },
       "settings": {
         "label": "Go to Settings",
         "description": "Configure your preferences",
-        "keywords": [
-          "preferences",
-          "config",
-          "options"
-        ]
+        "keywords": ["preferences", "config", "options"]
       }
     },
     "help": {
       "about": {
         "label": "About Arbor",
         "description": "View information about Arbor",
-        "keywords": [
-          "about",
-          "info",
-          "version"
-        ]
+        "keywords": ["about", "info", "version"]
       }
     }
   },
