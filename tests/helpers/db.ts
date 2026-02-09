@@ -5,9 +5,18 @@ import { sql } from "drizzle-orm";
 
 // CRITICAL: Use a separate test database to avoid wiping production data!
 // Tests run resetTestDb() before each test which DELETES ALL DATA
+// NEVER use DATABASE_URL - always use arbor_test!
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ||
   "postgresql://arbor:local_dev_only@localhost:5432/arbor_test";
+
+// Log which database we're using to help debug connection issues
+if (process.env.NODE_ENV !== 'production') {
+  console.log(`🔍 Test database URL: ${TEST_DATABASE_URL}`);
+  if (process.env.DATABASE_URL) {
+    console.warn(`⚠️  DATABASE_URL is set to: ${process.env.DATABASE_URL} (but tests will use TEST_DATABASE_URL)`);
+  }
+}
 
 let testClient: postgres.Sql | null = null;
 let testDb: ReturnType<typeof drizzle> | null = null;
@@ -31,15 +40,39 @@ export function getTestDb() {
  * Reset test database - delete all data from tables
  */
 export async function resetTestDb() {
-  const db = getTestDb();
+  if (!testClient) {
+    getTestDb(); // Initialize the connection
+  }
 
-  // Delete all data from tables using TRUNCATE for better performance and to reset sequences
-  // TRUNCATE is faster than DELETE and resets auto-increment sequences
-  // CASCADE ensures that dependent rows in other tables are also deleted
+  // Use the raw postgres client to ensure the TRUNCATE is committed immediately
+  // Drizzle's execute() might wrap queries in transactions
   try {
-    await db.execute(sql`TRUNCATE TABLE nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`);
+    // First, verify we're using the test database
+    const result = await testClient!`SELECT current_database()`;
+    const dbName = result[0].current_database;
+    if (dbName !== 'arbor_test') {
+      throw new Error(`CRITICAL: Attempting to reset non-test database: ${dbName}`);
+    }
+
+    // Use raw SQL to truncate all tables
+    // TRUNCATE is faster than DELETE and resets auto-increment sequences
+    // CASCADE ensures that dependent rows in other tables are also deleted
+    await testClient!`TRUNCATE TABLE nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`;
+
+    // Verify the truncate worked
+    const counts = await testClient!`
+      SELECT
+        (SELECT COUNT(*) FROM nodes) as nodes_count,
+        (SELECT COUNT(*) FROM user_preferences) as prefs_count,
+        (SELECT COUNT(*) FROM app_settings) as settings_count
+    `;
+    const { nodes_count, prefs_count, settings_count } = counts[0];
+    if (nodes_count !== '0' || prefs_count !== '0' || settings_count !== '0') {
+      console.error(`⚠️  TRUNCATE did not clear all data! nodes=${nodes_count}, prefs=${prefs_count}, settings=${settings_count}`);
+    }
   } catch (error) {
     // If TRUNCATE fails (e.g., tables don't exist yet), fall back to DELETE
+    const db = getTestDb();
     try {
       await db.delete(schema.nodes);
       await db.delete(schema.userPreferences);

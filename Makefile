@@ -83,9 +83,9 @@ clean:
 # Docker
 up:
 	@make banner
-	@echo "========================================="
+	@echo "=================================================================================="
 	@echo "   Starting Services"
-	@echo "========================================="
+	@echo "=================================================================================="
 	@echo ""
 	@echo "Stopping any existing containers..."
 	@docker compose -f apps/api/docker-compose.yml -f apps/key-value-store/docker-compose.yml down --remove-orphans 2>/dev/null || true

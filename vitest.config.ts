@@ -7,6 +7,11 @@ export default defineConfig({
     globals: true,
     environment: "node",
     setupFiles: ["./tests/setup.ts"],
+    // CRITICAL: Set DATABASE_URL to test database to prevent tests from using production database
+    env: {
+      DATABASE_URL: "postgresql://arbor:local_dev_only@localhost:5432/arbor_test",
+      TEST_DATABASE_URL: "postgresql://arbor:local_dev_only@localhost:5432/arbor_test",
+    },
     include: ["tests/**/*.test.ts"],
     exclude: [
       "apps/**",
@@ -59,6 +64,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./apps/api/src"),
       "@server": path.resolve(__dirname, "./apps/api/src"),
       "@tests": path.resolve(__dirname, "./tests"),
+      // Force all graphql imports to use the same instance
+      "graphql": path.resolve(__dirname, "./node_modules/graphql/index.js"),
     },
     dedupe: ["graphql"],
   },
