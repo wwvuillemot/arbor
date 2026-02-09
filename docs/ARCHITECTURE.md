@@ -11,6 +11,72 @@ Arbor is a local-first, AI-powered writing assistant built on a **block-based no
 3. **AI-First Design** - Architecture optimized for LLM interaction
 4. **Local-First** - All data stored locally, cloud optional
 5. **Provenance Tracking** - Know who (user/LLM) changed what and when
+6. **Web-First** - Primary interface is web browser, desktop app de-emphasized
+
+---
+
+## Infrastructure Overview
+
+### Deployment Architecture
+
+Arbor uses a **hybrid deployment model**:
+
+- **Web App & API Server**: Run locally on host machine (not in Docker)
+- **Third-Party Services**: Run in Docker containers (PostgreSQL, Redis, MinIO, pgAdmin)
+- **Unified Proxy**: Single nginx container (`arbor-proxy`) routes all services via `*.arbor.local` domains
+
+### Port Allocation
+
+| Service | Local Port | Domain | Access Method |
+|---------|-----------|--------|---------------|
+| Web App | 3847 | `app.arbor.local` | HTTP via arbor-proxy |
+| API Server | 3848 | `api.arbor.local` | HTTP via arbor-proxy |
+| PostgreSQL | 5432 | `postgres.arbor.local:5432` | TCP via arbor-proxy |
+| Redis | 6379 | `redis.arbor.local:6379` | TCP via arbor-proxy |
+| MinIO API | 9000 | `minio.arbor.local:9000` | TCP via arbor-proxy |
+| MinIO Console | 9001 | `minio-console.arbor.local` | HTTP via arbor-proxy |
+| pgAdmin | 5050 | `pgadmin.arbor.local` | HTTP via arbor-proxy |
+
+### Database Configuration
+
+- **Development Database**: `arbor_dev` (for local development)
+- **Test Database**: `arbor_test` (for running tests)
+- **Connection String**: `postgresql://arbor:local_dev_only@postgres.arbor.local:5432/{database_name}`
+- **Migration System**: Drizzle Kit with versioned migrations (see `docs/DATABASE_MIGRATIONS.md`)
+
+**CRITICAL**: Tests use a separate database (`arbor_test`) to prevent data loss. The `DATABASE_URL` environment variable is set to `arbor_test` in `vitest.config.ts`.
+
+### Proxy Architecture
+
+The `arbor-proxy` nginx container provides centralized routing for all services:
+
+**HTTP Services** (port 80):
+
+- Web App (`app.arbor.local`)
+- API Server (`api.arbor.local`)
+- MinIO Console (`minio-console.arbor.local`)
+- pgAdmin (`pgadmin.arbor.local`)
+
+**TCP Stream Services**:
+
+- PostgreSQL (port 5432)
+- Redis (port 6379)
+- MinIO API (port 9000)
+
+**Benefits**:
+
+- ✅ Consistent `*.arbor.local` domain pattern
+- ✅ Centralized port management
+- ✅ No scattered port mappings across compose files
+- ✅ Better service isolation
+
+### DNS Configuration
+
+All `*.arbor.local` domains are configured in `/etc/hosts`:
+
+```
+127.0.0.1 arbor.local app.arbor.local www.arbor.local admin.arbor.local api.arbor.local pgadmin.arbor.local db.arbor.local cache.arbor.local redis.arbor.local postgres.arbor.local minio.arbor.local minio-console.arbor.local
+```
 
 ---
 
@@ -266,25 +332,32 @@ type Query {
 ### Docker Configuration
 
 ```yaml
-# docker-compose.yml
+# apps/api/docker-compose.yml
 services:
   minio:
     image: minio/minio:latest
-    ports:
-      - "9000:9000" # API
-      - "9001:9001" # Console
+    container_name: arbor-minio
+    # Ports exposed via arbor-proxy (minio.arbor.local:9000, minio-console.arbor.local)
     environment:
       MINIO_ROOT_USER: arbor
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+      MINIO_ROOT_PASSWORD: local_dev_only
     volumes:
-      - ./data/minio:/data # Persistent local storage
+      - ../../data/minio:/data # Persistent local storage
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
+      interval: 2s
+      timeout: 3s
       retries: 3
+      start_period: 2s
+    restart: unless-stopped
 ```
+
+### Access URLs
+
+- **MinIO API**: `minio.arbor.local:9000` (via arbor-proxy)
+- **MinIO Console**: `http://minio-console.arbor.local` (via arbor-proxy HTTP)
+- **Credentials**: `arbor` / `local_dev_only`
 
 ### Bucket Structure
 
@@ -684,13 +757,13 @@ UI shows:
 
 - **Runtime:** Node.js 20+
 - **Language:** TypeScript 5.7+
-- **API:** Fastify 5.7+ (tRPC 11.9+, GraphQL via Pothos)
+- **API:** Fastify 5.7+ (tRPC 11.9+, GraphQL via Pothos + Apollo Server)
 - **Database:** PostgreSQL 16 + pgvector
 - **Cache:** Redis 7
-- **ORM:** Drizzle ORM 0.38+
+- **ORM:** Drizzle ORM 0.38+ with Drizzle Kit 0.30+ (migrations)
 - **Object Storage:** MinIO (S3-compatible)
-- **Background Jobs:** BullMQ
-- **Embeddings:** OpenAI API + local fallback
+- **Background Jobs:** BullMQ (planned)
+- **Embeddings:** OpenAI API + local fallback (planned)
 
 ### Frontend
 
@@ -698,20 +771,23 @@ UI shows:
 - **Language:** TypeScript 5.7+
 - **UI:** React 19.2+, Tailwind CSS 3.4+
 - **State:** TanStack Query (React Query)
-- **GraphQL Client:** Apollo Client or urql
-- **Editor:** TipTap (Phase 5)
+- **GraphQL Client:** Apollo Client (planned)
+- **Editor:** TipTap (Phase 1)
+- **Icons:** lucide-react
+- **Command Palette:** cmdk
 
 ### Desktop
 
-- **Framework:** Tauri v2.2+
-- **Security:** OS keychain, AES-256-GCM encryption
+- **Framework:** Tauri v2.2+ (de-emphasized, web-first approach)
+- **Security:** AES-256-GCM encryption with database-stored master key
 
 ### DevOps
 
-- **Containerization:** Docker Compose
-- **Reverse Proxy:** Traefik + nginx
+- **Containerization:** Docker Compose (3P services only: PostgreSQL, Redis, MinIO, pgAdmin)
+- **Reverse Proxy:** nginx (arbor-proxy container) for local development
 - **Testing:** Vitest 2.1+, Testing Library
 - **Package Manager:** pnpm 9.15+
+- **Databases:** Separate `arbor_dev` and `arbor_test` databases
 
 ---
 
@@ -746,6 +822,7 @@ UI shows:
 - AES-256-GCM encryption with random IV per encrypted value
 - Master key is base64-encoded for storage
 - **Note:** Master key stored unencrypted in database (local-first, single-user assumption)
+- **Architecture Decision:** Abandoned OS keychain approach due to Tauri dependency issues; using simpler database-stored master key
 
 ### API Authentication
 
