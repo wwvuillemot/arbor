@@ -27,7 +27,7 @@ function useConfiguration() {
   React.useEffect(() => {
     // Placeholder: Load from API
     setConfig({
-      DATABASE_URL: "postgres://arbor:arbor@localhost:5432/arbor",
+      DATABASE_URL: "postgres://arbor:local_dev_only@localhost:5432/arbor_dev",
       REDIS_URL: "redis://localhost:6379",
       API_URL: "http://localhost:3001",
       OLLAMA_BASE_URL: "http://localhost:11434",
@@ -44,7 +44,7 @@ function useConfiguration() {
     // TODO: Reset via tRPC
     // For now, just reset to default
     const defaults = {
-      DATABASE_URL: "postgres://arbor:arbor@localhost:5432/arbor",
+      DATABASE_URL: "postgres://arbor:local_dev_only@localhost:5432/arbor_dev",
       REDIS_URL: "redis://localhost:6379",
       API_URL: "http://localhost:3001",
       OLLAMA_BASE_URL: "http://localhost:11434",
@@ -241,7 +241,7 @@ export default function ConfigurationPage() {
                   <div className="flex-1 font-mono text-sm bg-muted p-3 rounded border">
                     {showMasterKey
                       ? masterKeyData?.masterKey ||
-                        t("encryption.masterKey.notGenerated")
+                      t("encryption.masterKey.notGenerated")
                       : "••••••••••••••••••••••••••••••••••••••••••"}
                   </div>
                   <button

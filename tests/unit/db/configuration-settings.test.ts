@@ -76,7 +76,7 @@ describe("Configuration Settings Schema", () => {
     await db.insert(userPreferences).values([
       {
         key: "config.database_url",
-        value: "postgres://arbor:arbor@localhost:5432/arbor",
+        value: "postgres://arbor:local_dev_only@localhost:5432/arbor_dev",
       },
       { key: "config.redis_url", value: "redis://localhost:6379" },
       { key: "config.api_url", value: "http://localhost:3001" },

@@ -8,9 +8,9 @@
 export const DEFAULT_CONFIG = {
   /**
    * PostgreSQL database connection URL
-   * Default: Local PostgreSQL instance with arbor user and database
+   * Default: Local PostgreSQL instance with arbor user and arbor_dev database
    */
-  DATABASE_URL: "postgres://arbor:arbor@localhost:5432/arbor",
+  DATABASE_URL: "postgres://arbor:local_dev_only@localhost:5432/arbor_dev",
 
   /**
    * Redis connection URL

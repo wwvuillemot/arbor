@@ -190,7 +190,7 @@ if [ ! -f .env.local ]; then
     echo -e "${YELLOW}Creating .env.local file...${NC}"
     cat > .env.local << EOF
 # Database (via Traefik proxy)
-DATABASE_URL=postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor
+DATABASE_URL=postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor_dev
 
 # Redis (via Traefik proxy)
 REDIS_URL=redis://redis.arbor.local:6379

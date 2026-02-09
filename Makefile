@@ -174,7 +174,7 @@ health:
 	@curl -s -o /dev/null -w "" http://pgadmin.arbor.local 2>/dev/null && echo "  ✅ pgAdmin: http://pgadmin.arbor.local (HTTP 200)" || echo "  ⚠️  pgAdmin: Not accessible via Traefik"
 	@echo ""
 	@echo "Database Schema:"
-	@docker exec arbor-postgres psql -U arbor -d arbor -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'nodes';" 2>/dev/null | grep -q "1" && echo "  ✅ Migrations applied (nodes table exists)" || echo "  ⚠️  Migrations not applied yet (run: make db-migrate)"
+	@docker exec arbor-postgres psql -U arbor -d arbor_dev -c "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'nodes';" 2>/dev/null | grep -q "1" && echo "  ✅ Migrations applied (nodes table exists)" || echo "  ⚠️  Migrations not applied yet (run: make db-migrate)"
 	@echo ""
 	@echo "Quick Access:"
 	@echo "  Web App:             http://app.arbor.local"

@@ -21,7 +21,7 @@ import * as path from "path";
 async function runMigrations() {
   const connectionString =
     process.env.DATABASE_URL ||
-    "postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor";
+    "postgresql://arbor:local_dev_only@postgres.arbor.local:5432/arbor_dev";
 
   console.log("🔄 Running database migrations...");
   console.log(
