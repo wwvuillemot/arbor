@@ -291,6 +291,13 @@
     "deleteSuccess": "Deleted successfully.",
     "moveSuccess": "Moved successfully.",
     "moveError": "Failed to move item.",
+    "export": "Export",
+    "exportMarkdown": "Export as Markdown",
+    "exportPdf": "Export as PDF",
+    "exportProject": "Export Project as Markdown",
+    "exportProjectPdf": "Export Project as PDF",
+    "exportSuccess": "Exported successfully.",
+    "exportError": "Failed to export.",
     "untitled": "Untitled",
     "emptyProject": "This project is empty. Create a folder or note to get started.",
     "createFolder": {

@@ -2,7 +2,15 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Plus, FolderTree, Pencil, Trash2, X, Check } from "lucide-react";
+import {
+  Plus,
+  FolderTree,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  Download,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { useCurrentProject } from "@/hooks/use-current-project";
@@ -73,6 +81,8 @@ export default function ProjectsPage() {
   const tEditor = useTranslations("editor");
   const editorInstanceRef = React.useRef<Editor | null>(null);
   const [showImageUpload, setShowImageUpload] = React.useState(false);
+  const [showExportMenu, setShowExportMenu] = React.useState(false);
+  const exportMenuRef = React.useRef<HTMLDivElement>(null);
 
   // Inline title editing state
   const [isTitleEditing, setIsTitleEditing] = React.useState(false);
@@ -305,6 +315,69 @@ export default function ProjectsPage() {
     [addToast],
   );
 
+  // Close export menu on outside click
+  React.useEffect(() => {
+    if (!showExportMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        exportMenuRef.current &&
+        !exportMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showExportMenu]);
+
+  // Export handlers
+  const handleExportMarkdown = React.useCallback(
+    async (includeDescendants: boolean) => {
+      if (!selectedNodeId) return;
+      try {
+        const result = await utils.nodes.exportMarkdown.fetch({
+          id: selectedNodeId,
+          includeDescendants,
+        });
+        const blob = new Blob([result.content], { type: "text/markdown" });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `${selectedNodeQuery.data?.name || "export"}.md`;
+        anchor.click();
+        URL.revokeObjectURL(url);
+        addToast(tFileTree("exportSuccess"), "success");
+      } catch {
+        addToast(tFileTree("exportError"), "error");
+      }
+      setShowExportMenu(false);
+    },
+    [selectedNodeId, selectedNodeQuery.data?.name, utils, addToast, tFileTree],
+  );
+
+  const handleExportPdf = React.useCallback(
+    async (includeDescendants: boolean) => {
+      if (!selectedNodeId) return;
+      try {
+        const result = await utils.nodes.exportHtml.fetch({
+          id: selectedNodeId,
+          includeDescendants,
+        });
+        const printWindow = window.open("", "_blank");
+        if (printWindow) {
+          printWindow.document.write(result.content);
+          printWindow.document.close();
+          printWindow.print();
+        }
+        addToast(tFileTree("exportSuccess"), "success");
+      } catch {
+        addToast(tFileTree("exportError"), "error");
+      }
+      setShowExportMenu(false);
+    },
+    [selectedNodeId, utils, addToast, tFileTree],
+  );
+
   // Auto-save for editor content
   const handleAutoSave = React.useCallback(
     async (nodeId: string, content: Record<string, unknown>) => {
@@ -533,6 +606,53 @@ export default function ProjectsPage() {
                   <span className="text-xs text-muted-foreground px-2 py-1 rounded bg-muted">
                     {tFileTree(`nodeTypes.${selectedNodeQuery.data.type}`)}
                   </span>
+                  <div className="relative" ref={exportMenuRef}>
+                    <button
+                      onClick={() => setShowExportMenu((prev) => !prev)}
+                      className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+                      title={tFileTree("export")}
+                      aria-label={tFileTree("export")}
+                      data-testid="content-export-button"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                    {showExportMenu && (
+                      <div
+                        className="absolute right-0 top-full mt-1 w-56 rounded-md border bg-popover text-popover-foreground shadow-md z-50"
+                        data-testid="export-menu"
+                      >
+                        <button
+                          onClick={() => handleExportMarkdown(false)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors rounded-t-md"
+                          data-testid="export-markdown"
+                        >
+                          {tFileTree("exportMarkdown")}
+                        </button>
+                        <button
+                          onClick={() => handleExportMarkdown(true)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                          data-testid="export-project-markdown"
+                        >
+                          {tFileTree("exportProject")}
+                        </button>
+                        <hr className="border-border" />
+                        <button
+                          onClick={() => handleExportPdf(false)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                          data-testid="export-pdf"
+                        >
+                          {tFileTree("exportPdf")}
+                        </button>
+                        <button
+                          onClick={() => handleExportPdf(true)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors rounded-b-md"
+                          data-testid="export-project-pdf"
+                        >
+                          {tFileTree("exportProjectPdf")}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={() =>
                       setNodeDeleteConfirm({

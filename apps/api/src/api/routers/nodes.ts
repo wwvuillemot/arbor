@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { NodeService } from "../../services/node-service";
+import { ExportService } from "../../services/export-service";
 
 const nodeService = new NodeService();
+const exportService = new ExportService();
 
 // Zod schemas for validation
 const nodeTypeSchema = z.enum([
@@ -158,5 +160,37 @@ export const nodesRouter = router({
     )
     .query(async ({ input }) => {
       return await nodeService.getDescendants(input.id, input.maxDepth);
+    }),
+
+  // Export a node or project as Markdown
+  exportMarkdown: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        includeDescendants: z.boolean().default(false),
+      }),
+    )
+    .query(async ({ input }) => {
+      if (input.includeDescendants) {
+        return {
+          content: await exportService.exportProjectAsMarkdown(input.id),
+        };
+      }
+      return { content: await exportService.exportNodeAsMarkdown(input.id) };
+    }),
+
+  // Export a node or project as HTML (for PDF printing)
+  exportHtml: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        includeDescendants: z.boolean().default(false),
+      }),
+    )
+    .query(async ({ input }) => {
+      if (input.includeDescendants) {
+        return { content: await exportService.exportProjectAsHtml(input.id) };
+      }
+      return { content: await exportService.exportNodeAsHtml(input.id) };
     }),
 });

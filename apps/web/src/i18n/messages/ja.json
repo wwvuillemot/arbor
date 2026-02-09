@@ -291,6 +291,13 @@
     "deleteSuccess": "正常に削除されました。",
     "moveSuccess": "正常に移動しました。",
     "moveError": "アイテムの移動に失敗しました。",
+    "export": "エクスポート",
+    "exportMarkdown": "Markdownとしてエクスポート",
+    "exportPdf": "PDFとしてエクスポート",
+    "exportProject": "プロジェクトをMarkdownとしてエクスポート",
+    "exportProjectPdf": "プロジェクトをPDFとしてエクスポート",
+    "exportSuccess": "正常にエクスポートされました。",
+    "exportError": "エクスポートに失敗しました。",
     "untitled": "無題",
     "emptyProject": "このプロジェクトは空です。フォルダまたはノートを作成して始めましょう。",
     "createFolder": {
