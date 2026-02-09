@@ -131,6 +131,29 @@ NodeType.implement({
         return current.type === "project" ? current : null;
       },
     }),
+    ancestors: t.field({
+      type: [NodeType],
+      resolve: async (node) => {
+        const ancestors: DbNode[] = [];
+        let current = node;
+        while (current.parentId) {
+          const parent = await nodeService.getNodeById(current.parentId);
+          if (!parent) break;
+          ancestors.push(parent);
+          current = parent;
+        }
+        return ancestors;
+      },
+    }),
+    descendants: t.field({
+      type: [NodeType],
+      args: {
+        maxDepth: t.arg.int(),
+      },
+      resolve: async (node, args) => {
+        return getAllDescendants(node.id, args.maxDepth ?? undefined);
+      },
+    }),
   }),
 });
 

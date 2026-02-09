@@ -53,7 +53,7 @@ describe("GraphQL Schema", () => {
       const result = await graphql({
         schema,
         source: query,
-        variableValues: { id: "non-existent-id" },
+        variableValues: { id: "00000000-0000-0000-0000-000000000000" }, // Valid UUID that doesn't exist
       });
 
       expect(result.errors).toBeUndefined();
