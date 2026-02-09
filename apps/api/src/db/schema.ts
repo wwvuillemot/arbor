@@ -8,6 +8,7 @@ import {
   bigint,
   timestamp,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -267,3 +268,89 @@ export const mediaAttachments = pgTable(
 // Type inference for TypeScript
 export type MediaAttachment = typeof mediaAttachments.$inferSelect;
 export type NewMediaAttachment = typeof mediaAttachments.$inferInsert;
+
+/**
+ * Tags Table
+ *
+ * Stores tag definitions with name, color, icon, and type.
+ * Tags can be of different types (general, character, location, event, concept)
+ * to support rich entity tagging in writing projects.
+ */
+export const tagTypeEnum = [
+  "general",
+  "character",
+  "location",
+  "event",
+  "concept",
+] as const;
+export type TagType = (typeof tagTypeEnum)[number];
+
+export const tags = pgTable(
+  "tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Tag display name (e.g., "protagonist", "magic system", "New York")
+    name: varchar("name", { length: 255 }).notNull(),
+
+    // Hex color for visual display (e.g., "#3b82f6")
+    color: varchar("color", { length: 7 }),
+
+    // Icon name from Lucide icons (e.g., "user", "map-pin", "sword")
+    icon: varchar("icon", { length: 50 }),
+
+    // Tag type for categorization
+    type: varchar("type", { length: 50 }).default("general").notNull(),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Index for searching tags by name
+    nameIdx: index("idx_tags_name").on(table.name),
+    // Index for filtering tags by type
+    typeIdx: index("idx_tags_type").on(table.type),
+  }),
+);
+
+// Type inference for TypeScript
+export type Tag = typeof tags.$inferSelect;
+export type NewTag = typeof tags.$inferInsert;
+
+/**
+ * Node Tags Junction Table
+ *
+ * Many-to-many relationship between nodes and tags.
+ * Allows assigning multiple tags to any node and querying
+ * nodes by their tags.
+ */
+export const nodeTags = pgTable(
+  "node_tags",
+  {
+    // The node being tagged
+    nodeId: uuid("node_id")
+      .references(() => nodes.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // The tag being assigned
+    tagId: uuid("tag_id")
+      .references(() => tags.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // When the tag was assigned to this node
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Composite primary key (each node-tag pair is unique)
+    pk: primaryKey({ columns: [table.nodeId, table.tagId] }),
+    // Index for finding all tags for a node
+    nodeIdIdx: index("idx_node_tags_node").on(table.nodeId),
+    // Index for finding all nodes with a tag
+    tagIdIdx: index("idx_node_tags_tag").on(table.tagId),
+  }),
+);
+
+// Type inference for TypeScript
+export type NodeTag = typeof nodeTags.$inferSelect;
+export type NewNodeTag = typeof nodeTags.$inferInsert;
