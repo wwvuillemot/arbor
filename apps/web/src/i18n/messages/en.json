@@ -209,7 +209,25 @@
   },
   "search": {
     "title": "Search",
-    "description": "Search across all your notes, projects, and content."
+    "description": "Search across all your notes, projects, and content.",
+    "placeholder": "Search your content...",
+    "clear": "Clear search",
+    "mode": {
+      "hybrid": "Hybrid",
+      "vector": "Semantic",
+      "keyword": "Keyword"
+    },
+    "sort": {
+      "relevance": "Relevance",
+      "date": "Date",
+      "name": "Name"
+    },
+    "filters": "Filters",
+    "filterNodeType": "Node Type",
+    "searching": "Searching...",
+    "noResults": "No results found",
+    "prompt": "Enter a search query to find content",
+    "resultCount": "{count} results"
   },
   "projects": {
     "title": "Projects",

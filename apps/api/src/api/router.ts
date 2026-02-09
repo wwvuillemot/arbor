@@ -7,6 +7,8 @@ import { setupRouter } from "./routers/setup";
 import { systemRouter } from "./routers/system";
 import { mediaRouter } from "./routers/media";
 import { tagsRouter } from "./routers/tags";
+import { searchRouter } from "./routers/search";
+import { ragRouter } from "./routers/rag";
 
 /**
  * Main application router
@@ -21,6 +23,8 @@ export const appRouter = router({
   system: systemRouter,
   media: mediaRouter,
   tags: tagsRouter,
+  search: searchRouter,
+  rag: ragRouter,
 
   // Health check endpoint
   health: publicProcedure.query(() => ({

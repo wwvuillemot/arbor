@@ -9,12 +9,17 @@ import {
   timestamp,
   index,
   primaryKey,
+  vector,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-// TODO: Add vector embedding column after initial schema is pushed
-// The customType approach doesn't work with drizzle-kit v0.20.18
-// We'll add this via raw SQL migration or upgrade drizzle-orm later
+// Vector embedding dimensions for different models:
+// - OpenAI text-embedding-3-small: 1536
+// - OpenAI text-embedding-3-large: 3072
+// - Cohere embed-english-v3.0: 1024
+// - all-MiniLM-L6-v2 (local): 384
+// Default: 1536 (OpenAI text-embedding-3-small)
+export const EMBEDDING_DIMENSIONS = 1536;
 
 /**
  * Node Types Hierarchy:
@@ -105,8 +110,10 @@ export const nodes = pgTable(
     // Keeping for backward compatibility, will remove in future migration
     authorType: varchar("author_type", { length: 20 }).default("human"),
 
-    // TODO: Add vector embedding column via migration
-    // embedding: vector('embedding'),
+    // Vector embedding for semantic search (pgvector)
+    // Dimensions: 1536 (OpenAI text-embedding-3-small default)
+    // Nullable: not all nodes need embeddings (e.g., folders, projects)
+    embedding: vector("embedding", { dimensions: EMBEDDING_DIMENSIONS }),
 
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -121,7 +128,12 @@ export const nodes = pgTable(
     typeIdx: index("idx_nodes_type").on(table.type),
     slugIdx: index("idx_nodes_slug").on(table.slug),
     deletedAtIdx: index("idx_nodes_deleted_at").on(table.deletedAt),
-    // Note: GIN and IVFFlat indexes for metadata and embedding will be created via raw SQL migration
+    // HNSW index for fast approximate nearest neighbor search on embeddings
+    // HNSW is preferred over IVFFlat for better recall and no need for training
+    embeddingIdx: index("idx_nodes_embedding").using(
+      "hnsw",
+      table.embedding.op("vector_cosine_ops"),
+    ),
   }),
 );
 

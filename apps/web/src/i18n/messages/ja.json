@@ -209,7 +209,25 @@
   },
   "search": {
     "title": "検索",
-    "description": "すべてのノート、プロジェクト、コンテンツを検索します。"
+    "description": "すべてのノート、プロジェクト、コンテンツを検索します。",
+    "placeholder": "コンテンツを検索...",
+    "clear": "検索をクリア",
+    "mode": {
+      "hybrid": "ハイブリッド",
+      "vector": "セマンティック",
+      "keyword": "キーワード"
+    },
+    "sort": {
+      "relevance": "関連度",
+      "date": "日付",
+      "name": "名前"
+    },
+    "filters": "フィルター",
+    "filterNodeType": "ノードタイプ",
+    "searching": "検索中...",
+    "noResults": "結果が見つかりません",
+    "prompt": "検索クエリを入力してコンテンツを見つけます",
+    "resultCount": "{count} 件の結果"
   },
   "projects": {
     "title": "プロジェクト",

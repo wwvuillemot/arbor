@@ -29,6 +29,13 @@
       "when": 1770660643109,
       "tag": "0003_grey_wolverine",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1770666084250,
+      "tag": "0004_blue_demogoblin",
+      "breakpoints": true
     }
   ]
 }
