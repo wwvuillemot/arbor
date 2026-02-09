@@ -70,6 +70,11 @@ export default function ProjectsPage() {
   > | null>(null);
   const tEditor = useTranslations("editor");
 
+  // Inline title editing state
+  const [isTitleEditing, setIsTitleEditing] = React.useState(false);
+  const [titleEditValue, setTitleEditValue] = React.useState("");
+  const titleInputRef = React.useRef<HTMLInputElement>(null);
+
   // Queries
   const projectsQuery = trpc.nodes.getAllProjects.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -247,6 +252,35 @@ export default function ProjectsPage() {
     }
   }, [selectedNodeQuery.data]);
 
+  // Reset title editing when selected node changes
+  React.useEffect(() => {
+    setIsTitleEditing(false);
+  }, [selectedNodeId]);
+
+  // Focus title input when entering edit mode
+  React.useEffect(() => {
+    if (isTitleEditing && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isTitleEditing]);
+
+  const handleTitleSave = React.useCallback(() => {
+    const trimmed = titleEditValue.trim();
+    if (trimmed && trimmed !== selectedNodeQuery.data?.name && selectedNodeId) {
+      nodeUpdateMutation.mutate({
+        id: selectedNodeId,
+        data: { name: trimmed },
+      });
+    }
+    setIsTitleEditing(false);
+  }, [
+    titleEditValue,
+    selectedNodeQuery.data?.name,
+    selectedNodeId,
+    nodeUpdateMutation,
+  ]);
+
   // Node handlers
   const handleNodeCreate = (
     name: string,
@@ -353,6 +387,7 @@ export default function ProjectsPage() {
             onCreateNote={(parentId) =>
               setNodeCreateDialog({ open: true, type: "note", parentId })
             }
+            onRenameNode={handleNodeRename}
             className="flex-1"
           />
         </div>
@@ -362,9 +397,37 @@ export default function ProjectsPage() {
           {selectedNodeQuery.data ? (
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h1 className="text-2xl font-bold">
-                  {selectedNodeQuery.data.name}
-                </h1>
+                {isTitleEditing ? (
+                  <input
+                    ref={titleInputRef}
+                    value={titleEditValue}
+                    onChange={(e) => setTitleEditValue(e.target.value)}
+                    onBlur={handleTitleSave}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleTitleSave();
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setIsTitleEditing(false);
+                      }
+                    }}
+                    className="text-2xl font-bold bg-transparent outline-none border-b-2 border-accent w-full"
+                    data-testid="title-inline-edit"
+                  />
+                ) : (
+                  <h1
+                    className="text-2xl font-bold cursor-pointer"
+                    onDoubleClick={() => {
+                      setTitleEditValue(selectedNodeQuery.data?.name || "");
+                      setIsTitleEditing(true);
+                    }}
+                    data-testid="content-title"
+                  >
+                    {selectedNodeQuery.data.name}
+                  </h1>
+                )}
                 <div className="flex items-center gap-2">
                   {selectedNodeQuery.data.type === "note" && (
                     <span
@@ -388,6 +451,20 @@ export default function ProjectsPage() {
                   <span className="text-xs text-muted-foreground px-2 py-1 rounded bg-muted">
                     {tFileTree(`nodeTypes.${selectedNodeQuery.data.type}`)}
                   </span>
+                  <button
+                    onClick={() =>
+                      setNodeDeleteConfirm({
+                        open: true,
+                        node: selectedNodeQuery.data as TreeNode,
+                      })
+                    }
+                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                    title={tCommon("delete")}
+                    aria-label={tCommon("delete")}
+                    data-testid="content-delete-button"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
               {selectedNodeQuery.data.type === "note" ? (

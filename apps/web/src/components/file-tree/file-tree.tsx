@@ -14,6 +14,7 @@ export interface FileTreeProps {
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
   onCreateFolder: (parentId: string) => void;
   onCreateNote: (parentId: string) => void;
+  onRenameNode?: (nodeId: string, newName: string) => void;
   className?: string;
 }
 
@@ -32,6 +33,7 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
       onContextMenu,
       onCreateFolder,
       onCreateNote,
+      onRenameNode,
       className,
     },
     ref,
@@ -132,6 +134,7 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
             onToggle={toggleNode}
             onSelect={onSelectNode}
             onContextMenu={onContextMenu}
+            onRename={onRenameNode}
             emptyMessage={t("emptyProject")}
           />
         </div>
@@ -149,6 +152,7 @@ function ChildrenList({
   onToggle,
   onSelect,
   onContextMenu,
+  onRename,
   emptyMessage,
 }: {
   parentId: string;
@@ -158,6 +162,7 @@ function ChildrenList({
   onToggle: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
+  onRename?: (nodeId: string, newName: string) => void;
   emptyMessage?: string;
 }) {
   const childrenQuery = trpc.nodes.getChildren.useQuery(
@@ -200,6 +205,7 @@ function ChildrenList({
           onToggle={onToggle}
           onSelect={onSelect}
           onContextMenu={onContextMenu}
+          onRename={onRename}
           renderChildren={(childParentId, childDepth) => (
             <ChildrenList
               parentId={childParentId}
@@ -209,6 +215,7 @@ function ChildrenList({
               onToggle={onToggle}
               onSelect={onSelect}
               onContextMenu={onContextMenu}
+              onRename={onRename}
             />
           )}
         />

@@ -169,6 +169,110 @@ describe("FileTreeNode", () => {
     const treeitem = screen.getByRole("treeitem");
     expect(treeitem.style.paddingLeft).toBe("56px"); // 3 * 16 + 8
   });
+
+  // Inline editing tests
+  it("should enter edit mode on double-click when onRename is provided", () => {
+    const onRename = vi.fn();
+    render(<FileTreeNode {...defaultProps} onRename={onRename} />);
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    expect(screen.getByTestId("tree-node-edit-node-1")).toBeInTheDocument();
+  });
+
+  it("should not enter edit mode on double-click when onRename is not provided", () => {
+    render(<FileTreeNode {...defaultProps} />);
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    expect(
+      screen.queryByTestId("tree-node-edit-node-1"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should populate edit input with current node name", () => {
+    const onRename = vi.fn();
+    render(<FileTreeNode {...defaultProps} onRename={onRename} />);
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    const input = screen.getByTestId(
+      "tree-node-edit-node-1",
+    ) as HTMLInputElement;
+    expect(input.value).toBe("Test Node");
+  });
+
+  it("should call onRename and exit edit mode on Enter", () => {
+    const onRename = vi.fn();
+    render(<FileTreeNode {...defaultProps} onRename={onRename} />);
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    const input = screen.getByTestId("tree-node-edit-node-1");
+    fireEvent.change(input, { target: { value: "Renamed Node" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onRename).toHaveBeenCalledWith("node-1", "Renamed Node");
+    expect(
+      screen.queryByTestId("tree-node-edit-node-1"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should cancel editing on Escape without calling onRename", () => {
+    const onRename = vi.fn();
+    render(<FileTreeNode {...defaultProps} onRename={onRename} />);
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    const input = screen.getByTestId("tree-node-edit-node-1");
+    fireEvent.change(input, { target: { value: "Something Else" } });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(onRename).not.toHaveBeenCalled();
+    expect(
+      screen.queryByTestId("tree-node-edit-node-1"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Test Node")).toBeInTheDocument();
+  });
+
+  it("should save on blur", () => {
+    const onRename = vi.fn();
+    render(<FileTreeNode {...defaultProps} onRename={onRename} />);
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    const input = screen.getByTestId("tree-node-edit-node-1");
+    fireEvent.change(input, { target: { value: "Blur Rename" } });
+    fireEvent.blur(input);
+    expect(onRename).toHaveBeenCalledWith("node-1", "Blur Rename");
+  });
+
+  it("should not call onRename if name is unchanged", () => {
+    const onRename = vi.fn();
+    render(<FileTreeNode {...defaultProps} onRename={onRename} />);
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    const input = screen.getByTestId("tree-node-edit-node-1");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it("should not call onRename if name is empty", () => {
+    const onRename = vi.fn();
+    render(<FileTreeNode {...defaultProps} onRename={onRename} />);
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    const input = screen.getByTestId("tree-node-edit-node-1");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it("should not toggle or select when clicking during edit mode", () => {
+    const onRename = vi.fn();
+    const onToggle = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <FileTreeNode
+        {...defaultProps}
+        onRename={onRename}
+        onToggle={onToggle}
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    // Clear mocks from the initial interactions
+    onToggle.mockClear();
+    onSelect.mockClear();
+    // Click the treeitem while in edit mode
+    fireEvent.click(screen.getByRole("treeitem"));
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });
 
 describe("CreateNodeDialog", () => {

@@ -35,6 +35,7 @@ export interface FileTreeNodeProps {
   onToggle: (nodeId: string) => void;
   onSelect: (nodeId: string) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
+  onRename?: (nodeId: string, newName: string) => void;
   renderChildren?: (parentId: string, depth: number) => React.ReactNode;
 }
 
@@ -66,13 +67,58 @@ export function FileTreeNode({
   onToggle,
   onSelect,
   onContextMenu,
+  onRename,
   renderChildren,
 }: FileTreeNodeProps) {
   const isExpandable = expandableTypes.has(node.type);
   const Icon = getNodeIcon(node.type, isExpanded);
 
+  // Inline editing state
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editValue, setEditValue] = React.useState(node.name);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Focus input when entering edit mode
+  React.useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== node.name && onRename) {
+      onRename(node.id, trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSave();
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      setEditValue(node.name);
+      setIsEditing(false);
+    }
+    // Stop propagation so tree navigation keys don't fire
+    e.stopPropagation();
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onRename) {
+      setEditValue(node.name);
+      setIsEditing(true);
+    }
+  };
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isEditing) return; // Don't toggle/select while editing
     if (isExpandable) {
       onToggle(node.id);
     }
@@ -143,7 +189,21 @@ export function FileTreeNode({
         />
 
         {/* Node name */}
-        <span className="truncate flex-1">{node.name}</span>
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleEditKeyDown}
+            className="truncate flex-1 bg-transparent outline-none border-b border-accent text-sm"
+            data-testid={`tree-node-edit-${node.id}`}
+          />
+        ) : (
+          <span className="truncate flex-1" onDoubleClick={handleDoubleClick}>
+            {node.name}
+          </span>
+        )}
       </div>
 
       {/* Children */}

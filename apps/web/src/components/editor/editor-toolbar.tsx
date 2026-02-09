@@ -45,10 +45,11 @@ function ToolbarButton({
       onClick={onClick}
       disabled={disabled}
       title={title}
-      className={`p-1.5 rounded transition-colors ${isActive
-        ? "bg-accent text-accent-foreground"
-        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-        } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+      className={`p-1.5 rounded transition-colors ${
+        isActive
+          ? "bg-accent text-accent-foreground"
+          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
     >
       {children}
     </button>
