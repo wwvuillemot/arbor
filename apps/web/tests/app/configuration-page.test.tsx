@@ -1,30 +1,45 @@
 import * as React from "react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import messages from "@/i18n/messages/en.json";
 import ConfigurationPage from "@/app/[locale]/(app)/settings/configuration/page";
+import { trpc, getTRPCClient } from "@/lib/trpc";
 
-// Helper to render with intl
-function renderWithIntl(component: React.ReactElement) {
+// Helper to render with intl and tRPC
+function renderWithProviders(component: React.ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  });
+  const trpcClient = getTRPCClient();
+
   return render(
-    <NextIntlClientProvider locale="en" messages={messages}>
-      {component}
-    </NextIntlClientProvider>,
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <NextIntlClientProvider locale="en" messages={messages}>
+          {component}
+        </NextIntlClientProvider>
+      </QueryClientProvider>
+    </trpc.Provider>,
   );
 }
 
 describe("Configuration Page", () => {
   it("should render the configuration page without errors", () => {
     // This test verifies the component renders without import errors or crashes
-    const { container } = renderWithIntl(<ConfigurationPage />);
+    const { container } = renderWithProviders(<ConfigurationPage />);
     expect(container).toBeTruthy();
     // Verify the component structure exists
     expect(container.querySelector('input[type="text"]')).toBeInTheDocument();
   });
 
   it("should display configuration input fields", () => {
-    const { container } = renderWithIntl(<ConfigurationPage />);
+    const { container } = renderWithProviders(<ConfigurationPage />);
     // Verify we have 4 input fields (DATABASE_URL, REDIS_URL, API_URL, OLLAMA_BASE_URL)
     const inputs = container.querySelectorAll('input[type="text"]');
     expect(inputs).toHaveLength(4);
