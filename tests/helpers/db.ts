@@ -33,14 +33,20 @@ export function getTestDb() {
 export async function resetTestDb() {
   const db = getTestDb();
 
-  // Delete all data from tables
-  await db.delete(schema.nodes);
-
-  // Only delete from user_preferences if it exists
+  // Delete all data from tables using TRUNCATE for better performance and to reset sequences
+  // TRUNCATE is faster than DELETE and resets auto-increment sequences
+  // CASCADE ensures that dependent rows in other tables are also deleted
   try {
-    await db.delete(schema.userPreferences);
+    await db.execute(sql`TRUNCATE TABLE nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`);
   } catch (error) {
-    // Table doesn't exist yet, ignore
+    // If TRUNCATE fails (e.g., tables don't exist yet), fall back to DELETE
+    try {
+      await db.delete(schema.nodes);
+      await db.delete(schema.userPreferences);
+      await db.delete(schema.appSettings);
+    } catch (deleteError) {
+      // Tables don't exist yet, ignore
+    }
   }
 }
 

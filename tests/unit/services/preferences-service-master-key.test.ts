@@ -8,9 +8,7 @@ describe("PreferencesService - Master Key Management", () => {
   const db = getTestDb();
 
   beforeEach(async () => {
-    await resetTestDb();
-    // Clean up user_preferences table
-    await db.delete(userPreferences);
+    // resetTestDb() is already called by the global beforeEach hook in tests/setup.ts
     preferencesService = new PreferencesService();
   });
 
