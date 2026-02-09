@@ -112,7 +112,7 @@ export function FileTreeNode({
           "hover:bg-accent hover:text-accent-foreground",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           "transition-colors",
-          isSelected && "bg-accent text-accent-foreground font-medium",
+          isSelected && "text-accent-foreground font-medium",
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}

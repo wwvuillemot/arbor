@@ -1,4 +1,4 @@
-export { FileTree } from "./file-tree";
+export { FileTree, type FileTreeHandle } from "./file-tree";
 export {
   FileTreeNode,
   type TreeNode,

@@ -251,6 +251,27 @@
     "deleteSuccess": "Project deleted successfully",
     "deleteError": "Failed to delete project"
   },
+  "editor": {
+    "toolbar": "Editor toolbar",
+    "undo": "Undo",
+    "redo": "Redo",
+    "heading1": "Heading 1",
+    "heading2": "Heading 2",
+    "heading3": "Heading 3",
+    "bold": "Bold",
+    "italic": "Italic",
+    "strikethrough": "Strikethrough",
+    "code": "Code",
+    "bulletList": "Bullet list",
+    "orderedList": "Numbered list",
+    "blockquote": "Quote",
+    "horizontalRule": "Horizontal rule",
+    "clearFormatting": "Clear formatting",
+    "placeholder": "Start writing...",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "saveFailed": "Save failed"
+  },
   "fileTree": {
     "newFolder": "New Folder",
     "newNote": "New Note",
@@ -258,6 +279,7 @@
     "delete": "Delete",
     "confirmDelete": "Are you sure you want to delete \"{name}\"? This cannot be undone.",
     "confirmDeleteWithChildren": "Are you sure you want to delete \"{name}\" and all its contents? This cannot be undone.",
+    "deleteSuccess": "Deleted successfully.",
     "untitled": "Untitled",
     "emptyProject": "This project is empty. Create a folder or note to get started.",
     "createFolder": {

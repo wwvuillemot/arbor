@@ -251,6 +251,27 @@
     "deleteSuccess": "プロジェクトを削除しました",
     "deleteError": "プロジェクトの削除に失敗しました"
   },
+  "editor": {
+    "toolbar": "エディターツールバー",
+    "undo": "元に戻す",
+    "redo": "やり直し",
+    "heading1": "見出し1",
+    "heading2": "見出し2",
+    "heading3": "見出し3",
+    "bold": "太字",
+    "italic": "斜体",
+    "strikethrough": "取り消し線",
+    "code": "コード",
+    "bulletList": "箇条書きリスト",
+    "orderedList": "番号付きリスト",
+    "blockquote": "引用",
+    "horizontalRule": "水平線",
+    "clearFormatting": "書式をクリア",
+    "placeholder": "書き始める...",
+    "saving": "保存中...",
+    "saved": "保存済み",
+    "saveFailed": "保存に失敗しました"
+  },
   "fileTree": {
     "newFolder": "新しいフォルダ",
     "newNote": "新しいノート",
@@ -258,6 +279,7 @@
     "delete": "削除",
     "confirmDelete": "「{name}」を削除してもよろしいですか？この操作は元に戻せません。",
     "confirmDeleteWithChildren": "「{name}」とそのすべての内容を削除してもよろしいですか？この操作は元に戻せません。",
+    "deleteSuccess": "正常に削除されました。",
     "untitled": "無題",
     "emptyProject": "このプロジェクトは空です。フォルダまたはノートを作成して始めましょう。",
     "createFolder": {

@@ -6,15 +6,18 @@ import { Plus, FolderTree, Pencil, Trash2, X, Check } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { useCurrentProject } from "@/hooks/use-current-project";
+import { useAutoSave, type AutoSaveStatus } from "@/hooks/use-auto-save";
 import { useToast } from "@/contexts/toast-context";
 import {
   FileTree,
+  type FileTreeHandle,
   CreateNodeDialog,
   RenameDialog,
   NodeContextMenu,
   type TreeNode,
   type ContextMenuAction,
 } from "@/components/file-tree";
+import { TiptapEditor } from "@/components/editor";
 
 export default function ProjectsPage() {
   const utils = trpc.useUtils();
@@ -36,6 +39,7 @@ export default function ProjectsPage() {
   const { currentProjectId, setCurrentProject } = useCurrentProject();
 
   // File tree state
+  const fileTreeRef = React.useRef<FileTreeHandle>(null);
   const [selectedNodeId, setSelectedNodeId] = React.useState<string | null>(
     null,
   );
@@ -58,6 +62,13 @@ export default function ProjectsPage() {
     open: boolean;
     node: TreeNode | null;
   }>({ open: false, node: null });
+
+  // Editor state
+  const [editorContent, setEditorContent] = React.useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const tEditor = useTranslations("editor");
 
   // Queries
   const projectsQuery = trpc.nodes.getAllProjects.useQuery(undefined, {
@@ -164,8 +175,14 @@ export default function ProjectsPage() {
 
   // Node mutations (for file tree)
   const nodeCreateMutation = trpc.nodes.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.nodes.getChildren.invalidate();
+      // Auto-select the newly created node
+      setSelectedNodeId(data.id);
+      // Expand the parent folder so the new node is visible
+      if (data.parentId) {
+        fileTreeRef.current?.expandNode(data.parentId);
+      }
       setNodeCreateDialog({ open: false, type: "folder", parentId: null });
     },
     onError: (error) => {
@@ -193,6 +210,7 @@ export default function ProjectsPage() {
         setSelectedNodeId(null);
       }
       setNodeDeleteConfirm({ open: false, node: null });
+      addToast(tFileTree("deleteSuccess"), "success");
     },
     onError: (error) => {
       console.error("Error deleting node:", error);
@@ -200,6 +218,34 @@ export default function ProjectsPage() {
       setNodeDeleteConfirm({ open: false, node: null });
     },
   });
+
+  // Auto-save for editor content
+  const handleAutoSave = React.useCallback(
+    async (nodeId: string, content: Record<string, unknown>) => {
+      await nodeUpdateMutation.mutateAsync({
+        id: nodeId,
+        data: { content },
+      });
+    },
+    [nodeUpdateMutation],
+  );
+
+  const { status: autoSaveStatus } = useAutoSave({
+    nodeId: selectedNodeId,
+    content: editorContent,
+    onSave: handleAutoSave,
+  });
+
+  // Sync editor content when selected node changes
+  React.useEffect(() => {
+    if (selectedNodeQuery.data?.type === "note") {
+      setEditorContent(
+        (selectedNodeQuery.data.content as Record<string, unknown>) ?? null,
+      );
+    } else {
+      setEditorContent(null);
+    }
+  }, [selectedNodeQuery.data]);
 
   // Node handlers
   const handleNodeCreate = (
@@ -290,6 +336,7 @@ export default function ProjectsPage() {
             </button>
           </div>
           <FileTree
+            ref={fileTreeRef}
             projectId={currentProjectId}
             selectedNodeId={selectedNodeId}
             onSelectNode={setSelectedNodeId}
@@ -318,29 +365,41 @@ export default function ProjectsPage() {
                 <h1 className="text-2xl font-bold">
                   {selectedNodeQuery.data.name}
                 </h1>
-                <span className="text-xs text-muted-foreground px-2 py-1 rounded bg-muted">
-                  {tFileTree(`nodeTypes.${selectedNodeQuery.data.type}`)}
-                </span>
+                <div className="flex items-center gap-2">
+                  {selectedNodeQuery.data.type === "note" && (
+                    <span
+                      className={cn(
+                        "text-xs px-2 py-1 rounded",
+                        autoSaveStatus === "saving" &&
+                          "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
+                        autoSaveStatus === "saved" &&
+                          "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
+                        autoSaveStatus === "error" &&
+                          "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
+                        autoSaveStatus === "idle" && "hidden",
+                      )}
+                      data-testid="auto-save-status"
+                    >
+                      {autoSaveStatus === "saving" && tEditor("saving")}
+                      {autoSaveStatus === "saved" && tEditor("saved")}
+                      {autoSaveStatus === "error" && tEditor("saveFailed")}
+                    </span>
+                  )}
+                  <span className="text-xs text-muted-foreground px-2 py-1 rounded bg-muted">
+                    {tFileTree(`nodeTypes.${selectedNodeQuery.data.type}`)}
+                  </span>
+                </div>
               </div>
               {selectedNodeQuery.data.type === "note" ? (
-                <div className="prose dark:prose-invert max-w-none">
-                  {selectedNodeQuery.data.content ? (
-                    <pre className="text-sm bg-muted p-4 rounded-md whitespace-pre-wrap">
-                      {typeof selectedNodeQuery.data.content === "string"
-                        ? selectedNodeQuery.data.content
-                        : JSON.stringify(
-                            selectedNodeQuery.data.content,
-                            null,
-                            2,
-                          )}
-                    </pre>
-                  ) : (
-                    <p className="text-muted-foreground italic">
-                      No content yet. A rich text editor will be added in Phase
-                      1.4.
-                    </p>
-                  )}
-                </div>
+                <TiptapEditor
+                  content={
+                    (selectedNodeQuery.data.content as Record<
+                      string,
+                      unknown
+                    >) ?? null
+                  }
+                  onChange={setEditorContent}
+                />
               ) : (
                 <p className="text-muted-foreground">
                   Select a note from the tree to view its content.
