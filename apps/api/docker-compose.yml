@@ -35,9 +35,7 @@ services:
   minio:
     image: minio/minio:latest
     container_name: arbor-minio
-    ports:
-      - "9000:9000" # MinIO API
-      - "9001:9001" # MinIO Console
+    # Ports exposed via arbor-proxy (minio.arbor.local:9000, minio-console.arbor.local)
     environment:
       MINIO_ROOT_USER: arbor
       MINIO_ROOT_PASSWORD: local_dev_only
@@ -46,10 +44,10 @@ services:
     command: server /data --console-address ":9001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 2s # Check every 5 seconds
-      timeout: 3s # 3 second timeout per check
-      retries: 3 # Retry 3 times before marking unhealthy
-      start_period: 2s # Wait 5s before first check (gives MinIO time to start)
+      interval: 2s
+      timeout: 3s
+      retries: 3
+      start_period: 2s
     restart: unless-stopped
 
   # API service removed - now runs locally on host at port 3848

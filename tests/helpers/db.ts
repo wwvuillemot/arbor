@@ -11,10 +11,12 @@ const TEST_DATABASE_URL =
   "postgresql://arbor:local_dev_only@localhost:5432/arbor_test";
 
 // Log which database we're using to help debug connection issues
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   console.log(`🔍 Test database URL: ${TEST_DATABASE_URL}`);
   if (process.env.DATABASE_URL) {
-    console.warn(`⚠️  DATABASE_URL is set to: ${process.env.DATABASE_URL} (but tests will use TEST_DATABASE_URL)`);
+    console.warn(
+      `⚠️  DATABASE_URL is set to: ${process.env.DATABASE_URL} (but tests will use TEST_DATABASE_URL)`,
+    );
   }
 }
 
@@ -50,8 +52,10 @@ export async function resetTestDb() {
     // First, verify we're using the test database
     const result = await testClient!`SELECT current_database()`;
     const dbName = result[0].current_database;
-    if (dbName !== 'arbor_test') {
-      throw new Error(`CRITICAL: Attempting to reset non-test database: ${dbName}`);
+    if (dbName !== "arbor_test") {
+      throw new Error(
+        `CRITICAL: Attempting to reset non-test database: ${dbName}`,
+      );
     }
 
     // Use raw SQL to truncate all tables
@@ -67,8 +71,10 @@ export async function resetTestDb() {
         (SELECT COUNT(*) FROM app_settings) as settings_count
     `;
     const { nodes_count, prefs_count, settings_count } = counts[0];
-    if (nodes_count !== '0' || prefs_count !== '0' || settings_count !== '0') {
-      console.error(`⚠️  TRUNCATE did not clear all data! nodes=${nodes_count}, prefs=${prefs_count}, settings=${settings_count}`);
+    if (nodes_count !== "0" || prefs_count !== "0" || settings_count !== "0") {
+      console.error(
+        `⚠️  TRUNCATE did not clear all data! nodes=${nodes_count}, prefs=${prefs_count}, settings=${settings_count}`,
+      );
     }
   } catch (error) {
     // If TRUNCATE fails (e.g., tables don't exist yet), fall back to DELETE
