@@ -3,6 +3,7 @@ export {
   FileTreeNode,
   type TreeNode,
   type FileTreeNodeProps,
+  type DropPosition,
 } from "./file-tree-node";
 export {
   CreateNodeDialog,

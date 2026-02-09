@@ -16,6 +16,7 @@ import {
   NodeContextMenu,
   type TreeNode,
   type ContextMenuAction,
+  type DropPosition,
 } from "@/components/file-tree";
 import { TiptapEditor, ImageUpload } from "@/components/editor";
 import type { Editor } from "@tiptap/react";
@@ -227,6 +228,41 @@ export default function ProjectsPage() {
     },
   });
 
+  // Node move mutation (for drag-and-drop in file tree)
+  const nodeMoveMutation = trpc.nodes.move.useMutation({
+    onSuccess: () => {
+      utils.nodes.getChildren.invalidate();
+      addToast(tFileTree("moveSuccess"), "success");
+    },
+    onError: (error) => {
+      console.error("Error moving node:", error);
+      addToast(tFileTree("moveError"), "error");
+    },
+  });
+
+  const handleMoveNode = React.useCallback(
+    (draggedNodeId: string, targetNodeId: string, position: DropPosition) => {
+      if (position === "inside") {
+        // Drop inside a folder: move the node to be a child of the target
+        nodeMoveMutation.mutate({
+          id: draggedNodeId,
+          newParentId: targetNodeId,
+        });
+      } else {
+        // Drop before/after: move to same parent as target, at specific position
+        // We need to know the target's parentId - fetch it
+        const targetNode = utils.nodes.getById.getData({ id: targetNodeId });
+        if (targetNode && targetNode.parentId) {
+          nodeMoveMutation.mutate({
+            id: draggedNodeId,
+            newParentId: targetNode.parentId,
+          });
+        }
+      }
+    },
+    [nodeMoveMutation, utils.nodes.getById],
+  );
+
   // Media upload mutation
   const mediaUploadMutation = trpc.media.upload.useMutation();
   const mediaGetDownloadUrlMutation = trpc.media.getDownloadUrl.useMutation();
@@ -433,6 +469,7 @@ export default function ProjectsPage() {
               setNodeCreateDialog({ open: true, type: "note", parentId })
             }
             onRenameNode={handleNodeRename}
+            onMoveNode={handleMoveNode}
             className="flex-1"
           />
         </div>

@@ -517,3 +517,157 @@ describe("NodeContextMenu", () => {
     expect(defaultProps.onClose).toHaveBeenCalled();
   });
 });
+
+describe("FileTreeNode - Drag and Drop", () => {
+  const defaultProps = {
+    node: makeNode(),
+    depth: 0,
+    isExpanded: false,
+    isSelected: false,
+    onToggle: vi.fn(),
+    onSelect: vi.fn(),
+    onContextMenu: vi.fn(),
+    onDrop: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should make non-project nodes draggable", () => {
+    const noteNode = makeNode({ type: "note", id: "note-1" });
+    render(<FileTreeNode {...defaultProps} node={noteNode} />);
+    const treeitem = screen.getByRole("treeitem");
+    expect(treeitem).toHaveAttribute("draggable", "true");
+  });
+
+  it("should not make project nodes draggable", () => {
+    const projectNode = makeNode({ type: "project", id: "project-1" });
+    render(<FileTreeNode {...defaultProps} node={projectNode} />);
+    const treeitem = screen.getByRole("treeitem");
+    expect(treeitem).toHaveAttribute("draggable", "false");
+  });
+
+  it("should set node id in dataTransfer on dragStart", () => {
+    const noteNode = makeNode({ type: "note", id: "note-1" });
+    render(<FileTreeNode {...defaultProps} node={noteNode} />);
+    const treeitem = screen.getByRole("treeitem");
+    const setData = vi.fn();
+    const dataTransfer = {
+      setData,
+      effectAllowed: "",
+    };
+    fireEvent.dragStart(treeitem, { dataTransfer });
+    expect(setData).toHaveBeenCalledWith("application/arbor-node-id", "note-1");
+  });
+
+  it("should prevent dragStart for project nodes", () => {
+    const projectNode = makeNode({ type: "project", id: "project-1" });
+    render(<FileTreeNode {...defaultProps} node={projectNode} />);
+    const treeitem = screen.getByRole("treeitem");
+    const setData = vi.fn();
+    fireEvent.dragStart(treeitem, {
+      dataTransfer: { setData, effectAllowed: "" },
+    });
+    // setData should NOT be called because the handler prevents drag for projects
+    expect(setData).not.toHaveBeenCalled();
+  });
+
+  it("should show drop indicator on dragOver", () => {
+    render(<FileTreeNode {...defaultProps} />);
+    const treeitem = screen.getByRole("treeitem");
+    // Simulate dragOver in middle of element (should show 'inside' for folders)
+    fireEvent.dragOver(treeitem, {
+      clientY: 50,
+      dataTransfer: {
+        types: ["application/arbor-node-id"],
+        dropEffect: "",
+      },
+    });
+    // The "inside" indicator adds a ring-primary/40 class to the element
+    expect(treeitem.className).toContain("ring-primary/40");
+  });
+
+  it("should clear drop indicator on dragLeave", () => {
+    render(<FileTreeNode {...defaultProps} />);
+    const treeitem = screen.getByRole("treeitem");
+    // First dragOver to set indicator
+    fireEvent.dragOver(treeitem, {
+      clientY: 50,
+      dataTransfer: {
+        types: ["application/arbor-node-id"],
+        dropEffect: "",
+      },
+    });
+    // Then dragLeave with relatedTarget outside
+    fireEvent.dragLeave(treeitem, {
+      relatedTarget: document.body,
+    });
+    expect(treeitem.className).not.toContain("ring-primary/40");
+  });
+
+  it("should call onDrop with node IDs and position when dropped", () => {
+    render(<FileTreeNode {...defaultProps} />);
+    const treeitem = screen.getByRole("treeitem");
+    fireEvent.drop(treeitem, {
+      dataTransfer: {
+        getData: (type: string) =>
+          type === "application/arbor-node-id" ? "dragged-id" : "",
+      },
+      clientY: 50,
+    });
+    expect(defaultProps.onDrop).toHaveBeenCalledWith(
+      "dragged-id",
+      "node-1",
+      expect.any(String),
+    );
+  });
+
+  it("should not call onDrop when dropping node on itself", () => {
+    render(<FileTreeNode {...defaultProps} />);
+    const treeitem = screen.getByRole("treeitem");
+    fireEvent.drop(treeitem, {
+      dataTransfer: {
+        getData: (type: string) =>
+          type === "application/arbor-node-id" ? "node-1" : "",
+      },
+      clientY: 50,
+    });
+    expect(defaultProps.onDrop).not.toHaveBeenCalled();
+  });
+
+  it("should not call onDrop when no draggedNodeId in dataTransfer", () => {
+    render(<FileTreeNode {...defaultProps} />);
+    const treeitem = screen.getByRole("treeitem");
+    fireEvent.drop(treeitem, {
+      dataTransfer: {
+        getData: () => "",
+      },
+      clientY: 50,
+    });
+    expect(defaultProps.onDrop).not.toHaveBeenCalled();
+  });
+
+  it("should set opacity to 0.5 on dragStart", () => {
+    const noteNode = makeNode({ type: "note", id: "note-1" });
+    render(<FileTreeNode {...defaultProps} node={noteNode} />);
+    const treeitem = screen.getByRole("treeitem");
+    fireEvent.dragStart(treeitem, {
+      target: treeitem,
+      dataTransfer: { setData: vi.fn(), effectAllowed: "" },
+    });
+    expect(treeitem.style.opacity).toBe("0.5");
+  });
+
+  it("should restore opacity on dragEnd", () => {
+    const noteNode = makeNode({ type: "note", id: "note-1" });
+    render(<FileTreeNode {...defaultProps} node={noteNode} />);
+    const treeitem = screen.getByRole("treeitem");
+    fireEvent.dragStart(treeitem, {
+      target: treeitem,
+      dataTransfer: { setData: vi.fn(), effectAllowed: "" },
+    });
+    fireEvent.dragEnd(treeitem, { target: treeitem });
+    expect(treeitem.style.opacity).toBe("1");
+  });
+});

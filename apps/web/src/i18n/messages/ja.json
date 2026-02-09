@@ -289,6 +289,8 @@
     "confirmDelete": "「{name}」を削除してもよろしいですか？この操作は元に戻せません。",
     "confirmDeleteWithChildren": "「{name}」とそのすべての内容を削除してもよろしいですか？この操作は元に戻せません。",
     "deleteSuccess": "正常に削除されました。",
+    "moveSuccess": "正常に移動しました。",
+    "moveError": "アイテムの移動に失敗しました。",
     "untitled": "無題",
     "emptyProject": "このプロジェクトは空です。フォルダまたはノートを作成して始めましょう。",
     "createFolder": {

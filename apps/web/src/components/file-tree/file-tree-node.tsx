@@ -25,6 +25,8 @@ export interface TreeNode {
   updatedAt: string;
 }
 
+export type DropPosition = "before" | "inside" | "after";
+
 export interface FileTreeNodeProps {
   node: TreeNode;
   depth: number;
@@ -36,6 +38,11 @@ export interface FileTreeNodeProps {
   onSelect: (nodeId: string) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
   onRename?: (nodeId: string, newName: string) => void;
+  onDrop?: (
+    draggedNodeId: string,
+    targetNodeId: string,
+    position: DropPosition,
+  ) => void;
   renderChildren?: (parentId: string, depth: number) => React.ReactNode;
 }
 
@@ -68,6 +75,7 @@ export function FileTreeNode({
   onSelect,
   onContextMenu,
   onRename,
+  onDrop,
   renderChildren,
 }: FileTreeNodeProps) {
   const isExpandable = expandableTypes.has(node.type);
@@ -77,6 +85,12 @@ export function FileTreeNode({
   const [isEditing, setIsEditing] = React.useState(false);
   const [editValue, setEditValue] = React.useState(node.name);
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Drag-and-drop state
+  const [dropIndicator, setDropIndicator] = React.useState<DropPosition | null>(
+    null,
+  );
+  const rowRef = React.useRef<HTMLDivElement>(null);
 
   // Focus input when entering edit mode
   React.useEffect(() => {
@@ -131,6 +145,78 @@ export function FileTreeNode({
     onContextMenu(e, node);
   };
 
+  // Drag-and-drop handlers
+  const handleDragStart = (e: React.DragEvent) => {
+    // Don't drag while editing
+    if (isEditing) {
+      e.preventDefault();
+      return;
+    }
+    // Don't allow dragging projects
+    if (node.type === "project") {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.setData("application/arbor-node-id", node.id);
+    e.dataTransfer.effectAllowed = "move";
+    // Add a class to the dragged element for styling
+    (e.target as HTMLElement).style.opacity = "0.5";
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    (e.target as HTMLElement).style.opacity = "1";
+  };
+
+  const getDropPosition = (e: React.DragEvent): DropPosition => {
+    const rect = rowRef.current?.getBoundingClientRect();
+    if (!rect) return "inside";
+    const relativeY = e.clientY - rect.top;
+    const height = rect.height;
+    // Top 25% → before, bottom 25% → after, middle 50% → inside (for folders)
+    if (relativeY < height * 0.25) return "before";
+    if (relativeY > height * 0.75) return "after";
+    return isExpandable
+      ? "inside"
+      : relativeY < height * 0.5
+        ? "before"
+        : "after";
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const draggedId = e.dataTransfer.types.includes(
+      "application/arbor-node-id",
+    );
+    if (!draggedId) return;
+    e.dataTransfer.dropEffect = "move";
+    setDropIndicator(getDropPosition(e));
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.stopPropagation();
+    // Only clear if we're leaving the actual node element
+    const relatedTarget = e.relatedTarget as Node | null;
+    if (rowRef.current && !rowRef.current.contains(relatedTarget)) {
+      setDropIndicator(null);
+    }
+  };
+
+  const handleDropEvent = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropIndicator(null);
+    const draggedNodeId = e.dataTransfer.getData("application/arbor-node-id");
+    if (!draggedNodeId || draggedNodeId === node.id || !onDrop) return;
+    const position = getDropPosition(e);
+    onDrop(draggedNodeId, node.id, position);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -146,19 +232,38 @@ export function FileTreeNode({
     }
   };
 
+  const canDrag = node.type !== "project";
+
   return (
     <div data-testid={`tree-node-${node.id}`}>
+      {/* Drop indicator: before */}
+      {dropIndicator === "before" && (
+        <div
+          className="h-0.5 bg-primary rounded-full mx-2"
+          style={{ marginLeft: `${depth * 16 + 8}px` }}
+          data-testid={`drop-indicator-before-${node.id}`}
+        />
+      )}
       <div
+        ref={rowRef}
         role="treeitem"
         tabIndex={0}
         aria-expanded={isExpandable ? isExpanded : undefined}
         aria-selected={isSelected}
+        draggable={canDrag}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDropEvent}
         className={cn(
           "flex items-center gap-1 px-2 py-1 cursor-pointer rounded-sm text-sm",
           "hover:bg-accent hover:text-accent-foreground",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           "transition-colors",
           isSelected && "text-accent-foreground font-medium",
+          dropIndicator === "inside" && "bg-primary/10 ring-1 ring-primary/40",
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
@@ -205,6 +310,14 @@ export function FileTreeNode({
           </span>
         )}
       </div>
+      {/* Drop indicator: after */}
+      {dropIndicator === "after" && (
+        <div
+          className="h-0.5 bg-primary rounded-full mx-2"
+          style={{ marginLeft: `${depth * 16 + 8}px` }}
+          data-testid={`drop-indicator-after-${node.id}`}
+        />
+      )}
 
       {/* Children */}
       {isExpandable && isExpanded && renderChildren && (

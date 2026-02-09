@@ -289,6 +289,8 @@
     "confirmDelete": "Are you sure you want to delete \"{name}\"? This cannot be undone.",
     "confirmDeleteWithChildren": "Are you sure you want to delete \"{name}\" and all its contents? This cannot be undone.",
     "deleteSuccess": "Deleted successfully.",
+    "moveSuccess": "Moved successfully.",
+    "moveError": "Failed to move item.",
     "untitled": "Untitled",
     "emptyProject": "This project is empty. Create a folder or note to get started.",
     "createFolder": {

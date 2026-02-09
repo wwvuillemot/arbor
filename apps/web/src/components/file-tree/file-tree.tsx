@@ -4,7 +4,11 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { FolderPlus, FilePlus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { FileTreeNode, type TreeNode } from "./file-tree-node";
+import {
+  FileTreeNode,
+  type TreeNode,
+  type DropPosition,
+} from "./file-tree-node";
 import { cn } from "@/lib/utils";
 
 export interface FileTreeProps {
@@ -15,6 +19,11 @@ export interface FileTreeProps {
   onCreateFolder: (parentId: string) => void;
   onCreateNote: (parentId: string) => void;
   onRenameNode?: (nodeId: string, newName: string) => void;
+  onMoveNode?: (
+    draggedNodeId: string,
+    targetNodeId: string,
+    position: DropPosition,
+  ) => void;
   className?: string;
 }
 
@@ -34,6 +43,7 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
       onCreateFolder,
       onCreateNote,
       onRenameNode,
+      onMoveNode,
       className,
     },
     ref,
@@ -135,6 +145,7 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
             onSelect={onSelectNode}
             onContextMenu={onContextMenu}
             onRename={onRenameNode}
+            onDrop={onMoveNode}
             emptyMessage={t("emptyProject")}
           />
         </div>
@@ -153,6 +164,7 @@ function ChildrenList({
   onSelect,
   onContextMenu,
   onRename,
+  onDrop,
   emptyMessage,
 }: {
   parentId: string;
@@ -163,6 +175,11 @@ function ChildrenList({
   onSelect: (nodeId: string) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
   onRename?: (nodeId: string, newName: string) => void;
+  onDrop?: (
+    draggedNodeId: string,
+    targetNodeId: string,
+    position: DropPosition,
+  ) => void;
   emptyMessage?: string;
 }) {
   const childrenQuery = trpc.nodes.getChildren.useQuery(
@@ -206,6 +223,7 @@ function ChildrenList({
           onSelect={onSelect}
           onContextMenu={onContextMenu}
           onRename={onRename}
+          onDrop={onDrop}
           renderChildren={(childParentId, childDepth) => (
             <ChildrenList
               parentId={childParentId}
@@ -216,6 +234,7 @@ function ChildrenList({
               onSelect={onSelect}
               onContextMenu={onContextMenu}
               onRename={onRename}
+              onDrop={onDrop}
             />
           )}
         />
