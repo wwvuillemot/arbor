@@ -151,7 +151,7 @@ NodeType.implement({
         maxDepth: t.arg.int(),
       },
       resolve: async (node, args) => {
-        return getAllDescendants(node.id, args.maxDepth ?? undefined);
+        return nodeService.getDescendants(node.id, args.maxDepth ?? undefined);
       },
     }),
   }),
@@ -174,30 +174,7 @@ NodeTreeType.implement({
   }),
 });
 
-// Helper function to get all descendants recursively
-async function getAllDescendants(
-  nodeId: string,
-  maxDepth?: number,
-  currentDepth = 0,
-): Promise<DbNode[]> {
-  if (maxDepth !== undefined && currentDepth >= maxDepth) {
-    return [];
-  }
-
-  const children = await nodeService.getNodesByParentId(nodeId);
-  const descendants: DbNode[] = [...children];
-
-  for (const child of children) {
-    const childDescendants = await getAllDescendants(
-      child.id,
-      maxDepth,
-      currentDepth + 1,
-    );
-    descendants.push(...childDescendants);
-  }
-
-  return descendants;
-}
+// getAllDescendants is now provided by NodeService.getDescendants()
 
 // Query type
 builder.queryType({
@@ -279,7 +256,7 @@ builder.queryType({
           return null;
         }
 
-        const descendants = await getAllDescendants(
+        const descendants = await nodeService.getDescendants(
           root.id,
           args.maxDepth ?? undefined,
         );

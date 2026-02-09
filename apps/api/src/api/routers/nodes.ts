@@ -105,4 +105,58 @@ export const nodesRouter = router({
       await nodeService.deleteNode(input.id);
       return { success: true };
     }),
+
+  // Move a node to a new parent
+  move: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        newParentId: z.string().uuid(),
+        position: z.number().int().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await nodeService.moveNode(
+        input.id,
+        input.newParentId,
+        input.position,
+      );
+    }),
+
+  // Copy a node (deep copy with children)
+  copy: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        targetParentId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await nodeService.copyNode(input.id, input.targetParentId);
+    }),
+
+  // Reorder children of a parent
+  reorder: publicProcedure
+    .input(
+      z.object({
+        parentId: z.string().uuid(),
+        childIds: z.array(z.string().uuid()),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await nodeService.reorderChildren(input.parentId, input.childIds);
+      return { success: true };
+    }),
+
+  // Get all descendants of a node
+  getDescendants: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        maxDepth: z.number().int().positive().optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return await nodeService.getDescendants(input.id, input.maxDepth);
+    }),
 });
