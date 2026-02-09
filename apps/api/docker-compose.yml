@@ -35,7 +35,9 @@ services:
   minio:
     image: minio/minio:latest
     container_name: arbor-minio
-    # Ports exposed via arbor-proxy (minio.arbor.local:9000, minio-console.arbor.local)
+    ports:
+      - "9000:9000" # MinIO API
+      - "9001:9001" # MinIO Console
     environment:
       MINIO_ROOT_USER: arbor
       MINIO_ROOT_PASSWORD: local_dev_only
