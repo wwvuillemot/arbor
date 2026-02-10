@@ -116,56 +116,34 @@
       "dashboard": {
         "label": "ダッシュボードへ移動",
         "description": "ダッシュボードを表示",
-        "keywords": [
-          "ホーム",
-          "概要"
-        ]
+        "keywords": ["ホーム", "概要"]
       },
       "search": {
         "label": "検索へ移動",
         "description": "コンテンツを検索",
-        "keywords": [
-          "検索",
-          "探す"
-        ]
+        "keywords": ["検索", "探す"]
       },
       "projects": {
         "label": "プロジェクトへ移動",
         "description": "プロジェクトを閲覧",
-        "keywords": [
-          "フォルダ",
-          "ファイル",
-          "プロジェクト"
-        ]
+        "keywords": ["フォルダ", "ファイル", "プロジェクト"]
       },
       "chat": {
         "label": "AIチャットへ移動",
         "description": "AIアシスタントとチャット",
-        "keywords": [
-          "AI",
-          "アシスタント",
-          "ヘルプ"
-        ]
+        "keywords": ["AI", "アシスタント", "ヘルプ"]
       },
       "settings": {
         "label": "設定へ移動",
         "description": "設定を変更",
-        "keywords": [
-          "設定",
-          "環境設定",
-          "オプション"
-        ]
+        "keywords": ["設定", "環境設定", "オプション"]
       }
     },
     "help": {
       "about": {
         "label": "Arborについて",
         "description": "Arborの情報を表示",
-        "keywords": [
-          "について",
-          "情報",
-          "バージョン"
-        ]
+        "keywords": ["について", "情報", "バージョン"]
       }
     }
   },
@@ -502,6 +480,44 @@
       "noDiff": "差分がありません",
       "versionA": "バージョンA",
       "versionB": "バージョンB"
+    },
+    "auditLog": {
+      "title": "監査ログ",
+      "description": "プロジェクト全体の変更タイムライン",
+      "filters": {
+        "title": "フィルター",
+        "actorType": "アクタータイプ",
+        "actionType": "アクションタイプ",
+        "dateRange": "期間",
+        "startDate": "開始日",
+        "endDate": "終了日",
+        "node": "ノード",
+        "all": "すべて",
+        "apply": "フィルター適用",
+        "clear": "フィルターをクリア"
+      },
+      "search": {
+        "placeholder": "変更を検索...",
+        "noResults": "一致する変更が見つかりません"
+      },
+      "export": {
+        "title": "エクスポート",
+        "csv": "CSVエクスポート",
+        "pdf": "PDFエクスポート"
+      },
+      "timeline": {
+        "loading": "監査ログを読み込み中...",
+        "empty": "変更はまだ記録されていません",
+        "entries": "件",
+        "showMore": "もっと見る"
+      },
+      "entry": {
+        "version": "v{version}",
+        "node": "ノード",
+        "actor": "アクター",
+        "action": "アクション",
+        "timestamp": "タイムスタンプ"
+      }
     }
   }
 }

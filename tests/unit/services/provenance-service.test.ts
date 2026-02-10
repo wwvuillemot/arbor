@@ -714,9 +714,9 @@ describe("ProvenanceService", () => {
         createdBy: "user:test",
         updatedBy: "user:test",
       });
-      await expect(
-        provenanceService.checkout(project.id, 999),
-      ).rejects.toThrow("Version 999 not found");
+      await expect(provenanceService.checkout(project.id, 999)).rejects.toThrow(
+        "Version 999 not found",
+      );
     });
 
     it("should checkout version 2 after multiple updates", async () => {
@@ -746,6 +746,286 @@ describe("ProvenanceService", () => {
       const v2 = await provenanceService.checkout(node.id, 2);
       expect(v2.version).toBe(2);
       expect(v2.content).toEqual({ text: "v2" });
+    });
+  });
+
+  // ─── Audit Log (Cross-Node) ──────────────────────────────────────
+
+  describe("getAuditLog", () => {
+    it("should return all entries across nodes without filters", async () => {
+      const projectId = await createTestProject("Audit Project");
+      // Create two separate notes (different nodes)
+      const noteA = await testDb
+        .insert(nodes)
+        .values({
+          type: "note",
+          name: "Note A",
+          parentId: projectId,
+          content: { text: "A" },
+          createdBy: "user:test",
+          updatedBy: "user:test",
+        })
+        .returning();
+      const noteB = await testDb
+        .insert(nodes)
+        .values({
+          type: "note",
+          name: "Note B",
+          parentId: projectId,
+          content: { text: "B" },
+          createdBy: "user:test",
+          updatedBy: "user:test",
+        })
+        .returning();
+
+      await provenanceService.recordChange({
+        nodeId: noteA[0].id,
+        actorType: "user",
+        actorId: "user:alice",
+        action: "create",
+        contentAfter: { text: "A" },
+      });
+      await provenanceService.recordChange({
+        nodeId: noteB[0].id,
+        actorType: "llm",
+        actorId: "llm:gpt-4o",
+        action: "update",
+        contentBefore: { text: "B" },
+        contentAfter: { text: "B updated" },
+      });
+
+      const allEntries = await provenanceService.getAuditLog({});
+      expect(allEntries.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("should filter by actorType", async () => {
+      const projectId = await createTestProject("Filter Project");
+      const noteId = (
+        await testDb
+          .insert(nodes)
+          .values({
+            type: "note",
+            name: "FN",
+            parentId: projectId,
+            createdBy: "user:test",
+            updatedBy: "user:test",
+          })
+          .returning()
+      )[0].id;
+
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        action: "create",
+        contentAfter: { text: "hi" },
+      });
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "llm",
+        action: "update",
+        contentAfter: { text: "hello" },
+      });
+
+      const userEntries = await provenanceService.getAuditLog({
+        actorType: "user",
+      });
+      for (const entry of userEntries) {
+        expect(entry.actorType).toBe("user");
+      }
+    });
+
+    it("should filter by action", async () => {
+      const projectId = await createTestProject("Action Filter");
+      const noteId = (
+        await testDb
+          .insert(nodes)
+          .values({
+            type: "note",
+            name: "AN",
+            parentId: projectId,
+            createdBy: "user:test",
+            updatedBy: "user:test",
+          })
+          .returning()
+      )[0].id;
+
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        action: "create",
+        contentAfter: { text: "x" },
+      });
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        action: "update",
+        contentAfter: { text: "y" },
+      });
+
+      const createEntries = await provenanceService.getAuditLog({
+        action: "create",
+      });
+      for (const entry of createEntries) {
+        expect(entry.action).toBe("create");
+      }
+    });
+  });
+
+  describe("getAuditLogCount", () => {
+    it("should return total count matching filters", async () => {
+      const projectId = await createTestProject("Count Project");
+      const noteId = (
+        await testDb
+          .insert(nodes)
+          .values({
+            type: "note",
+            name: "CN",
+            parentId: projectId,
+            createdBy: "user:test",
+            updatedBy: "user:test",
+          })
+          .returning()
+      )[0].id;
+
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        action: "create",
+        contentAfter: { text: "x" },
+      });
+
+      const totalCount = await provenanceService.getAuditLogCount({});
+      expect(totalCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("searchHistory", () => {
+    it("should find entries matching content text", async () => {
+      const projectId = await createTestProject("Search Project");
+      const noteId = (
+        await testDb
+          .insert(nodes)
+          .values({
+            type: "note",
+            name: "SN",
+            parentId: projectId,
+            createdBy: "user:test",
+            updatedBy: "user:test",
+          })
+          .returning()
+      )[0].id;
+
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        actorId: "user:searchtest",
+        action: "create",
+        contentAfter: { text: "unique_search_term_xyz" },
+      });
+
+      const results = await provenanceService.searchHistory({
+        query: "unique_search_term_xyz",
+      });
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(
+        results.some((r) =>
+          JSON.stringify(r.contentAfter).includes("unique_search_term_xyz"),
+        ),
+      ).toBe(true);
+    });
+
+    it("should find entries matching actorId", async () => {
+      const projectId = await createTestProject("Search Actor");
+      const noteId = (
+        await testDb
+          .insert(nodes)
+          .values({
+            type: "note",
+            name: "SA",
+            parentId: projectId,
+            createdBy: "user:test",
+            updatedBy: "user:test",
+          })
+          .returning()
+      )[0].id;
+
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "llm",
+        actorId: "llm:unique_model_abc",
+        action: "update",
+        contentAfter: { text: "something" },
+      });
+
+      const results = await provenanceService.searchHistory({
+        query: "unique_model_abc",
+      });
+      expect(results.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("exportAuditCsv", () => {
+    it("should return CSV string with header and data rows", async () => {
+      const projectId = await createTestProject("CSV Project");
+      const noteId = (
+        await testDb
+          .insert(nodes)
+          .values({
+            type: "note",
+            name: "CSVN",
+            parentId: projectId,
+            createdBy: "user:test",
+            updatedBy: "user:test",
+          })
+          .returning()
+      )[0].id;
+
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        actorId: "user:csvtest",
+        action: "create",
+        contentAfter: { text: "csv data" },
+      });
+
+      const csv = await provenanceService.exportAuditCsv({});
+      expect(csv).toContain(
+        "id,nodeId,version,actorType,actorId,action,createdAt",
+      );
+      expect(csv).toContain("user:csvtest");
+      expect(csv).toContain("create");
+    });
+  });
+
+  describe("exportAuditHtml", () => {
+    it("should return HTML document with table", async () => {
+      const projectId = await createTestProject("HTML Project");
+      const noteId = (
+        await testDb
+          .insert(nodes)
+          .values({
+            type: "note",
+            name: "HTMLN",
+            parentId: projectId,
+            createdBy: "user:test",
+            updatedBy: "user:test",
+          })
+          .returning()
+      )[0].id;
+
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "llm",
+        actorId: "llm:htmltest",
+        action: "update",
+        contentAfter: { text: "html data" },
+      });
+
+      const html = await provenanceService.exportAuditHtml({});
+      expect(html).toContain("<!DOCTYPE html>");
+      expect(html).toContain("Audit Report");
+      expect(html).toContain("<table>");
+      expect(html).toContain("llm:htmltest");
     });
   });
 });

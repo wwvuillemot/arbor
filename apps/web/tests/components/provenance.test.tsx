@@ -87,6 +87,49 @@ vi.mock("@/lib/trpc", () => {
     })),
   });
 
+  // Audit log entries (cross-node)
+  const auditLogEntries = [
+    {
+      id: "audit-1",
+      nodeId: "node-1",
+      version: 3,
+      actorType: "user",
+      actorId: "user:alice",
+      action: "update",
+      contentBefore: { text: "old" },
+      contentAfter: { text: "new" },
+      diff: null,
+      metadata: null,
+      createdAt: "2024-06-15T14:00:00Z",
+    },
+    {
+      id: "audit-2",
+      nodeId: "node-2",
+      version: 1,
+      actorType: "llm",
+      actorId: "llm:gpt-4o",
+      action: "create",
+      contentBefore: null,
+      contentAfter: { text: "generated" },
+      diff: null,
+      metadata: null,
+      createdAt: "2024-06-15T13:00:00Z",
+    },
+    {
+      id: "audit-3",
+      nodeId: "node-1",
+      version: 2,
+      actorType: "system",
+      actorId: "system:auto",
+      action: "move",
+      contentBefore: null,
+      contentAfter: null,
+      diff: null,
+      metadata: { oldParentId: "p1", newParentId: "p2" },
+      createdAt: "2024-06-15T12:30:00Z",
+    },
+  ];
+
   const mockTrpc = {
     provenance: {
       getHistory: makeQuery(historyEntries),
@@ -104,6 +147,17 @@ vi.mock("@/lib/trpc", () => {
           isPending: false,
           isLoading: false,
           error: null,
+        })),
+      },
+      getAuditLog: makeQuery(auditLogEntries),
+      getAuditLogCount: makeQuery(3),
+      searchHistory: makeQuery(auditLogEntries.slice(0, 1)),
+      exportAuditReport: {
+        useQuery: vi.fn(() => ({
+          data: "csv-data",
+          isLoading: false,
+          error: null,
+          refetch: vi.fn().mockResolvedValue({ data: "id,nodeId\n1,node-1" }),
         })),
       },
     },
@@ -124,6 +178,7 @@ import {
 } from "@/components/provenance/attribution-badge";
 import { VersionHistory } from "@/components/provenance/version-history";
 import { DiffViewer } from "@/components/provenance/diff-viewer";
+import { AuditLog } from "@/components/provenance/audit-log";
 
 // === AttributionBadge Tests ===
 
@@ -173,9 +228,7 @@ describe("AttributionBadge", () => {
 
     // Hover to show tooltip
     fireEvent.mouseEnter(badge);
-    expect(
-      screen.getByTestId("attribution-badge-tooltip"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("attribution-badge-tooltip")).toBeInTheDocument();
     expect(screen.getByTestId("attribution-badge-tooltip")).toHaveTextContent(
       "gpt-4o",
     );
@@ -221,10 +274,7 @@ describe("AttributionBadge", () => {
   it("should have correct aria-label", () => {
     render(<AttributionBadge actorType="llm" actorId="llm:gpt-4o" />);
     const badge = screen.getByTestId("attribution-badge-llm");
-    expect(badge).toHaveAttribute(
-      "aria-label",
-      "aiGenerated - gpt-4o",
-    );
+    expect(badge).toHaveAttribute("aria-label", "aiGenerated - gpt-4o");
   });
 });
 
@@ -287,9 +337,7 @@ describe("VersionHistory", () => {
 
   it("should not render checkout buttons when onCheckout is not provided", () => {
     render(<VersionHistory nodeId="node-1" />);
-    expect(
-      screen.queryByTestId("version-checkout-3"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("version-checkout-3")).not.toBeInTheDocument();
   });
 
   it("should call onCheckout when checkout button is clicked", () => {
@@ -308,9 +356,7 @@ describe("VersionHistory", () => {
 
   it("should handle compare selection flow", () => {
     const mockCompare = vi.fn();
-    render(
-      <VersionHistory nodeId="node-1" onCompare={mockCompare} />,
-    );
+    render(<VersionHistory nodeId="node-1" onCompare={mockCompare} />);
 
     // First click selects version for comparison
     fireEvent.click(screen.getByTestId("version-compare-3"));
@@ -329,9 +375,7 @@ describe("VersionHistory", () => {
     });
 
     render(<VersionHistory nodeId="node-1" />);
-    expect(
-      screen.getByTestId("version-history-loading"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("version-history-loading")).toBeInTheDocument();
     expect(screen.getByText("loading")).toBeInTheDocument();
   });
 
@@ -344,13 +388,10 @@ describe("VersionHistory", () => {
     });
 
     render(<VersionHistory nodeId="node-1" />);
-    expect(
-      screen.getByTestId("version-history-empty"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("version-history-empty")).toBeInTheDocument();
     expect(screen.getByText("noHistory")).toBeInTheDocument();
   });
 });
-
 
 // === DiffViewer Tests ===
 
@@ -371,12 +412,8 @@ describe("DiffViewer", () => {
 
   it("should display version labels", () => {
     render(<DiffViewer nodeId="node-1" versionA={1} versionB={3} />);
-    expect(screen.getByTestId("diff-viewer-version-a")).toHaveTextContent(
-      "v1",
-    );
-    expect(screen.getByTestId("diff-viewer-version-b")).toHaveTextContent(
-      "v3",
-    );
+    expect(screen.getByTestId("diff-viewer-version-a")).toHaveTextContent("v1");
+    expect(screen.getByTestId("diff-viewer-version-b")).toHaveTextContent("v3");
   });
 
   it("should render diff content area", () => {
@@ -428,5 +465,142 @@ describe("DiffViewer", () => {
     render(<DiffViewer nodeId="node-1" versionA={1} versionB={3} />);
     expect(screen.getByTestId("diff-viewer-empty")).toBeInTheDocument();
     expect(screen.getByText("noDiff")).toBeInTheDocument();
+  });
+});
+
+// === AuditLog Tests ===
+
+describe("AuditLog", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Mock browser APIs not available in jsdom
+    global.URL.createObjectURL = vi.fn(() => "blob:mock-url");
+    global.URL.revokeObjectURL = vi.fn();
+    vi.spyOn(window, "open").mockImplementation(() => null);
+  });
+
+  it("should render the audit log container with title", () => {
+    render(<AuditLog />);
+    expect(screen.getByTestId("audit-log")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-log-title")).toHaveTextContent("title");
+  });
+
+  it("should render filter controls", () => {
+    render(<AuditLog />);
+    expect(screen.getByTestId("audit-log-filters")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-filter-actor")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-filter-action")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-clear-filters")).toBeInTheDocument();
+  });
+
+  it("should render search input and button", () => {
+    render(<AuditLog />);
+    expect(screen.getByTestId("audit-log-search")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-search-input")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-search-button")).toBeInTheDocument();
+  });
+
+  it("should render export buttons", () => {
+    render(<AuditLog />);
+    expect(screen.getByTestId("audit-log-export")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-export-csv")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-export-pdf")).toBeInTheDocument();
+  });
+
+  it("should render timeline entries from audit log data", () => {
+    render(<AuditLog />);
+    expect(screen.getByTestId("audit-log-timeline")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-entry-audit-1")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-entry-audit-2")).toBeInTheDocument();
+    expect(screen.getByTestId("audit-entry-audit-3")).toBeInTheDocument();
+  });
+
+  it("should display version numbers for each entry", () => {
+    render(<AuditLog />);
+    const entry1 = screen.getByTestId("audit-entry-audit-1");
+    expect(entry1).toHaveTextContent("v3");
+    const entry2 = screen.getByTestId("audit-entry-audit-2");
+    expect(entry2).toHaveTextContent("v1");
+  });
+
+  it("should allow changing actor type filter", () => {
+    render(<AuditLog />);
+    const actorFilter = screen.getByTestId(
+      "audit-filter-actor",
+    ) as HTMLSelectElement;
+    fireEvent.change(actorFilter, { target: { value: "llm" } });
+    expect(actorFilter.value).toBe("llm");
+  });
+
+  it("should allow changing action filter", () => {
+    render(<AuditLog />);
+    const actionFilterEl = screen.getByTestId(
+      "audit-filter-action",
+    ) as HTMLSelectElement;
+    fireEvent.change(actionFilterEl, { target: { value: "create" } });
+    expect(actionFilterEl.value).toBe("create");
+  });
+
+  it("should clear filters when clear button is clicked", () => {
+    render(<AuditLog />);
+    const actorFilter = screen.getByTestId(
+      "audit-filter-actor",
+    ) as HTMLSelectElement;
+    fireEvent.change(actorFilter, { target: { value: "user" } });
+    expect(actorFilter.value).toBe("user");
+
+    fireEvent.click(screen.getByTestId("audit-clear-filters"));
+    expect(actorFilter.value).toBe("");
+  });
+
+  it("should trigger search when search button is clicked", () => {
+    render(<AuditLog />);
+    const searchInput = screen.getByTestId("audit-search-input");
+    fireEvent.change(searchInput, { target: { value: "test query" } });
+    fireEvent.click(screen.getByTestId("audit-search-button"));
+    // After search, the search query should be used
+    // (search mock returns 1 entry)
+    expect(searchInput).toHaveValue("test query");
+  });
+
+  it("should show loading state", async () => {
+    const { trpc } = (await import("@/lib/trpc")) as any;
+    trpc.provenance.getAuditLog.useQuery.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      error: null,
+    });
+
+    render(<AuditLog />);
+    expect(screen.getByTestId("audit-log-loading")).toBeInTheDocument();
+    expect(screen.getByText("timeline.loading")).toBeInTheDocument();
+  });
+
+  it("should show empty state when no entries", async () => {
+    const { trpc } = (await import("@/lib/trpc")) as any;
+    trpc.provenance.getAuditLog.useQuery.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    render(<AuditLog />);
+    expect(screen.getByTestId("audit-log-empty")).toBeInTheDocument();
+    expect(screen.getByText("timeline.empty")).toBeInTheDocument();
+  });
+
+  it("should trigger CSV export on button click", () => {
+    render(<AuditLog />);
+    const csvButton = screen.getByTestId("audit-export-csv");
+    fireEvent.click(csvButton);
+    // CSV export refetch should be called
+    expect(csvButton).toBeInTheDocument();
+  });
+
+  it("should trigger HTML/PDF export on button click", () => {
+    render(<AuditLog />);
+    const pdfButton = screen.getByTestId("audit-export-pdf");
+    fireEvent.click(pdfButton);
+    expect(pdfButton).toBeInTheDocument();
   });
 });

@@ -22,7 +22,8 @@ const ACTOR_ICONS: Record<ActorType, string> = {
 const ACTOR_COLORS: Record<ActorType, string> = {
   user: "bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700",
   llm: "bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700",
-  system: "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600",
+  system:
+    "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600",
 };
 
 /**
@@ -91,4 +92,3 @@ export function AttributionBadge({
     </span>
   );
 }
-

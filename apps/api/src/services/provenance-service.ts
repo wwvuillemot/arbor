@@ -6,7 +6,17 @@ import {
   type ActorType,
   type HistoryAction,
 } from "../db/schema";
-import { eq, desc, and, asc, sql, count, between, inArray } from "drizzle-orm";
+import {
+  eq,
+  desc,
+  and,
+  asc,
+  sql,
+  count,
+  between,
+  inArray,
+  or,
+} from "drizzle-orm";
 import diff_match_patch from "diff-match-patch";
 
 const dmp = new diff_match_patch();
@@ -40,6 +50,22 @@ export interface GetHistoryInRangeParams {
   nodeId: string;
   startDate: Date;
   endDate: Date;
+}
+
+export interface GetAuditLogParams {
+  limit?: number;
+  offset?: number;
+  actorType?: ActorType;
+  action?: HistoryAction;
+  startDate?: Date;
+  endDate?: Date;
+  nodeId?: string;
+}
+
+export interface SearchHistoryParams {
+  query: string;
+  limit?: number;
+  offset?: number;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────
@@ -189,6 +215,167 @@ export class ProvenanceService {
         ),
       )
       .orderBy(desc(nodeHistory.version));
+  }
+
+  // ─── Audit Log (Cross-Node) ────────────────────────────────────────
+
+  /**
+   * Get audit log across all nodes with optional filters.
+   */
+  async getAuditLog(params: GetAuditLogParams): Promise<NodeHistory[]> {
+    const limit = params.limit ?? 50;
+    const offset = params.offset ?? 0;
+
+    const conditions = [];
+    if (params.actorType) {
+      conditions.push(eq(nodeHistory.actorType, params.actorType));
+    }
+    if (params.action) {
+      conditions.push(eq(nodeHistory.action, params.action));
+    }
+    if (params.startDate && params.endDate) {
+      conditions.push(
+        between(nodeHistory.createdAt, params.startDate, params.endDate),
+      );
+    }
+    if (params.nodeId) {
+      conditions.push(eq(nodeHistory.nodeId, params.nodeId));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    return db
+      .select()
+      .from(nodeHistory)
+      .where(whereClause)
+      .orderBy(desc(nodeHistory.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  /**
+   * Count total audit log entries matching filters.
+   */
+  async getAuditLogCount(
+    params: Omit<GetAuditLogParams, "limit" | "offset">,
+  ): Promise<number> {
+    const conditions = [];
+    if (params.actorType) {
+      conditions.push(eq(nodeHistory.actorType, params.actorType));
+    }
+    if (params.action) {
+      conditions.push(eq(nodeHistory.action, params.action));
+    }
+    if (params.startDate && params.endDate) {
+      conditions.push(
+        between(nodeHistory.createdAt, params.startDate, params.endDate),
+      );
+    }
+    if (params.nodeId) {
+      conditions.push(eq(nodeHistory.nodeId, params.nodeId));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [result] = await db
+      .select({ total: count() })
+      .from(nodeHistory)
+      .where(whereClause);
+
+    return result?.total ?? 0;
+  }
+
+  /**
+   * Search within change history (contentBefore/contentAfter as JSONB text).
+   */
+  async searchHistory(params: SearchHistoryParams): Promise<NodeHistory[]> {
+    const limit = params.limit ?? 50;
+    const offset = params.offset ?? 0;
+    const pattern = `%${params.query}%`;
+
+    return db
+      .select()
+      .from(nodeHistory)
+      .where(
+        or(
+          sql`${nodeHistory.contentBefore}::text ILIKE ${pattern}`,
+          sql`${nodeHistory.contentAfter}::text ILIKE ${pattern}`,
+          sql`${nodeHistory.actorId} ILIKE ${pattern}`,
+        ),
+      )
+      .orderBy(desc(nodeHistory.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  /**
+   * Export audit log as CSV string.
+   */
+  async exportAuditCsv(
+    params: Omit<GetAuditLogParams, "limit" | "offset">,
+  ): Promise<string> {
+    const entries = await this.getAuditLog({ ...params, limit: 10000 });
+
+    const header = "id,nodeId,version,actorType,actorId,action,createdAt";
+    const rows = entries.map((entry) => {
+      const actorId = (entry.actorId ?? "").replace(/,/g, ";");
+      return `${entry.id},${entry.nodeId},${entry.version},${entry.actorType},${actorId},${entry.action},${entry.createdAt.toISOString()}`;
+    });
+
+    return [header, ...rows].join("\n");
+  }
+
+  /**
+   * Export audit log as HTML string (for PDF printing via browser).
+   */
+  async exportAuditHtml(
+    params: Omit<GetAuditLogParams, "limit" | "offset">,
+  ): Promise<string> {
+    const entries = await this.getAuditLog({ ...params, limit: 10000 });
+
+    const tableRows = entries
+      .map(
+        (entry) =>
+          `<tr><td>${entry.version}</td><td>${entry.actorType}</td><td>${this.escapeHtml(entry.actorId ?? "")}</td><td>${entry.action}</td><td>${entry.nodeId}</td><td>${entry.createdAt.toISOString()}</td></tr>`,
+      )
+      .join("\n");
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Audit Report</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+    h1 { border-bottom: 2px solid #333; padding-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 0.9em; }
+    th { background: #f5f5f5; font-weight: 600; }
+    tr:nth-child(even) { background: #fafafa; }
+    .meta { color: #666; margin-bottom: 16px; }
+    @media print { body { padding: 0; } @page { margin: 1.5cm; } }
+  </style>
+</head>
+<body>
+  <h1>Audit Report</h1>
+  <p class="meta">Generated: ${new Date().toISOString()} | Entries: ${entries.length}</p>
+  <table>
+    <thead><tr><th>Version</th><th>Actor</th><th>Actor ID</th><th>Action</th><th>Node ID</th><th>Timestamp</th></tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+</body>
+</html>`;
+  }
+
+  /**
+   * Escape HTML special characters.
+   */
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
 
   // ─── Checkout (Read-Only) ─────────────────────────────────────────

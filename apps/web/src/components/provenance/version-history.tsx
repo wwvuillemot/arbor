@@ -9,6 +9,16 @@ import { AttributionBadge, type ActorType } from "./attribution-badge";
 
 const PAGE_SIZE = 10;
 
+interface HistoryEntry {
+  id: string;
+  nodeId: string;
+  version: number;
+  actorType: string;
+  actorId: string | null;
+  action: string;
+  createdAt: string;
+}
+
 export interface VersionHistoryProps {
   nodeId: string;
   onCheckout?: (version: number) => void;
@@ -58,15 +68,16 @@ export function VersionHistory({
     },
   });
 
-  const totalPages = Math.ceil(
-    (versionCountQuery.data ?? 0) / PAGE_SIZE,
-  );
+  const totalPages = Math.ceil((versionCountQuery.data ?? 0) / PAGE_SIZE);
 
   const history = historyQuery.data ?? [];
 
   if (historyQuery.isLoading) {
     return (
-      <div className={cn("p-4", className)} data-testid="version-history-loading">
+      <div
+        className={cn("p-4", className)}
+        data-testid="version-history-loading"
+      >
         <p className="text-sm text-muted-foreground">{t("loading")}</p>
       </div>
     );
@@ -102,13 +113,12 @@ export function VersionHistory({
       <h3 className="text-sm font-semibold">{t("title")}</h3>
 
       <div className="flex flex-col gap-1" data-testid="version-history-list">
-        {history.map((entry: any) => (
+        {(history as HistoryEntry[]).map((entry) => (
           <div
             key={entry.id}
             className={cn(
               "flex items-center gap-2 p-2 rounded border text-xs",
-              compareSelection === entry.version &&
-              "ring-2 ring-primary",
+              compareSelection === entry.version && "ring-2 ring-primary",
             )}
             data-testid={`version-entry-${entry.version}`}
           >

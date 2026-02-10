@@ -116,56 +116,34 @@
       "dashboard": {
         "label": "Go to Dashboard",
         "description": "View your dashboard",
-        "keywords": [
-          "home",
-          "overview"
-        ]
+        "keywords": ["home", "overview"]
       },
       "search": {
         "label": "Go to Search",
         "description": "Search your content",
-        "keywords": [
-          "find",
-          "lookup"
-        ]
+        "keywords": ["find", "lookup"]
       },
       "projects": {
         "label": "Go to Projects",
         "description": "Browse your projects",
-        "keywords": [
-          "folders",
-          "files",
-          "projects"
-        ]
+        "keywords": ["folders", "files", "projects"]
       },
       "chat": {
         "label": "Go to AI Chat",
         "description": "Chat with AI assistant",
-        "keywords": [
-          "ai",
-          "assistant",
-          "help"
-        ]
+        "keywords": ["ai", "assistant", "help"]
       },
       "settings": {
         "label": "Go to Settings",
         "description": "Configure your preferences",
-        "keywords": [
-          "preferences",
-          "config",
-          "options"
-        ]
+        "keywords": ["preferences", "config", "options"]
       }
     },
     "help": {
       "about": {
         "label": "About Arbor",
         "description": "View information about Arbor",
-        "keywords": [
-          "about",
-          "info",
-          "version"
-        ]
+        "keywords": ["about", "info", "version"]
       }
     }
   },
@@ -502,6 +480,44 @@
       "noDiff": "No differences found",
       "versionA": "Version A",
       "versionB": "Version B"
+    },
+    "auditLog": {
+      "title": "Audit Log",
+      "description": "Timeline of all changes across your project",
+      "filters": {
+        "title": "Filters",
+        "actorType": "Actor Type",
+        "actionType": "Action Type",
+        "dateRange": "Date Range",
+        "startDate": "Start Date",
+        "endDate": "End Date",
+        "node": "Node",
+        "all": "All",
+        "apply": "Apply Filters",
+        "clear": "Clear Filters"
+      },
+      "search": {
+        "placeholder": "Search within changes...",
+        "noResults": "No matching changes found"
+      },
+      "export": {
+        "title": "Export",
+        "csv": "Export CSV",
+        "pdf": "Export PDF"
+      },
+      "timeline": {
+        "loading": "Loading audit log...",
+        "empty": "No changes recorded yet",
+        "entries": "entries",
+        "showMore": "Show More"
+      },
+      "entry": {
+        "version": "v{version}",
+        "node": "Node",
+        "actor": "Actor",
+        "action": "Action",
+        "timestamp": "Timestamp"
+      }
     }
   }
 }

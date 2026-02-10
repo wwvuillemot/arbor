@@ -21,9 +21,7 @@ interface DiffPatch {
  * Each segment is [operation, text] where operation is:
  * -1 = deletion, 0 = equal, 1 = insertion
  */
-function parseDiffSegments(
-  diff: unknown,
-): Array<{ op: number; text: string }> {
+function parseDiffSegments(diff: unknown): Array<{ op: number; text: string }> {
   if (!diff) return [];
 
   // If diff is a string (patch text), parse it
@@ -122,10 +120,7 @@ export function DiffViewer({
       </div>
 
       {/* Summary */}
-      <div
-        className="flex gap-3 text-xs"
-        data-testid="diff-viewer-summary"
-      >
+      <div className="flex gap-3 text-xs" data-testid="diff-viewer-summary">
         <span className="text-green-600 dark:text-green-400">
           +{additionChars} {t("additions")}
         </span>
@@ -164,4 +159,3 @@ export function DiffViewer({
     </div>
   );
 }
-

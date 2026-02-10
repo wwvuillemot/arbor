@@ -408,4 +408,112 @@ describe("Provenance Router", () => {
       ).rejects.toThrow("Version 999 not found");
     });
   });
+
+  // ─── Audit Log (Cross-Node) ──────────────────────────────────────
+
+  describe("getAuditLog", () => {
+    it("should return entries across all nodes", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("AuditProject");
+      const noteA = await createTestNote(project.id, "A", { text: "a" });
+      const noteB = await createTestNote(project.id, "B", { text: "b" });
+
+      const entries = await caller.provenance.getAuditLog({});
+      // Both create events should appear (project + noteA + noteB)
+      expect(entries.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("should filter by actorType", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("AuditFilter");
+      await createTestNote(project.id, "N1", { text: "n1" });
+
+      // Update with LLM provenance
+      await nodeService.updateNode(project.id, {
+        content: { text: "llm edit" },
+        updatedBy: "llm:gpt-4o",
+      });
+
+      const llmEntries = await caller.provenance.getAuditLog({
+        actorType: "llm",
+      });
+      for (const entry of llmEntries) {
+        expect(entry.actorType).toBe("llm");
+      }
+    });
+
+    it("should filter by action type", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("AuditAction");
+      await createTestNote(project.id, "N2", { text: "n2" });
+
+      const createEntries = await caller.provenance.getAuditLog({
+        action: "create",
+      });
+      for (const entry of createEntries) {
+        expect(entry.action).toBe("create");
+      }
+    });
+  });
+
+  describe("getAuditLogCount", () => {
+    it("should return count of matching entries", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("CountProject");
+      await createTestNote(project.id, "C1", { text: "c" });
+
+      const totalCount = await caller.provenance.getAuditLogCount({});
+      expect(totalCount).toBeGreaterThanOrEqual(2); // project + note
+    });
+  });
+
+  describe("searchHistory", () => {
+    it("should find entries by content text", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("SearchPrj");
+      await createTestNote(project.id, "SearchNote", {
+        text: "xyzUniqueTerm789",
+      });
+
+      const results = await caller.provenance.searchHistory({
+        query: "xyzUniqueTerm789",
+      });
+      expect(results.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should return empty for no matches", async () => {
+      const caller = createCaller();
+      const results = await caller.provenance.searchHistory({
+        query: "impossibleTermThatNeverExists999",
+      });
+      expect(results).toEqual([]);
+    });
+  });
+
+  describe("exportAuditReport", () => {
+    it("should export as CSV", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("CSVExport");
+      await createTestNote(project.id, "CSVNote", { text: "csv" });
+
+      const csv = await caller.provenance.exportAuditReport({
+        format: "csv",
+      });
+      expect(csv).toContain("id,nodeId,version,actorType");
+      expect(csv).toContain("create");
+    });
+
+    it("should export as HTML", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("HTMLExport");
+      await createTestNote(project.id, "HTMLNote", { text: "html" });
+
+      const html = await caller.provenance.exportAuditReport({
+        format: "html",
+      });
+      expect(html).toContain("<!DOCTYPE html>");
+      expect(html).toContain("Audit Report");
+      expect(html).toContain("<table>");
+    });
+  });
 });
