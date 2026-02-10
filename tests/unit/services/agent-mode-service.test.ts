@@ -108,8 +108,8 @@ describe("AGENT_MODES", () => {
 // ─── buildSystemPrompt ──────────────────────────────────────────────────────────
 
 describe("buildSystemPrompt", () => {
-  it("should generate a prompt for assistant mode", () => {
-    const prompt = buildSystemPrompt("assistant");
+  it("should generate a prompt for assistant mode", async () => {
+    const prompt = await buildSystemPrompt("assistant");
     expect(prompt).toContain("You are Assistant");
     expect(prompt).toContain("Role:");
     expect(prompt).toContain("Available Tools:");
@@ -117,40 +117,40 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("create_node");
   });
 
-  it("should generate a prompt for planner mode", () => {
-    const prompt = buildSystemPrompt("planner");
+  it("should generate a prompt for planner mode", async () => {
+    const prompt = await buildSystemPrompt("planner");
     expect(prompt).toContain("You are Planner");
     expect(prompt).toContain("create_node");
     expect(prompt).toContain("move_node");
     expect(prompt).not.toContain("delete_node");
   });
 
-  it("should generate a prompt for editor mode", () => {
-    const prompt = buildSystemPrompt("editor");
+  it("should generate a prompt for editor mode", async () => {
+    const prompt = await buildSystemPrompt("editor");
     expect(prompt).toContain("You are Editor");
     expect(prompt).toContain("update_node");
     expect(prompt).not.toContain("create_node");
   });
 
-  it("should generate a prompt for researcher mode", () => {
-    const prompt = buildSystemPrompt("researcher");
+  it("should generate a prompt for researcher mode", async () => {
+    const prompt = await buildSystemPrompt("researcher");
     expect(prompt).toContain("You are Researcher");
     expect(prompt).toContain("search_semantic");
     expect(prompt).not.toContain("delete_node");
   });
 
-  it("should include project name when provided", () => {
-    const prompt = buildSystemPrompt("assistant", "My Novel");
+  it("should include project name when provided", async () => {
+    const prompt = await buildSystemPrompt("assistant", "My Novel");
     expect(prompt).toContain("Current Project: My Novel");
   });
 
-  it("should show 'No project selected' when no project given", () => {
-    const prompt = buildSystemPrompt("assistant");
+  it("should show 'No project selected' when no project given", async () => {
+    const prompt = await buildSystemPrompt("assistant");
     expect(prompt).toContain("No project selected");
   });
 
-  it("should throw for unknown mode", () => {
-    expect(() => buildSystemPrompt("unknown" as any)).toThrow(
+  it("should throw for unknown mode", async () => {
+    await expect(buildSystemPrompt("unknown" as any)).rejects.toThrow(
       "Unknown agent mode: unknown",
     );
   });
@@ -194,30 +194,30 @@ describe("filterToolsForMode", () => {
     },
   ];
 
-  it("should return all tools for assistant mode", () => {
-    const filtered = filterToolsForMode("assistant", allTools);
+  it("should return all tools for assistant mode", async () => {
+    const filtered = await filterToolsForMode("assistant", allTools);
     expect(filtered).toHaveLength(4);
   });
 
-  it("should only return create_node for planner (from the subset)", () => {
-    const filtered = filterToolsForMode("planner", allTools);
+  it("should only return create_node for planner (from the subset)", async () => {
+    const filtered = await filterToolsForMode("planner", allTools);
     expect(filtered).toHaveLength(1);
     expect(filtered[0].function.name).toBe("create_node");
   });
 
-  it("should only return update_node for editor (from the subset)", () => {
-    const filtered = filterToolsForMode("editor", allTools);
+  it("should only return update_node for editor (from the subset)", async () => {
+    const filtered = await filterToolsForMode("editor", allTools);
     expect(filtered).toHaveLength(1);
     expect(filtered[0].function.name).toBe("update_node");
   });
 
-  it("should only return search_semantic for researcher (from the subset)", () => {
-    const filtered = filterToolsForMode("researcher", allTools);
+  it("should only return search_semantic for researcher (from the subset)", async () => {
+    const filtered = await filterToolsForMode("researcher", allTools);
     expect(filtered).toHaveLength(1);
     expect(filtered[0].function.name).toBe("search_semantic");
   });
 
-  it("should return empty array when no tools match", () => {
+  it("should return empty array when no tools match", async () => {
     const noMatchTools: ToolDefinition[] = [
       {
         type: "function",
@@ -228,12 +228,12 @@ describe("filterToolsForMode", () => {
         },
       },
     ];
-    const filtered = filterToolsForMode("planner", noMatchTools);
+    const filtered = await filterToolsForMode("planner", noMatchTools);
     expect(filtered).toHaveLength(0);
   });
 
-  it("should throw for unknown mode", () => {
-    expect(() => filterToolsForMode("unknown" as any, allTools)).toThrow(
+  it("should throw for unknown mode", async () => {
+    await expect(filterToolsForMode("unknown" as any, allTools)).rejects.toThrow(
       "Unknown agent mode: unknown",
     );
   });
@@ -242,21 +242,21 @@ describe("filterToolsForMode", () => {
 // ─── getAgentModeConfig ─────────────────────────────────────────────────────────
 
 describe("getAgentModeConfig", () => {
-  it("should return config for valid mode", () => {
-    const config = getAgentModeConfig("assistant");
+  it("should return config for valid mode", async () => {
+    const config = await getAgentModeConfig("assistant");
     expect(config).not.toBeNull();
     expect(config!.name).toBe("assistant");
     expect(config!.displayName).toBe("Assistant");
   });
 
-  it("should return null for invalid mode", () => {
-    const config = getAgentModeConfig("nonexistent");
+  it("should return null for invalid mode", async () => {
+    const config = await getAgentModeConfig("nonexistent");
     expect(config).toBeNull();
   });
 
-  it("should return all four modes when queried individually", () => {
+  it("should return all four modes when queried individually", async () => {
     for (const modeName of ["assistant", "planner", "editor", "researcher"]) {
-      const config = getAgentModeConfig(modeName);
+      const config = await getAgentModeConfig(modeName);
       expect(config).not.toBeNull();
       expect(config!.name).toBe(modeName);
     }
@@ -266,8 +266,8 @@ describe("getAgentModeConfig", () => {
 // ─── getAllAgentModes ────────────────────────────────────────────────────────────
 
 describe("getAllAgentModes", () => {
-  it("should return all four modes as array", () => {
-    const modes = getAllAgentModes();
+  it("should return all four modes as array", async () => {
+    const modes = await getAllAgentModes();
     expect(modes).toHaveLength(4);
     const names = modes.map((m) => m.name);
     expect(names).toContain("assistant");
@@ -276,8 +276,8 @@ describe("getAllAgentModes", () => {
     expect(names).toContain("researcher");
   });
 
-  it("should return AgentModeConfig objects", () => {
-    const modes = getAllAgentModes();
+  it("should return AgentModeConfig objects", async () => {
+    const modes = await getAllAgentModes();
     for (const mode of modes) {
       expect(mode).toHaveProperty("name");
       expect(mode).toHaveProperty("displayName");
@@ -292,29 +292,29 @@ describe("getAllAgentModes", () => {
 // ─── isToolAllowedForMode ───────────────────────────────────────────────────────
 
 describe("isToolAllowedForMode", () => {
-  it("should return true for allowed tool in assistant mode", () => {
-    expect(isToolAllowedForMode("assistant", "create_node")).toBe(true);
-    expect(isToolAllowedForMode("assistant", "delete_node")).toBe(true);
-    expect(isToolAllowedForMode("assistant", "search_semantic")).toBe(true);
+  it("should return true for allowed tool in assistant mode", async () => {
+    expect(await isToolAllowedForMode("assistant", "create_node")).toBe(true);
+    expect(await isToolAllowedForMode("assistant", "delete_node")).toBe(true);
+    expect(await isToolAllowedForMode("assistant", "search_semantic")).toBe(true);
   });
 
-  it("should return false for disallowed tool in planner mode", () => {
-    expect(isToolAllowedForMode("planner", "delete_node")).toBe(false);
-    expect(isToolAllowedForMode("planner", "update_node")).toBe(false);
-    expect(isToolAllowedForMode("planner", "search_semantic")).toBe(false);
+  it("should return false for disallowed tool in planner mode", async () => {
+    expect(await isToolAllowedForMode("planner", "delete_node")).toBe(false);
+    expect(await isToolAllowedForMode("planner", "update_node")).toBe(false);
+    expect(await isToolAllowedForMode("planner", "search_semantic")).toBe(false);
   });
 
-  it("should return true for allowed tool in planner mode", () => {
-    expect(isToolAllowedForMode("planner", "create_node")).toBe(true);
-    expect(isToolAllowedForMode("planner", "move_node")).toBe(true);
-    expect(isToolAllowedForMode("planner", "add_tag")).toBe(true);
+  it("should return true for allowed tool in planner mode", async () => {
+    expect(await isToolAllowedForMode("planner", "create_node")).toBe(true);
+    expect(await isToolAllowedForMode("planner", "move_node")).toBe(true);
+    expect(await isToolAllowedForMode("planner", "add_tag")).toBe(true);
   });
 
-  it("should return false for unknown mode", () => {
-    expect(isToolAllowedForMode("unknown" as any, "create_node")).toBe(false);
+  it("should return false for unknown mode", async () => {
+    expect(await isToolAllowedForMode("unknown" as any, "create_node")).toBe(false);
   });
 
-  it("should return false for nonexistent tool", () => {
-    expect(isToolAllowedForMode("assistant", "nonexistent_tool")).toBe(false);
+  it("should return false for nonexistent tool", async () => {
+    expect(await isToolAllowedForMode("assistant", "nonexistent_tool")).toBe(false);
   });
 });

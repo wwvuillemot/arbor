@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@server/db/schema";
 import { sql } from "drizzle-orm";
+import { seedAgentModes } from "@server/db/seed";
 
 // CRITICAL: Use a separate test database to avoid wiping production data!
 // Tests run resetTestDb() before each test which DELETES ALL DATA
@@ -105,6 +106,9 @@ export async function resetTestDb() {
         `⚠️  TRUNCATE did not clear all data! nodes=${nodes_count}, prefs=${prefs_count}, settings=${settings_count}, media=${media_count}, tags=${tags_count}, node_tags=${node_tags_count}, threads=${threads_count}, messages=${messages_count}, history=${history_count}`,
       );
     }
+
+    // Seed built-in agent modes after truncate
+    await seedAgentModes();
   } catch (error) {
     // If TRUNCATE fails (e.g., tables don't exist yet), fall back to DELETE
     const db = getTestDb();
@@ -118,8 +122,16 @@ export async function resetTestDb() {
       await db.delete(schema.nodes);
       await db.delete(schema.userPreferences);
       await db.delete(schema.appSettings);
+      await db.delete(schema.agentModes);
     } catch (deleteError) {
       // Tables don't exist yet, ignore
+    }
+
+    // Seed built-in agent modes after delete
+    try {
+      await seedAgentModes();
+    } catch (seedError) {
+      // Ignore seed errors in case table doesn't exist yet
     }
   }
 }

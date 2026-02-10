@@ -6,6 +6,10 @@ import {
   getAllAgentModes,
   getAgentModeConfig,
   buildSystemPrompt,
+  createAgentMode,
+  updateAgentMode,
+  deleteAgentMode,
+  listCustomAgentModes,
 } from "../../services/agent-mode-service";
 
 const chatService = new ChatService();
@@ -166,23 +170,77 @@ export const chatRouter = router({
   // ─── Agent Mode Endpoints ─────────────────────────────────────────
 
   /**
-   * List all available agent modes
+   * List all available agent modes (built-in + custom)
    */
-  listAgentModes: publicProcedure.query(() => {
-    return getAllAgentModes();
+  listAgentModes: publicProcedure.query(async () => {
+    return await getAllAgentModes();
   }),
 
   /**
-   * Get a specific agent mode configuration
+   * List only custom (non-built-in) agent modes
+   */
+  listCustomAgentModes: publicProcedure.query(async () => {
+    return await listCustomAgentModes();
+  }),
+
+  /**
+   * Get a specific agent mode configuration by name
    */
   getAgentMode: publicProcedure
-    .input(z.object({ mode: z.enum(agentModeEnum) }))
-    .query(({ input }) => {
-      const config = getAgentModeConfig(input.mode);
+    .input(z.object({ mode: z.string() }))
+    .query(async ({ input }) => {
+      const config = await getAgentModeConfig(input.mode);
       if (!config) {
         throw new Error(`Unknown agent mode: ${input.mode}`);
       }
       return config;
+    }),
+
+  /**
+   * Create a new custom agent mode
+   */
+  createAgentMode: publicProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(50),
+        displayName: z.string().min(1).max(100),
+        description: z.string().min(1),
+        allowedTools: z.array(z.string()),
+        guidelines: z.string().min(1),
+        temperature: z.number().min(0).max(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await createAgentMode(input);
+    }),
+
+  /**
+   * Update an existing custom agent mode
+   */
+  updateAgentMode: publicProcedure
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        displayName: z.string().min(1).max(100).optional(),
+        description: z.string().min(1).optional(),
+        allowedTools: z.array(z.string()).optional(),
+        guidelines: z.string().min(1).optional(),
+        temperature: z.number().min(0).max(1).optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { id, ...params } = input;
+      return await updateAgentMode(id, params);
+    }),
+
+  /**
+   * Delete a custom agent mode
+   */
+  deleteAgentMode: publicProcedure
+    .input(z.object({ id: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      const success = await deleteAgentMode(input.id);
+      return { success };
     }),
 
   /**
@@ -191,13 +249,13 @@ export const chatRouter = router({
   buildSystemPrompt: publicProcedure
     .input(
       z.object({
-        mode: z.enum(agentModeEnum),
+        mode: z.string(),
         projectName: z.string().optional(),
       }),
     )
-    .query(({ input }) => {
+    .query(async ({ input }) => {
       return {
-        prompt: buildSystemPrompt(input.mode, input.projectName),
+        prompt: await buildSystemPrompt(input.mode, input.projectName),
       };
     }),
 });
