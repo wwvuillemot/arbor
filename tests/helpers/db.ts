@@ -61,7 +61,7 @@ export async function resetTestDb() {
     // Use raw SQL to truncate all tables
     // TRUNCATE is faster than DELETE and resets auto-increment sequences
     // CASCADE ensures that dependent rows in other tables are also deleted
-    await testClient!`TRUNCATE TABLE chat_messages, chat_threads, node_tags, tags, media_attachments, nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`;
+    await testClient!`TRUNCATE TABLE node_history, chat_messages, chat_threads, node_tags, tags, media_attachments, nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`;
 
     // Verify the truncate worked
     const counts = await testClient!`
@@ -73,7 +73,8 @@ export async function resetTestDb() {
         (SELECT COUNT(*) FROM tags) as tags_count,
         (SELECT COUNT(*) FROM node_tags) as node_tags_count,
         (SELECT COUNT(*) FROM chat_threads) as threads_count,
-        (SELECT COUNT(*) FROM chat_messages) as messages_count
+        (SELECT COUNT(*) FROM chat_messages) as messages_count,
+        (SELECT COUNT(*) FROM node_history) as history_count
     `;
     const {
       nodes_count,
@@ -84,6 +85,7 @@ export async function resetTestDb() {
       node_tags_count,
       threads_count,
       messages_count,
+      history_count,
     } = counts[0];
     if (
       nodes_count !== "0" ||
@@ -93,16 +95,18 @@ export async function resetTestDb() {
       tags_count !== "0" ||
       node_tags_count !== "0" ||
       threads_count !== "0" ||
-      messages_count !== "0"
+      messages_count !== "0" ||
+      history_count !== "0"
     ) {
       console.error(
-        `⚠️  TRUNCATE did not clear all data! nodes=${nodes_count}, prefs=${prefs_count}, settings=${settings_count}, media=${media_count}, tags=${tags_count}, node_tags=${node_tags_count}, threads=${threads_count}, messages=${messages_count}`,
+        `⚠️  TRUNCATE did not clear all data! nodes=${nodes_count}, prefs=${prefs_count}, settings=${settings_count}, media=${media_count}, tags=${tags_count}, node_tags=${node_tags_count}, threads=${threads_count}, messages=${messages_count}, history=${history_count}`,
       );
     }
   } catch (error) {
     // If TRUNCATE fails (e.g., tables don't exist yet), fall back to DELETE
     const db = getTestDb();
     try {
+      await db.delete(schema.nodeHistory);
       await db.delete(schema.chatMessages);
       await db.delete(schema.chatThreads);
       await db.delete(schema.nodeTags);

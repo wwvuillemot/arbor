@@ -494,3 +494,107 @@ export const chatMessages = pgTable(
 // Type inference for TypeScript
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type NewChatMessage = typeof chatMessages.$inferInsert;
+
+/**
+ * Actor Types for Provenance Tracking
+ *
+ * Identifies who made a change:
+ * - user: Human user action
+ * - llm: AI/LLM generated change
+ * - system: Automated system action (migrations, imports, etc.)
+ */
+export const actorTypeEnum = ["user", "llm", "system"] as const;
+export type ActorType = (typeof actorTypeEnum)[number];
+
+/**
+ * History Action Types
+ *
+ * Types of actions tracked in version history:
+ * - create: Node was created
+ * - update: Node content or properties were modified
+ * - delete: Node was soft-deleted
+ * - move: Node was moved to a different parent
+ * - restore: Node was restored from soft-delete
+ */
+export const historyActionEnum = [
+  "create",
+  "update",
+  "delete",
+  "move",
+  "restore",
+] as const;
+export type HistoryAction = (typeof historyActionEnum)[number];
+
+/**
+ * Node History Table
+ *
+ * Tracks all changes to nodes with granular provenance.
+ * Each row represents a single version/change event.
+ *
+ * Provenance metadata examples:
+ * - User: {user_id: "alice", username: "Alice", session_id: "sess-123"}
+ * - LLM: {model: "gpt-4o", mode: "editor", thread_id: "uuid", message_id: "uuid", tool_call_id: "tc-1"}
+ * - System: {action: "import", source: "markdown_file"}
+ *
+ * Diff format (JSONB):
+ * - For text content: array of diff-match-patch operations
+ * - For metadata: JSON patch operations (RFC 6902)
+ * - For moves: {from_parent_id, to_parent_id, from_position, to_position}
+ */
+export const nodeHistory = pgTable(
+  "node_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // The node this history entry belongs to
+    nodeId: uuid("node_id")
+      .references(() => nodes.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Monotonically increasing version number per node
+    version: integer("version").notNull(),
+
+    // Who made the change
+    actorType: varchar("actor_type", { length: 20 }).notNull(),
+
+    // Actor identifier (user_id or model name)
+    actorId: varchar("actor_id", { length: 255 }),
+
+    // What type of change was made
+    action: varchar("action", { length: 50 }).notNull(),
+
+    // Content before the change (null for create actions)
+    contentBefore: jsonb("content_before"),
+
+    // Content after the change (null for delete actions)
+    contentAfter: jsonb("content_after"),
+
+    // Structured diff (diff-match-patch for text, JSON patch for metadata)
+    diff: jsonb("diff"),
+
+    // Additional context about the change
+    // User: {user_id, username, session_id}
+    // LLM: {model, mode, thread_id, message_id, tool_call_id}
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+
+    // Timestamp of the change
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Primary lookup: all versions of a node, newest first
+    nodeVersionIdx: index("idx_node_history_node_version").on(
+      table.nodeId,
+      table.version,
+    ),
+    // Filter by actor type (user vs LLM changes)
+    actorTypeIdx: index("idx_node_history_actor_type").on(table.actorType),
+    // Filter by action type
+    actionIdx: index("idx_node_history_action").on(table.action),
+    // Timeline queries
+    createdAtIdx: index("idx_node_history_created_at").on(table.createdAt),
+  }),
+);
+
+// Type inference for TypeScript
+export type NodeHistory = typeof nodeHistory.$inferSelect;
+export type NewNodeHistory = typeof nodeHistory.$inferInsert;

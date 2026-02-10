@@ -43,6 +43,13 @@
       "when": 1770677421528,
       "tag": "0005_worthless_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770686506102,
+      "tag": "0006_funny_doomsday",
+      "breakpoints": true
     }
   ]
 }

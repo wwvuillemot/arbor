@@ -64,6 +64,9 @@ importers:
       dataloader:
         specifier: ^2.2.3
         version: 2.2.3
+      diff-match-patch:
+        specifier: ^1.0.5
+        version: 1.0.5
       drizzle-orm:
         specifier: ^0.38.3
         version: 0.38.4(@types/react@19.2.13)(postgres@3.4.8)(react@19.2.4)
@@ -126,6 +129,9 @@ importers:
       "@testing-library/react":
         specifier: ^16.3.2
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.13))(@types/react@19.2.13)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      "@types/diff-match-patch":
+        specifier: ^1.0.36
+        version: 1.0.36
       "@types/minio":
         specifier: ^7.1.1
         version: 7.1.1
@@ -3849,6 +3855,12 @@ packages:
         integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==,
       }
 
+  "@types/diff-match-patch@1.0.36":
+    resolution:
+      {
+        integrity: sha512-xFdR6tkm0MWvBfO8xXCSsinYxHcqkQUlcHeSpMC2ukzOb6lwQAfDmW+Qt0AvlGd8HpsS28qKsB+oPeJn9I39jg==,
+      }
+
   "@types/es-aggregate-error@1.0.6":
     resolution:
       {
@@ -5254,6 +5266,12 @@ packages:
     resolution:
       {
         integrity: sha512-gxtyfqMg7GKyhQmb056K7M3xszy/myH8w+B4RT+QXBQsvAOdc3XymqDDPHx1BgPgsdAA5SIifona89YtRATDzw==,
+      }
+
+  diff-match-patch@1.0.5:
+    resolution:
+      {
+        integrity: sha512-IayShXAgj/QMXgB0IWmKx+rOPuGMhqm5w6jvFxmVenXKIzRqTAAsbBPT3kWQeGANj3jGgvcvv4yK6SxqYmikgw==,
       }
 
   dir-glob@3.0.1:
@@ -11810,6 +11828,8 @@ snapshots:
     dependencies:
       "@types/node": 22.19.9
 
+  "@types/diff-match-patch@1.0.36": {}
+
   "@types/es-aggregate-error@1.0.6":
     dependencies:
       "@types/node": 22.19.9
@@ -12644,6 +12664,8 @@ snapshots:
   detect-node-es@1.1.0: {}
 
   didyoumean@1.2.2: {}
+
+  diff-match-patch@1.0.5: {}
 
   dir-glob@3.0.1:
     dependencies:
