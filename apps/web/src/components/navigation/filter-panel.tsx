@@ -205,14 +205,19 @@ export function FilterPanel({
                     ? "aiAssisted"
                     : filter;
 
+              const isActive = attributionFilter === filter;
+
               return (
                 <button
                   key={filter}
-                  onClick={() => setAttributionFilter(filter)}
+                  onClick={() => {
+                    // Toggle: if already active, reset to "all", otherwise activate this filter
+                    setAttributionFilter(isActive ? "all" : filter);
+                  }}
                   data-testid={`attribution-filter-${filter}`}
                   className={cn(
                     "rounded-md px-2 py-1 text-xs font-medium transition-colors whitespace-nowrap",
-                    attributionFilter === filter
+                    isActive
                       ? "bg-primary text-primary-foreground"
                       : "border bg-background hover:bg-accent",
                   )}
@@ -225,11 +230,14 @@ export function FilterPanel({
         </div>
       </div>
 
-      {/* Clear All Button */}
-      {hasActiveFilters && (
+      {/* Clear All Button - only for search and tags */}
+      {(searchQuery.length > 0 || selectedTagIds.length > 0) && (
         <div className="flex justify-end">
           <button
-            onClick={handleClearAll}
+            onClick={() => {
+              setSearchQuery("");
+              setSelectedTagIds([]);
+            }}
             data-testid="filter-panel-clear-all"
             className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm hover:bg-accent transition-colors"
           >

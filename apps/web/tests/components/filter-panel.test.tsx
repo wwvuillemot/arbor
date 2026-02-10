@@ -49,7 +49,7 @@ vi.mock("next-intl", () => ({
           selectTags: "Select tags...",
         },
         attributionFilter: {
-          all: "All",
+          all: "Any",
           human: "Human",
           aiGenerated: "AI-generated",
           aiAssisted: "AI-assisted",
@@ -185,7 +185,7 @@ describe("FilterPanel", () => {
       />,
     );
 
-    expect(screen.getByText("All")).toBeInTheDocument();
+    expect(screen.getByText("Any")).toBeInTheDocument();
     expect(screen.getByText("Human")).toBeInTheDocument();
     expect(screen.getByText("AI-generated")).toBeInTheDocument();
     expect(screen.getByText("AI-assisted")).toBeInTheDocument();
@@ -221,7 +221,27 @@ describe("FilterPanel", () => {
     expect(humanButton).toHaveClass("bg-primary");
   });
 
-  it("should clear all filters when clear button clicked", async () => {
+  it("should toggle attribution filter off when clicked again", () => {
+    render(
+      <FilterPanel
+        onSearchChange={mockOnSearchChange}
+        onTagsChange={mockOnTagsChange}
+        onAttributionChange={mockOnAttributionChange}
+      />,
+    );
+
+    const humanButton = screen.getByTestId("attribution-filter-human");
+
+    // Click to activate
+    fireEvent.click(humanButton);
+    expect(mockOnAttributionChange).toHaveBeenCalledWith("human");
+
+    // Click again to deactivate (reset to "all")
+    fireEvent.click(humanButton);
+    expect(mockOnAttributionChange).toHaveBeenCalledWith("all");
+  });
+
+  it("should clear search and tags when clear button clicked", async () => {
     vi.useFakeTimers();
 
     render(
@@ -239,8 +259,11 @@ describe("FilterPanel", () => {
     // Advance timers to trigger debounced search
     await vi.advanceTimersByTimeAsync(300);
 
-    const humanButton = screen.getByTestId("attribution-filter-human");
-    fireEvent.click(humanButton);
+    // Select a tag
+    const tagButton = screen.getByTestId("filter-panel-tag-selector");
+    fireEvent.click(tagButton);
+    const tag1 = screen.getByTestId("tag-option-tag-1");
+    fireEvent.click(tag1);
 
     // Clear the mocks to start fresh
     mockOnSearchChange.mockClear();
@@ -256,12 +279,13 @@ describe("FilterPanel", () => {
 
     expect(mockOnSearchChange).toHaveBeenCalledWith("");
     expect(mockOnTagsChange).toHaveBeenCalledWith([], "OR");
-    expect(mockOnAttributionChange).toHaveBeenCalledWith("all");
+    // Attribution filter should NOT be cleared (it's a toggle now)
+    expect(mockOnAttributionChange).not.toHaveBeenCalled();
 
     vi.useRealTimers();
   });
 
-  it("should show clear button only when filters are active", () => {
+  it("should show clear button only when search or tags are active", () => {
     const { rerender } = render(
       <FilterPanel
         onSearchChange={mockOnSearchChange}
@@ -275,7 +299,7 @@ describe("FilterPanel", () => {
       screen.queryByTestId("filter-panel-clear-all"),
     ).not.toBeInTheDocument();
 
-    // Add a filter
+    // Add a search filter
     const searchInput = screen.getByPlaceholderText("Search nodes...");
     fireEvent.change(searchInput, { target: { value: "test" } });
 
@@ -289,5 +313,24 @@ describe("FilterPanel", () => {
     );
 
     expect(screen.getByTestId("filter-panel-clear-all")).toBeInTheDocument();
+  });
+
+  it("should NOT show clear button when only attribution filter is active", () => {
+    render(
+      <FilterPanel
+        onSearchChange={mockOnSearchChange}
+        onTagsChange={mockOnTagsChange}
+        onAttributionChange={mockOnAttributionChange}
+      />,
+    );
+
+    // Click attribution filter
+    const humanButton = screen.getByTestId("attribution-filter-human");
+    fireEvent.click(humanButton);
+
+    // Clear button should NOT appear (attribution is a toggle)
+    expect(
+      screen.queryByTestId("filter-panel-clear-all"),
+    ).not.toBeInTheDocument();
   });
 });
