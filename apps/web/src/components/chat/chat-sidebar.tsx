@@ -52,7 +52,7 @@ export function ChatSidebar({ isOpen, onClose, className }: ChatSidebarProps) {
 
       {/* Chat panel content */}
       <div className="flex-1 min-h-0">
-        <ChatPanel className="h-full" />
+        <ChatPanel className="h-full" showThreadSidebar={false} />
       </div>
     </div>
   );
