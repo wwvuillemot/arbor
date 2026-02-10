@@ -21,6 +21,7 @@
       "title": "設定",
       "preferences": "設定",
       "integrations": "統合",
+      "agentModes": "エージェントモード",
       "configuration": "構成"
     },
     "appearance": "外観",
@@ -99,6 +100,41 @@
           "warning": "⚠️ このキーは安全に保管してください。紛失した場合、すべての暗号化された設定を再入力する必要があります。"
         }
       }
+    },
+    "agentModes": {
+      "description": "カスタムツール制限と動作ガイドラインを持つAIエージェントモードを管理します。",
+      "loading": "エージェントモードを読み込み中...",
+      "createMode": "モードを作成",
+      "editMode": "モードを編集",
+      "edit": "編集",
+      "delete": "削除",
+      "confirmDelete": "もう一度クリックして確認",
+      "builtIn": "組み込み",
+      "temperature": "温度",
+      "tools": "ツール",
+      "allTools": "すべてのツール",
+      "toolsCount": "ツール",
+      "errorSaving": "エージェントモードの保存に失敗しました",
+      "form": {
+        "name": "名前",
+        "namePlaceholder": "my-custom-mode",
+        "nameHint": "小文字、数字、ハイフン、アンダースコアのみ",
+        "displayName": "表示名",
+        "displayNamePlaceholder": "マイカスタムモード",
+        "description": "説明",
+        "descriptionPlaceholder": "このモードが何をするかの簡単な説明...",
+        "guidelines": "ガイドライン",
+        "guidelinesPlaceholder": "このモードでのAIエージェントの動作ガイドライン...",
+        "guidelinesHint": "これらのガイドラインはシステムプロンプトに含まれます",
+        "temperature": "温度",
+        "temperatureHint": "低い値（0.0-0.3）はより集中的、高い値（0.7-1.0）はより創造的",
+        "allowedTools": "許可されたツール",
+        "allowedToolsPlaceholder": "create_node, update_node, search_semantic",
+        "allowedToolsHint": "カンマ区切りのツール名リスト。すべてのツールを許可する場合は空のままにします。",
+        "cancel": "キャンセル",
+        "save": "保存",
+        "saving": "保存中..."
+      }
     }
   },
   "commandPalette": {
@@ -116,34 +152,56 @@
       "dashboard": {
         "label": "ダッシュボードへ移動",
         "description": "ダッシュボードを表示",
-        "keywords": ["ホーム", "概要"]
+        "keywords": [
+          "ホーム",
+          "概要"
+        ]
       },
       "search": {
         "label": "検索へ移動",
         "description": "コンテンツを検索",
-        "keywords": ["検索", "探す"]
+        "keywords": [
+          "検索",
+          "探す"
+        ]
       },
       "projects": {
         "label": "プロジェクトへ移動",
         "description": "プロジェクトを閲覧",
-        "keywords": ["フォルダ", "ファイル", "プロジェクト"]
+        "keywords": [
+          "フォルダ",
+          "ファイル",
+          "プロジェクト"
+        ]
       },
       "chat": {
         "label": "AIチャットへ移動",
         "description": "AIアシスタントとチャット",
-        "keywords": ["AI", "アシスタント", "ヘルプ"]
+        "keywords": [
+          "AI",
+          "アシスタント",
+          "ヘルプ"
+        ]
       },
       "settings": {
         "label": "設定へ移動",
         "description": "設定を変更",
-        "keywords": ["設定", "環境設定", "オプション"]
+        "keywords": [
+          "設定",
+          "環境設定",
+          "オプション"
+        ]
       }
     },
     "help": {
       "about": {
         "label": "Arborについて",
         "description": "Arborの情報を表示",
-        "keywords": ["について", "情報", "バージョン"]
+        "keywords": [
+          "について",
+          "情報",
+          "バージョン"
+        ]
       }
     }
   },

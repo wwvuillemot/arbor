@@ -21,6 +21,7 @@
       "title": "Settings",
       "preferences": "Preferences",
       "integrations": "Integrations",
+      "agentModes": "Agent Modes",
       "configuration": "Configuration"
     },
     "appearance": "Appearance",
@@ -99,6 +100,41 @@
           "warning": "⚠️ Keep this key secure. If lost, you will need to re-enter all encrypted settings."
         }
       }
+    },
+    "agentModes": {
+      "description": "Manage AI agent modes with custom tool restrictions and behavioral guidelines.",
+      "loading": "Loading agent modes...",
+      "createMode": "Create Mode",
+      "editMode": "Edit Mode",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirmDelete": "Click again to confirm",
+      "builtIn": "Built-in",
+      "temperature": "Temperature",
+      "tools": "Tools",
+      "allTools": "All tools",
+      "toolsCount": "tools",
+      "errorSaving": "Failed to save agent mode",
+      "form": {
+        "name": "Name",
+        "namePlaceholder": "my-custom-mode",
+        "nameHint": "Lowercase letters, numbers, hyphens, and underscores only",
+        "displayName": "Display Name",
+        "displayNamePlaceholder": "My Custom Mode",
+        "description": "Description",
+        "descriptionPlaceholder": "A brief description of what this mode does...",
+        "guidelines": "Guidelines",
+        "guidelinesPlaceholder": "Behavioral guidelines for the AI agent in this mode...",
+        "guidelinesHint": "These guidelines will be included in the system prompt",
+        "temperature": "Temperature",
+        "temperatureHint": "Lower values (0.0-0.3) are more focused, higher values (0.7-1.0) are more creative",
+        "allowedTools": "Allowed Tools",
+        "allowedToolsPlaceholder": "create_node, update_node, search_semantic",
+        "allowedToolsHint": "Comma-separated list of tool names. Leave empty to allow all tools.",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving..."
+      }
     }
   },
   "commandPalette": {
@@ -116,34 +152,56 @@
       "dashboard": {
         "label": "Go to Dashboard",
         "description": "View your dashboard",
-        "keywords": ["home", "overview"]
+        "keywords": [
+          "home",
+          "overview"
+        ]
       },
       "search": {
         "label": "Go to Search",
         "description": "Search your content",
-        "keywords": ["find", "lookup"]
+        "keywords": [
+          "find",
+          "lookup"
+        ]
       },
       "projects": {
         "label": "Go to Projects",
         "description": "Browse your projects",
-        "keywords": ["folders", "files", "projects"]
+        "keywords": [
+          "folders",
+          "files",
+          "projects"
+        ]
       },
       "chat": {
         "label": "Go to AI Chat",
         "description": "Chat with AI assistant",
-        "keywords": ["ai", "assistant", "help"]
+        "keywords": [
+          "ai",
+          "assistant",
+          "help"
+        ]
       },
       "settings": {
         "label": "Go to Settings",
         "description": "Configure your preferences",
-        "keywords": ["preferences", "config", "options"]
+        "keywords": [
+          "preferences",
+          "config",
+          "options"
+        ]
       }
     },
     "help": {
       "about": {
         "label": "About Arbor",
         "description": "View information about Arbor",
-        "keywords": ["about", "info", "version"]
+        "keywords": [
+          "about",
+          "info",
+          "version"
+        ]
       }
     }
   },

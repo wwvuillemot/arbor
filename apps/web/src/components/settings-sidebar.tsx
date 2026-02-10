@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Settings, Palette, Key, Cog } from "lucide-react";
+import { Settings, Palette, Key, Cog, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SettingsNavItem {
@@ -26,6 +26,12 @@ const settingsNavItems: SettingsNavItem[] = [
     labelKey: "integrations",
     href: "/settings/integrations",
     icon: Key,
+  },
+  {
+    id: "agentModes",
+    labelKey: "agentModes",
+    href: "/settings/agent-modes",
+    icon: Bot,
   },
   {
     id: "configuration",
