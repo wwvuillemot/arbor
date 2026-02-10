@@ -2,58 +2,74 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { X } from "lucide-react";
+import { MessageSquare, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChatPanel } from "./chat-panel";
 
 export interface ChatSidebarProps {
   isOpen: boolean;
-  onClose: () => void;
+  onToggle: () => void;
   className?: string;
 }
 
 /**
- * ChatSidebar - Right-hand flyout sidebar for AI chat
+ * ChatSidebar - Right-hand sidebar for AI chat that pushes content left
  *
  * Features:
- * - Flyout from right side of screen
- * - Fixed width (384px / w-96)
- * - Close button in header
- * - Reuses ChatPanel component for chat functionality
- * - Positioned absolutely on right side
+ * - Slides in/out from right side
+ * - Sticky tab on right edge when closed
+ * - Pushes content left when open (not overlay)
+ * - Fixed width (384px / w-96) when open
+ * - Tab width (40px) when closed
  */
-export function ChatSidebar({ isOpen, onClose, className }: ChatSidebarProps) {
+export function ChatSidebar({ isOpen, onToggle, className }: ChatSidebarProps) {
   const t = useTranslations("chat");
-
-  if (!isOpen) {
-    return null;
-  }
 
   return (
     <div
       data-testid="chat-sidebar"
       className={cn(
-        "fixed top-0 right-0 bottom-0 w-96 bg-background border-l shadow-lg z-50 flex flex-col",
+        "h-full bg-background border-l flex flex-col transition-all duration-300 ease-in-out",
+        isOpen ? "w-96" : "w-10",
         className,
       )}
     >
-      {/* Header with close button */}
-      <div className="flex items-center justify-between p-3 border-b">
-        <h2 className="text-lg font-semibold">{t("title")}</h2>
-        <button
-          data-testid="chat-sidebar-close"
-          onClick={onClose}
-          className="p-1 rounded hover:bg-muted transition-colors"
-          title={t("close")}
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
+      {isOpen ? (
+        <>
+          {/* Header with close button */}
+          <div className="flex items-center justify-between p-3 border-b">
+            <h2 className="text-lg font-semibold">{t("title")}</h2>
+            <button
+              data-testid="chat-sidebar-close"
+              onClick={onToggle}
+              className="p-1 rounded hover:bg-muted transition-colors"
+              title={t("close")}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-      {/* Chat panel content */}
-      <div className="flex-1 min-h-0">
-        <ChatPanel className="h-full" showThreadSidebar={false} />
-      </div>
+          {/* Chat panel content */}
+          <div className="flex-1 min-h-0">
+            <ChatPanel className="h-full" showThreadSidebar={false} />
+          </div>
+        </>
+      ) : (
+        /* Sticky tab when closed */
+        <button
+          data-testid="chat-sidebar-tab"
+          onClick={onToggle}
+          className="h-full w-full flex items-center justify-center hover:bg-accent transition-colors group"
+          title={t("title")}
+        >
+          <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-accent-foreground">
+            <MessageSquare className="w-5 h-5" />
+            <span className="text-xs writing-mode-vertical-rl transform rotate-180">
+              {t("title")}
+            </span>
+          </div>
+        </button>
+      )}
     </div>
   );
 }

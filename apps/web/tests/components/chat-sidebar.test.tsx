@@ -80,54 +80,56 @@ vi.mock("next-intl", () => ({
 }));
 
 describe("ChatSidebar", () => {
-  const mockOnClose = vi.fn();
+  const mockOnToggle = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("should render when open", () => {
-    render(<ChatSidebar isOpen={true} onClose={mockOnClose} />);
+  it("should always render (open or closed)", () => {
+    const { rerender } = render(<ChatSidebar isOpen={true} onToggle={mockOnToggle} />);
+    expect(screen.getByTestId("chat-sidebar")).toBeInTheDocument();
+
+    rerender(<ChatSidebar isOpen={false} onToggle={mockOnToggle} />);
     expect(screen.getByTestId("chat-sidebar")).toBeInTheDocument();
   });
 
-  it("should not render when closed", () => {
-    render(<ChatSidebar isOpen={false} onClose={mockOnClose} />);
-    expect(screen.queryByTestId("chat-sidebar")).not.toBeInTheDocument();
-  });
-
-  it("should render close button", () => {
-    render(<ChatSidebar isOpen={true} onClose={mockOnClose} />);
+  it("should render close button when open", () => {
+    render(<ChatSidebar isOpen={true} onToggle={mockOnToggle} />);
     expect(screen.getByTestId("chat-sidebar-close")).toBeInTheDocument();
   });
 
-  it("should call onClose when close button clicked", () => {
-    render(<ChatSidebar isOpen={true} onClose={mockOnClose} />);
-    fireEvent.click(screen.getByTestId("chat-sidebar-close"));
-    expect(mockOnClose).toHaveBeenCalledTimes(1);
+  it("should render sticky tab when closed", () => {
+    render(<ChatSidebar isOpen={false} onToggle={mockOnToggle} />);
+    expect(screen.getByTestId("chat-sidebar-tab")).toBeInTheDocument();
   });
 
-  it("should render chat panel content", () => {
-    render(<ChatSidebar isOpen={true} onClose={mockOnClose} />);
+  it("should call onToggle when close button clicked", () => {
+    render(<ChatSidebar isOpen={true} onToggle={mockOnToggle} />);
+    fireEvent.click(screen.getByTestId("chat-sidebar-close"));
+    expect(mockOnToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("should call onToggle when tab clicked", () => {
+    render(<ChatSidebar isOpen={false} onToggle={mockOnToggle} />);
+    fireEvent.click(screen.getByTestId("chat-sidebar-tab"));
+    expect(mockOnToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("should render chat panel content when open", () => {
+    render(<ChatSidebar isOpen={true} onToggle={mockOnToggle} />);
     expect(screen.getByTestId("chat-panel")).toBeInTheDocument();
   });
 
-  it("should have fixed width", () => {
-    render(<ChatSidebar isOpen={true} onClose={mockOnClose} />);
+  it("should have full width when open", () => {
+    render(<ChatSidebar isOpen={true} onToggle={mockOnToggle} />);
     const sidebar = screen.getByTestId("chat-sidebar");
     expect(sidebar).toHaveClass("w-96"); // 384px = 96 * 4px
   });
 
-  it("should be positioned on the right", () => {
-    render(<ChatSidebar isOpen={true} onClose={mockOnClose} />);
+  it("should have tab width when closed", () => {
+    render(<ChatSidebar isOpen={false} onToggle={mockOnToggle} />);
     const sidebar = screen.getByTestId("chat-sidebar");
-    expect(sidebar).toHaveClass("right-0");
-  });
-
-  it("should have shadow and border", () => {
-    render(<ChatSidebar isOpen={true} onClose={mockOnClose} />);
-    const sidebar = screen.getByTestId("chat-sidebar");
-    expect(sidebar).toHaveClass("shadow-lg");
-    expect(sidebar).toHaveClass("border-l");
+    expect(sidebar).toHaveClass("w-10"); // 40px tab width
   });
 });
