@@ -1168,3 +1168,498 @@ query GetNodeWithContext($id: ID!) {
 | Search by tags      | GraphQL | Complex filtering, relationships           |
 | AI context building | GraphQL | Flexible queries, graph traversal          |
 | RAG pipeline        | GraphQL | Vector search + graph traversal            |
+
+---
+
+## Phase 6: UX Architecture (In Progress)
+
+### Projects Page Layout
+
+The Projects page is the primary workspace with three main sections:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Header: Breadcrumb, Actions, Chat Toggle                       │
+├──────────────┬──────────────────────────────┬───────────────────┤
+│              │                              │                   │
+│  Left Panel  │      Center Panel            │  Right Sidebar    │
+│  (300px)     │      (flex-1)                │  (400px)          │
+│              │                              │  (collapsible)    │
+│ ┌──────────┐ │ ┌──────────────────────────┐ │ ┌───────────────┐ │
+│ │ Filter   │ │ │ Editor                   │ │ │ Chat Sidebar  │ │
+│ │ Panel    │ │ │ - TipTap                 │ │ │ - Threads     │ │
+│ └──────────┘ │ │ - Markdown               │ │ │ - Messages    │ │
+│              │ │ - Attribution            │ │ │ - Input       │ │
+│ ┌──────────┐ │ └──────────────────────────┘ │ │ - Model       │ │
+│ │ File     │ │                              │ │   Selector    │ │
+│ │ Tree     │ │ ┌──────────────────────────┐ │ └───────────────┘ │
+│ │          │ │ │ Version History          │ │                   │
+│ │          │ │ │ (collapsible)            │ │ OR                │
+│ │          │ │ └──────────────────────────┘ │                   │
+│ │          │ │                              │ ┌───────────────┐ │
+│ └──────────┘ │                              │ │ Tag Browser   │ │
+│              │                              │ │ (when chat    │ │
+│              │                              │ │  closed)      │ │
+│              │                              │ └───────────────┘ │
+└──────────────┴──────────────────────────────┴───────────────────┘
+```
+
+### FilterPanel Component
+
+**Purpose:** Unified filtering UI consolidating search, tags, and attribution
+
+**Location:** `apps/web/src/components/navigation/filter-panel.tsx`
+
+**Props:**
+
+```typescript
+interface FilterPanelProps {
+  onSearchChange: (query: string) => void;
+  onTagsChange: (tagIds: string[], operator: "AND" | "OR") => void;
+  onAttributionChange: (filter: AttributionFilter) => void;
+  className?: string;
+}
+```
+
+**Layout:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ 🔍 Search nodes...                                    [×]   │
+├─────────────────────────────────────────────────────────────┤
+│ 🏷️  Tags: [tag1] [tag2] [+]              AND ⟷ OR         │
+├─────────────────────────────────────────────────────────────┤
+│ 👤 Attribution: [All] [Human] [AI-generated] [AI-assisted] │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+
+- Debounced search input (300ms)
+- Tag multi-select with autocomplete
+- AND/OR toggle for tag filtering
+- Attribution filter buttons (radio group)
+- Clear all filters button
+- Collapsible sections (mobile)
+
+### ChatSidebar Component
+
+**Purpose:** Right-hand flyout sidebar for AI chat integrated into Projects page
+
+**Location:** `apps/web/src/components/chat/chat-sidebar.tsx`
+
+**Props:**
+
+```typescript
+interface ChatSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  projectId?: string;
+  className?: string;
+}
+```
+
+**Layout:**
+
+```
+┌─────────────────────────────────┐
+│ Chat          [Model ▼]    [×]  │
+├─────────────────────────────────┤
+│ Threads:                        │
+│ • General Chat                  │
+│ • Chapter 3 Edits          [+]  │
+├─────────────────────────────────┤
+│ Messages:                       │
+│ ┌─────────────────────────────┐ │
+│ │ User: Help me outline...    │ │
+│ │ Assistant: Here's a...      │ │
+│ │ [Tool: create_node]         │ │
+│ └─────────────────────────────┘ │
+├─────────────────────────────────┤
+│ Agent: [Assistant ▼]            │
+│ Model: [GPT-4o ▼]               │
+│ ┌─────────────────────────────┐ │
+│ │ Type a message...           │ │
+│ └─────────────────────────────┘ │
+│                    [Send] [🎤]  │
+└─────────────────────────────────┘
+```
+
+**Features:**
+
+- Reuses existing `ChatPanel` logic
+- Thread list with create/switch
+- Model selector (independent from agent mode)
+- Agent mode selector
+- Collapsible/expandable (slide in/out animation)
+- Resizable width (drag handle)
+- Persists state per project
+- Shows MCP tool calls inline
+
+### Agent Mode Management
+
+**Database Schema:**
+
+```sql
+CREATE TABLE agent_modes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(50) NOT NULL UNIQUE,
+  display_name VARCHAR(100) NOT NULL,
+  description TEXT NOT NULL,
+  allowed_tools JSONB NOT NULL, -- array of tool names
+  guidelines TEXT NOT NULL,
+  temperature DECIMAL(3,2) DEFAULT 0.7,
+  is_built_in BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Seed built-in modes
+INSERT INTO agent_modes (name, display_name, description, allowed_tools, guidelines, temperature, is_built_in)
+VALUES
+  ('assistant', 'Assistant', '...', '["create_node", "update_node", ...]', '...', 0.7, TRUE),
+  ('planner', 'Planner', '...', '["create_node", "move_node", ...]', '...', 0.4, TRUE),
+  ('editor', 'Editor', '...', '["update_node", "search_nodes", ...]', '...', 0.3, TRUE),
+  ('researcher', 'Researcher', '...', '["search_semantic", "search_nodes", ...]', '...', 0.2, TRUE);
+```
+
+**Service Updates:**
+
+`apps/api/src/services/agent-mode-service.ts`:
+
+- Change from hardcoded `AGENT_MODES` object to database queries
+- Add CRUD methods: `createAgentMode()`, `updateAgentMode()`, `deleteAgentMode()`
+- Prevent modification of `is_built_in = TRUE` modes
+- Validate `allowed_tools` against available MCP tools
+
+**UI Component:**
+
+`apps/web/src/components/settings/agent-mode-manager.tsx`:
+
+- List all modes (built-in + custom)
+- Create/edit dialog with form
+- Tool selector (multi-select from MCP tools)
+- Delete confirmation (custom modes only)
+- Preview system prompt
+
+### Model Selection Architecture
+
+**Database Schema:**
+
+```sql
+-- Add model column to chat_threads
+ALTER TABLE chat_threads ADD COLUMN model VARCHAR(100);
+```
+
+**LLM Provider Interface:**
+
+```typescript
+interface LLMProvider {
+  chat(messages: Message[], options: ChatOptions): AsyncIterator<Chunk>;
+  embed(text: string): Promise<number[]>;
+  listModels(): Promise<ModelInfo[]>; // NEW
+}
+
+interface ModelInfo {
+  id: string; // e.g., "gpt-4o", "claude-3.5-sonnet"
+  name: string; // Display name
+  provider: string; // "openai", "anthropic", "google", "ollama"
+  contextWindow: number;
+  capabilities: ("chat" | "reasoning" | "vision")[];
+  costTier?: "free" | "low" | "medium" | "high";
+}
+```
+
+**tRPC Endpoint:**
+
+```typescript
+// apps/api/src/api/routers/llm.ts
+export const llmRouter = router({
+  listAvailableModels: publicProcedure.query(async () => {
+    const providers = [
+      openaiProvider,
+      anthropicProvider,
+      googleProvider,
+      ollamaProvider,
+    ];
+    const allModels = await Promise.all(providers.map((p) => p.listModels()));
+    return allModels.flat();
+  }),
+});
+```
+
+**UI Component:**
+
+`apps/web/src/components/chat/model-selector.tsx`:
+
+- Dropdown grouped by provider
+- Show model metadata (context window, cost)
+- Filter by capability
+- Persist selection per thread
+
+### MCP Tool Visibility
+
+**tRPC Endpoint:**
+
+```typescript
+// apps/api/src/api/routers/mcp.ts
+export const mcpRouter = router({
+  listTools: publicProcedure.query(async () => {
+    const mcpClient = getMcpClient();
+    const tools = await mcpClient.listTools();
+    return tools.map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      inputSchema: tool.inputSchema,
+    }));
+  }),
+});
+```
+
+**UI Component:**
+
+`apps/web/src/components/mcp/mcp-tools-panel.tsx`:
+
+- List all available tools
+- Expandable sections for each tool
+- Show input schema (JSON Schema)
+- Usage examples
+- Highlight tools allowed by current agent mode
+- Search/filter tools
+
+**Integration:**
+
+- Add to Settings page under "Developer" section
+- OR add as collapsible section in ChatSidebar
+- Link to agent mode settings
+
+---
+
+## Component Hierarchy
+
+### Projects Page
+
+```
+ProjectsPage
+├── Header
+│   ├── Breadcrumb
+│   ├── Actions (Export, Share, etc.)
+│   └── ChatToggle
+├── LeftPanel
+│   ├── FilterPanel (NEW)
+│   │   ├── SearchInput
+│   │   ├── TagSelector
+│   │   └── AttributionFilter
+│   └── FileTree
+│       └── FileTreeNode[]
+├── CenterPanel
+│   ├── Editor (TipTap)
+│   ├── NodeAttribution
+│   └── VersionHistory (collapsible)
+└── RightSidebar (conditional)
+    ├── ChatSidebar (NEW, when chat open)
+    │   ├── ThreadList
+    │   ├── MessageList
+    │   ├── AgentModeSelector
+    │   ├── ModelSelector (NEW)
+    │   └── ChatInput
+    └── TagBrowser (when chat closed)
+```
+
+### Settings Page
+
+```
+SettingsPage
+├── Tabs
+│   ├── General
+│   ├── API Keys
+│   ├── Agents (NEW)
+│   │   └── AgentModeManager
+│   │       ├── ModeList
+│   │       ├── CreateModeDialog
+│   │       └── EditModeDialog
+│   └── Developer (NEW)
+│       └── McpToolsPanel
+│           ├── ToolList
+│           └── ToolDetail
+```
+
+---
+
+## State Management
+
+### Filter State
+
+```typescript
+// apps/web/src/app/[locale]/(app)/projects/page.tsx
+const [filters, setFilters] = useState({
+  search: "",
+  tagIds: [] as string[],
+  tagOperator: "OR" as "AND" | "OR",
+  attribution: "all" as AttributionFilter,
+});
+
+// Combine all filters
+const filterNodeIds = useMemo(() => {
+  let nodeIds = new Set<string>();
+
+  // Apply search filter
+  if (filters.search) {
+    const searchResults = searchQuery.data || [];
+    nodeIds = new Set(searchResults.map((n) => n.id));
+  }
+
+  // Apply tag filter
+  if (filters.tagIds.length > 0) {
+    const tagResults = tagQuery.data || [];
+    if (filters.search) {
+      // Intersect with search results
+      nodeIds = new Set(
+        tagResults.filter((n) => nodeIds.has(n.id)).map((n) => n.id),
+      );
+    } else {
+      nodeIds = new Set(tagResults.map((n) => n.id));
+    }
+  }
+
+  return nodeIds.size > 0 ? nodeIds : null;
+}, [filters, searchQuery.data, tagQuery.data]);
+```
+
+### Chat Sidebar State
+
+```typescript
+// apps/web/src/app/[locale]/(app)/projects/page.tsx
+const [chatOpen, setChatOpen] = useState(false);
+const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+
+// Persist chat state per project
+useEffect(() => {
+  if (selectedNodeId) {
+    const savedState = localStorage.getItem(`chat-state-${selectedNodeId}`);
+    if (savedState) {
+      const { open, threadId } = JSON.parse(savedState);
+      setChatOpen(open);
+      setSelectedThreadId(threadId);
+    }
+  }
+}, [selectedNodeId]);
+
+useEffect(() => {
+  if (selectedNodeId) {
+    localStorage.setItem(
+      `chat-state-${selectedNodeId}`,
+      JSON.stringify({ open: chatOpen, threadId: selectedThreadId }),
+    );
+  }
+}, [chatOpen, selectedThreadId, selectedNodeId]);
+```
+
+---
+
+## Testing Strategy
+
+### FilterPanel Tests
+
+```typescript
+// apps/web/tests/components/filter-panel.test.tsx
+describe("FilterPanel", () => {
+  it("should call onSearchChange with debounced value");
+  it("should call onTagsChange when tags selected");
+  it("should toggle tag operator AND/OR");
+  it("should call onAttributionChange when filter clicked");
+  it("should clear all filters");
+});
+```
+
+### ChatSidebar Tests
+
+```typescript
+// apps/web/tests/components/chat-sidebar.test.tsx
+describe("ChatSidebar", () => {
+  it("should render when open");
+  it("should call onClose when close button clicked");
+  it("should create new thread");
+  it("should switch between threads");
+  it("should send message");
+  it("should change agent mode");
+  it("should change model");
+});
+```
+
+### Agent Mode CRUD Tests
+
+```typescript
+// tests/unit/services/agent-mode-service.test.ts
+describe("AgentModeService", () => {
+  it("should create custom agent mode");
+  it("should update custom agent mode");
+  it("should delete custom agent mode");
+  it("should prevent deletion of built-in modes");
+  it("should validate tool names");
+});
+```
+
+### Model Selection Tests
+
+```typescript
+// tests/unit/services/llm-service.test.ts
+describe("LLMProvider.listModels", () => {
+  it("should list OpenAI models");
+  it("should list Anthropic models");
+  it("should list Google models");
+  it("should list Ollama models");
+});
+
+// tests/integration/routers/llm.test.ts
+describe("llm.listAvailableModels", () => {
+  it("should aggregate models from all providers");
+  it("should group by provider");
+  it("should include metadata");
+});
+```
+
+---
+
+## Migration Plan
+
+### Phase 6.1: Unified Filter Panel
+
+1. Create `FilterPanel` component
+2. Add text search tRPC endpoint
+3. Update `ProjectsPage` to use `FilterPanel`
+4. Remove old attribution filter bar
+5. Update tests
+
+### Phase 6.2: Chat Sidebar
+
+1. Create `ChatSidebar` component
+2. Add toggle button to `ProjectsPage` header
+3. Manage sidebar state
+4. Redirect `/chat` to `/projects?chat=open`
+5. Update tests
+
+### Phase 6.3: Agent Mode CRUD
+
+1. Create `agent_modes` table migration
+2. Seed built-in modes
+3. Update `AgentModeService` to use database
+4. Add CRUD tRPC endpoints
+5. Create `AgentModeManager` UI
+6. Update tests
+
+### Phase 6.4: Model Selection
+
+1. Add `model` column to `chat_threads`
+2. Add `listModels()` to `LLMProvider` interface
+3. Implement for all providers
+4. Create `ModelSelector` component
+5. Integrate into `ChatSidebar`
+6. Update tests
+
+### Phase 6.5: MCP Tool Visibility
+
+1. Add `mcp.listTools` tRPC endpoint
+2. Create `McpToolsPanel` component
+3. Add to Settings page
+4. Update tests

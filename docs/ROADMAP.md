@@ -6,7 +6,9 @@ Build a local-first, AI-powered writing assistant with hierarchical node-based d
 
 ## Current Status
 
-✅ **Phase 0 Foundation: 90% Complete**
+✅ **Phase 5: Provenance & Version Control - COMPLETE** (1054 tests passing)
+
+🚧 **Phase 6: UX Improvements & Agent Management - IN PROGRESS**
 
 **Infrastructure:**
 
@@ -1190,11 +1192,197 @@ CREATE INDEX idx_history_node ON node_history(node_id, version DESC);
 
 ---
 
-### Phase 5: Provenance & Version Control
+### Phase 5: Provenance & Version Control ✅ COMPLETED
+
+**Commit:** `a7d99c9`
+
+All 6 sub-phases complete:
+
+- ✅ 5.1: Provenance Schema Design
+- ✅ 5.2: Change Tracking System
+- ✅ 5.3: Content Versioning
+- ✅ 5.4: Attribution UI Components
+- ✅ 5.5: Audit Log & Export
+- ✅ 5.6: LLM Attribution Badges
+
+**Test Coverage:** 1054 tests passing (595 API + 39 MCP + 420 Web)
+
+#### Success Criteria ✅
+
+- [x] View complete change history
+- [x] Distinguish user vs LLM edits
+- [x] Rollback to previous version
+- [x] Export audit report
+
+---
+
+### Phase 6: UX Improvements & Agent Management 🚧 IN PROGRESS
+
+**Goal:** Improve Projects page UX, move chat to right sidebar, enable custom agent modes, add independent model selection, and surface MCP tools
+
+#### 6.1: Unified Project Navigation Filter
+
+**Problem:** Fragmented filtering UI with attribution filter at top, tag filter at bottom, no text search
+
+**Solution:** Single `FilterPanel` component consolidating all filters
+
+**Tasks:**
+
+- [ ] 6.1a: Design unified filter component
+  - Create `FilterPanel` with search input, tag selector, attribution buttons
+  - Compact single-row or collapsible design
+  - Clear visual hierarchy
+- [ ] 6.1b: Add text search to node filtering
+  - Implement fuzzy text search across node names
+  - Filter FileTree by search results
+  - Combine with existing tag/attribution filters
+- [ ] 6.1c: Wire up unified filters to FileTree
+  - Update ProjectsPage to use FilterPanel
+  - Remove separate attribution filter bar
+  - Move TagBrowser filter logic into FilterPanel
+- [ ] 6.1d: Update tests and commit
+  - Test FilterPanel component
+  - Test integration with FileTree
+  - Run `make preflight` and commit
+
+**Expected Outcome:** Single cohesive filter panel above file tree with search + tags + attribution
+
+#### 6.2: Chat UI Redesign - Right Sidebar
+
+**Problem:** Chat is on separate page (`/chat`), not integrated with project workflow
+
+**Solution:** Right-hand flyout sidebar in Projects page
+
+**Tasks:**
+
+- [ ] 6.2a: Create ChatSidebar component
+  - Flyout sidebar (collapsible/expandable)
+  - Thread list, message history, input box
+  - Reuse existing ChatPanel logic
+  - Add close/minimize controls
+- [ ] 6.2b: Integrate ChatSidebar into ProjectsPage
+  - Add toggle button (top-right or in header)
+  - Manage sidebar open/closed state
+  - Preserve chat context per project
+  - Responsive width (e.g., 400px default, resizable)
+- [ ] 6.2c: Update chat page routing
+  - Redirect `/chat` to `/projects?chat=open`
+  - Update navigation links
+  - Preserve backward compatibility
+- [ ] 6.2d: Update tests and commit
+  - Test ChatSidebar component
+  - Test integration with ProjectsPage
+  - Run `make preflight` and commit
+
+**Expected Outcome:** Chat accessible from Projects page via right sidebar flyout
+
+#### 6.3: Agent Mode CRUD
+
+**Problem:** Only 4 hardcoded agent modes (assistant, planner, editor, researcher), no way to create custom modes
+
+**Solution:** Database-backed custom agent modes with CRUD UI
+
+**Tasks:**
+
+- [ ] 6.3a: Extend agent mode schema
+  - Add `agent_modes` table (id, name, displayName, description, allowedTools, guidelines, temperature, isBuiltIn, createdAt, updatedAt)
+  - Migration to create table
+  - Seed built-in modes into table
+  - Update `AgentMode` type to support custom IDs
+- [ ] 6.3b: Agent mode service CRUD
+  - Add `createAgentMode()`, `updateAgentMode()`, `deleteAgentMode()`, `listCustomAgentModes()` to `agent-mode-service.ts`
+  - Prevent deletion/modification of built-in modes
+  - Validate tool names against available MCP tools
+- [ ] 6.3c: Agent mode tRPC endpoints
+  - Add CRUD endpoints to `chat` router
+  - `createAgentMode`, `updateAgentMode`, `deleteAgentMode`, `listAllAgentModes`
+  - Authorization checks (prevent modifying built-ins)
+- [ ] 6.3d: Agent mode management UI
+  - Create `AgentModeManager` component (Settings page or modal)
+  - List all modes (built-in + custom)
+  - Create/edit dialog with form (name, description, tools, guidelines, temperature)
+  - Delete confirmation for custom modes
+  - Tool selector (multi-select from available MCP tools)
+- [ ] 6.3e: Update tests and commit
+  - Test agent mode CRUD service
+  - Test tRPC endpoints
+  - Test UI component
+  - Run `make preflight` and commit
+
+**Expected Outcome:** Users can create custom agent modes with specific tool restrictions and behavioral guidelines
+
+#### 6.4: Independent Model Selection
+
+**Problem:** Model is coupled to agent mode, can't independently select model (e.g., use GPT-4o with planner mode)
+
+**Solution:** Add model field to chat threads, decouple from agent mode
+
+**Tasks:**
+
+- [ ] 6.4a: Add model field to chat threads
+  - Migration to add `model VARCHAR(100)` to `chat_threads`
+  - Update schema and types
+  - Default to null (use provider default)
+- [ ] 6.4b: LLM provider model listing
+  - Add `listModels()` to `LLMProvider` interface
+  - Implement for OpenAI, Anthropic, Google, Ollama providers
+  - Add tRPC endpoint `llm.listAvailableModels` to aggregate from all configured providers
+  - Return grouped by provider with metadata (name, description, context window, cost)
+- [ ] 6.4c: Model selector UI component
+  - Create `ModelSelector` dropdown component
+  - Group models by provider (OpenAI, Anthropic, Google, Local)
+  - Show model metadata (context window, cost tier)
+  - Filter by capability (chat, reasoning, vision)
+- [ ] 6.4d: Integrate model selection in chat
+  - Add ModelSelector to ChatSidebar (above input or in thread settings)
+  - Persist selected model per thread
+  - Update `ChatService.sendMessage()` to use thread's model
+  - Show current model in thread header
+- [ ] 6.4e: Update tests and commit
+  - Test model listing from providers
+  - Test model selection and persistence
+  - Test chat with different models
+  - Run `make preflight` and commit
+
+**Expected Outcome:** Users can select any available model independently from agent mode
+
+#### 6.5: MCP Tool Visibility
+
+**Problem:** No way to see what MCP tools are available or their schemas
+
+**Solution:** UI panel showing available tools with descriptions and schemas
+
+**Tasks:**
+
+- [ ] 6.5a: MCP tool introspection endpoint
+  - Add tRPC endpoint `mcp.listTools` that calls MCP server's `listTools()`
+  - Return tool name, description, input schema, examples
+  - Cache results (tools don't change often)
+- [ ] 6.5b: MCP tools panel UI
+  - Create `McpToolsPanel` component
+  - List all available tools
+  - Expandable sections showing description, input schema, usage examples
+  - Search/filter tools by name
+  - Visual indicator for tools allowed by current agent mode
+- [ ] 6.5c: Integrate MCP tools panel
+  - Add to Settings page under "Developer" section
+  - OR add as collapsible section in ChatSidebar
+  - Show which tools are available for current agent mode (highlight allowed tools)
+  - Link to agent mode settings
+- [ ] 6.5d: Update tests and commit
+  - Test MCP tool listing endpoint
+  - Test McpToolsPanel component
+  - Test filtering by agent mode
+  - Run `make preflight` and commit
+
+**Expected Outcome:** Users can see all available MCP tools, their schemas, and which tools are available for each agent mode
 
 #### Success Criteria
 
-- [ ] View complete change history
-- [ ] Distinguish user vs LLM edits
-- [ ] Rollback to previous version
-- [ ] Export audit report
+- [ ] Single unified filter panel in Projects page (search + tags + attribution)
+- [ ] Chat accessible via right sidebar flyout in Projects page
+- [ ] Users can create/edit/delete custom agent modes
+- [ ] Users can select LLM model independently from agent mode
+- [ ] Users can view available MCP tools and their schemas
+
+**Expected Test Coverage:** Maintain >75% (currently 77.76%)

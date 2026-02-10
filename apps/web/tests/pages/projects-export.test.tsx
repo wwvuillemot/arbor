@@ -152,6 +152,15 @@ vi.mock("@/lib/trpc", () => {
       delete: { useMutation: vi.fn(() => makeMutation()) },
       move: { useMutation: vi.fn(() => makeMutation()) },
     },
+    tags: {
+      getNodesByTags: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
     media: {
       upload: { useMutation: vi.fn(() => makeMutation()) },
       getDownloadUrl: { useMutation: vi.fn(() => makeMutation()) },

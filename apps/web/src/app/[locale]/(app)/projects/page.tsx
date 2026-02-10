@@ -19,6 +19,7 @@ import { useToast } from "@/contexts/toast-context";
 import {
   FileTree,
   type FileTreeHandle,
+  type AttributionFilter,
   CreateNodeDialog,
   RenameDialog,
   NodeContextMenu,
@@ -92,6 +93,20 @@ export default function ProjectsPage() {
   );
   const tTags = useTranslations("tags");
 
+  // Tag & attribution filter state
+  const [selectedTagIds, setSelectedTagIds] = React.useState<string[]>([]);
+  const [tagOperator, setTagOperator] = React.useState<"AND" | "OR">("OR");
+  const [attributionFilter, setAttributionFilter] =
+    React.useState<AttributionFilter>("all");
+
+  const handleFilterChange = React.useCallback(
+    (tagIds: string[], operator: "AND" | "OR") => {
+      setSelectedTagIds(tagIds);
+      setTagOperator(operator);
+    },
+    [],
+  );
+
   // Inline title editing state
   const [isTitleEditing, setIsTitleEditing] = React.useState(false);
   const [titleEditValue, setTitleEditValue] = React.useState("");
@@ -110,6 +125,18 @@ export default function ProjectsPage() {
     { id: selectedNodeId! },
     { enabled: !!selectedNodeId, refetchOnWindowFocus: false },
   );
+
+  // Fetch nodes filtered by selected tags (for file tree filtering)
+  const filteredNodesQuery = trpc.tags.getNodesByTags.useQuery(
+    { tagIds: selectedTagIds, operator: tagOperator },
+    { enabled: selectedTagIds.length > 0, refetchOnWindowFocus: false },
+  );
+
+  const filterNodeIds = React.useMemo(() => {
+    if (selectedTagIds.length === 0) return null;
+    if (!filteredNodesQuery.data) return new Set<string>();
+    return new Set(filteredNodesQuery.data.map((n) => n.id));
+  }, [selectedTagIds.length, filteredNodesQuery.data]);
 
   // Mutations
   const createMutation = trpc.nodes.create.useMutation({
@@ -531,6 +558,43 @@ export default function ProjectsPage() {
               <Pencil className="w-3 h-3" />
             </button>
           </div>
+          {/* Attribution filter bar */}
+          <div
+            className="flex items-center gap-1 px-2 py-1 border-b"
+            data-testid="attribution-filter-bar"
+          >
+            <span className="text-xs text-muted-foreground">
+              {tFileTree("attributionFilter.label")}:
+            </span>
+            {(
+              [
+                { value: "all", label: tFileTree("attributionFilter.all") },
+                { value: "human", label: tFileTree("attributionFilter.human") },
+                {
+                  value: "ai-generated",
+                  label: tFileTree("attributionFilter.aiGenerated"),
+                },
+                {
+                  value: "ai-assisted",
+                  label: tFileTree("attributionFilter.aiAssisted"),
+                },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setAttributionFilter(opt.value)}
+                className={cn(
+                  "text-xs px-1.5 py-0.5 rounded transition-colors",
+                  attributionFilter === opt.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent",
+                )}
+                data-testid={`attribution-filter-${opt.value}`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <FileTree
             ref={fileTreeRef}
             projectId={currentProjectId}
@@ -551,6 +615,8 @@ export default function ProjectsPage() {
             }
             onRenameNode={handleNodeRename}
             onMoveNode={handleMoveNode}
+            filterNodeIds={filterNodeIds}
+            attributionFilter={attributionFilter}
             className="flex-1 min-h-0"
           />
           <div className="border-t flex flex-col">
@@ -584,6 +650,7 @@ export default function ProjectsPage() {
               {sidebarTagTab === "browse" ? (
                 <TagBrowser
                   onSelectNode={(nodeId) => setSelectedNodeId(nodeId)}
+                  onFilterChange={handleFilterChange}
                 />
               ) : (
                 <TagManager />

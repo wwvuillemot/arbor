@@ -10,6 +10,7 @@ import { TagCloud, type TagCloudTag } from "./tag-cloud";
 
 export interface TagBrowserProps {
   onSelectNode?: (nodeId: string) => void;
+  onFilterChange?: (tagIds: string[], operator: "AND" | "OR") => void;
   className?: string;
 }
 
@@ -25,7 +26,11 @@ const TAG_TYPES = ["general", "character", "location", "event", "concept"];
  * - Tag cloud or list view
  * - Shows filtered nodes
  */
-export function TagBrowser({ onSelectNode, className }: TagBrowserProps) {
+export function TagBrowser({
+  onSelectNode,
+  onFilterChange,
+  className,
+}: TagBrowserProps) {
   const t = useTranslations("tags");
 
   const [search, setSearch] = React.useState("");
@@ -39,11 +44,10 @@ export function TagBrowser({ onSelectNode, className }: TagBrowserProps) {
     refetchOnWindowFocus: false,
   });
 
-  // Fetch nodes filtered by selected tags
-  const filteredNodesQuery = trpc.tags.getNodesByTags.useQuery(
-    { tagIds: selectedTagIds, operator },
-    { enabled: selectedTagIds.length > 0, refetchOnWindowFocus: false },
-  );
+  // Notify parent of filter changes
+  React.useEffect(() => {
+    onFilterChange?.(selectedTagIds, operator);
+  }, [selectedTagIds, operator, onFilterChange]);
 
   // Fetch related tags for suggestion
   const relatedTagsQuery = trpc.tags.getRelatedTags.useQuery(
@@ -190,7 +194,7 @@ export function TagBrowser({ onSelectNode, className }: TagBrowserProps) {
           </div>
 
           {/* Selected tag badges */}
-          <div className="flex flex-wrap gap-1 mb-2">
+          <div className="flex flex-wrap gap-1">
             {selectedTagIds.map((tagId) => {
               const tag = tagsWithCountsQuery.data?.find((t) => t.id === tagId);
               if (!tag) return null;
@@ -207,30 +211,6 @@ export function TagBrowser({ onSelectNode, className }: TagBrowserProps) {
                 />
               );
             })}
-          </div>
-
-          {/* Filtered nodes list */}
-          <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto">
-            {filteredNodesQuery.isLoading && (
-              <span className="text-xs text-muted-foreground">
-                {t("browser.loading")}
-              </span>
-            )}
-            {filteredNodesQuery.data?.map((node) => (
-              <button
-                key={node.id}
-                onClick={() => onSelectNode?.(node.id)}
-                className="text-left text-xs px-2 py-1 rounded hover:bg-accent transition-colors truncate"
-                data-testid={`tag-browser-node-${node.id}`}
-              >
-                {node.name}
-              </button>
-            ))}
-            {filteredNodesQuery.data?.length === 0 && (
-              <span className="text-xs text-muted-foreground">
-                {t("browser.noResults")}
-              </span>
-            )}
           </div>
         </div>
       )}

@@ -11,6 +11,32 @@ import {
 } from "./file-tree-node";
 import { cn } from "@/lib/utils";
 
+export type AttributionFilter =
+  | "all"
+  | "human"
+  | "ai-generated"
+  | "ai-assisted";
+
+/**
+ * Determine attribution level from provenance strings.
+ * Returns "ai-generated" if both created and updated by LLM,
+ * "ai-assisted" if updated by LLM but created by user,
+ * "human" if last updated by user.
+ */
+function getAttributionLevel(
+  createdBy?: string,
+  updatedBy?: string,
+): "ai-generated" | "ai-assisted" | "human" | null {
+  if (!updatedBy) return null;
+  const isUpdatedByLlm = updatedBy.startsWith("llm:");
+  if (isUpdatedByLlm) {
+    const isCreatedByLlm = createdBy?.startsWith("llm:") ?? false;
+    return isCreatedByLlm ? "ai-generated" : "ai-assisted";
+  }
+  if (updatedBy.startsWith("user:")) return "human";
+  return null;
+}
+
 export interface FileTreeProps {
   projectId: string;
   selectedNodeId: string | null;
@@ -24,6 +50,10 @@ export interface FileTreeProps {
     targetNodeId: string,
     position: DropPosition,
   ) => void;
+  /** When provided, only show nodes whose IDs are in this set (plus containers) */
+  filterNodeIds?: Set<string> | null;
+  /** When set to a value other than "all", filter leaf nodes by attribution */
+  attributionFilter?: AttributionFilter;
   className?: string;
 }
 
@@ -44,6 +74,8 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
       onCreateNote,
       onRenameNode,
       onMoveNode,
+      filterNodeIds,
+      attributionFilter,
       className,
     },
     ref,
@@ -146,6 +178,8 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
             onContextMenu={onContextMenu}
             onRename={onRenameNode}
             onDrop={onMoveNode}
+            filterNodeIds={filterNodeIds}
+            attributionFilter={attributionFilter}
             emptyMessage={t("emptyProject")}
           />
         </div>
@@ -165,6 +199,8 @@ function ChildrenList({
   onContextMenu,
   onRename,
   onDrop,
+  filterNodeIds,
+  attributionFilter,
   emptyMessage,
 }: {
   parentId: string;
@@ -180,6 +216,8 @@ function ChildrenList({
     targetNodeId: string,
     position: DropPosition,
   ) => void;
+  filterNodeIds?: Set<string> | null;
+  attributionFilter?: AttributionFilter;
   emptyMessage?: string;
 }) {
   const childrenQuery = trpc.nodes.getChildren.useQuery(
@@ -209,9 +247,46 @@ function ChildrenList({
     return null;
   }
 
+  // Apply filters to children
+  const filteredChildren = childrenQuery.data.filter((child) => {
+    const isContainer = containerTypes.has(child.type);
+
+    // Tag-based filter: show container nodes always (they'll show/hide based on descendants),
+    // but for leaf nodes, only show if they're in the filter set
+    if (filterNodeIds != null) {
+      if (!isContainer && !filterNodeIds.has(child.id)) return false;
+    }
+
+    // Attribution filter: only applies to leaf nodes
+    if (attributionFilter && attributionFilter !== "all") {
+      if (!isContainer) {
+        const typedChild = child as TreeNode;
+        const level = getAttributionLevel(
+          typedChild.createdBy,
+          typedChild.updatedBy,
+        );
+        // If attribution can't be determined, hide under non-"all" filters
+        if (level !== attributionFilter) return false;
+      }
+    }
+
+    return true;
+  });
+
+  if (filteredChildren.length === 0) {
+    if (depth === 0 && emptyMessage) {
+      return (
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+          {emptyMessage}
+        </div>
+      );
+    }
+    return null;
+  }
+
   return (
     <>
-      {childrenQuery.data.map((child) => (
+      {filteredChildren.map((child) => (
         <FileTreeNode
           key={child.id}
           node={child as TreeNode}
@@ -235,6 +310,8 @@ function ChildrenList({
               onContextMenu={onContextMenu}
               onRename={onRename}
               onDrop={onDrop}
+              filterNodeIds={filterNodeIds}
+              attributionFilter={attributionFilter}
             />
           )}
         />

@@ -377,6 +377,24 @@
       "link": "リンク",
       "ai_suggestion": "AI提案",
       "audio_note": "音声ノート"
+    },
+    "filterPanel": {
+      "search": "ノードを検索...",
+      "tags": "タグ",
+      "attribution": "帰属",
+      "clearAll": "すべてクリア",
+      "and": "AND",
+      "or": "OR",
+      "selectTags": "タグを選択..."
+    },
+    "attributionFilter": {
+      "label": "フィルター",
+      "all": "すべて",
+      "human": "人間",
+      "aiGenerated": "AI生成",
+      "aiAssisted": "AIアシスト",
+      "aigenerated": "AI生成",
+      "aiassisted": "AIアシスト"
     }
   },
   "tags": {

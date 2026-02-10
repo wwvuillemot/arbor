@@ -829,19 +829,22 @@ describe("TagBrowser", () => {
     expect(screen.getByTestId("tag-browser-clear")).toBeInTheDocument();
   });
 
-  it("should show filtered nodes when tags are selected", () => {
-    render(<TagBrowser />);
+  it("should call onFilterChange when tags are selected", () => {
+    const handleFilterChange = vi.fn();
+    render(<TagBrowser onFilterChange={handleFilterChange} />);
     fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
-    expect(screen.getByTestId("tag-browser-node-node-1")).toBeInTheDocument();
-    expect(screen.getByTestId("tag-browser-node-node-2")).toBeInTheDocument();
+    expect(handleFilterChange).toHaveBeenCalledWith(["tag-1"], "OR");
   });
 
-  it("should call onSelectNode when a filtered node is clicked", () => {
-    const handleSelectNode = vi.fn();
-    render(<TagBrowser onSelectNode={handleSelectNode} />);
+  it("should call onFilterChange with updated operator", () => {
+    const handleFilterChange = vi.fn();
+    render(<TagBrowser onFilterChange={handleFilterChange} />);
+    // Select two tags
     fireEvent.click(screen.getByTestId("tag-cloud-item-tag-1"));
-    fireEvent.click(screen.getByTestId("tag-browser-node-node-1"));
-    expect(handleSelectNode).toHaveBeenCalledWith("node-1");
+    fireEvent.click(screen.getByTestId("tag-cloud-item-tag-2"));
+    // Toggle operator
+    fireEvent.click(screen.getByTestId("tag-browser-operator-toggle"));
+    expect(handleFilterChange).toHaveBeenCalledWith(["tag-1", "tag-2"], "AND");
   });
 
   it("should clear selection when clear button is clicked", () => {

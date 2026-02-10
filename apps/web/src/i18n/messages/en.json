@@ -377,6 +377,24 @@
       "link": "Link",
       "ai_suggestion": "AI Suggestion",
       "audio_note": "Audio Note"
+    },
+    "filterPanel": {
+      "search": "Search nodes...",
+      "tags": "Tags",
+      "attribution": "Attribution",
+      "clearAll": "Clear all",
+      "and": "AND",
+      "or": "OR",
+      "selectTags": "Select tags..."
+    },
+    "attributionFilter": {
+      "label": "Filter by",
+      "all": "All",
+      "human": "Human",
+      "aiGenerated": "AI-generated",
+      "aiAssisted": "AI-assisted",
+      "aigenerated": "AI-generated",
+      "aiassisted": "AI-assisted"
     }
   },
   "tags": {
