@@ -83,6 +83,11 @@ vi.mock("@/components/navigation", () => ({
   FilterPanel: () => <div data-testid="filter-panel" />,
 }));
 
+// Mock ChatSidebar component
+vi.mock("@/components/chat", () => ({
+  ChatSidebar: () => <div data-testid="chat-sidebar" />,
+}));
+
 // Mock FileTree component - calls onSelectNode on mount to simulate selecting a node
 vi.mock("@/components/file-tree", () => ({
   FileTree: React.forwardRef(

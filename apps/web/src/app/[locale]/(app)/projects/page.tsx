@@ -10,6 +10,7 @@ import {
   X,
   Check,
   Download,
+  MessageSquare,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ import { FilterPanel } from "@/components/navigation";
 import { TiptapEditor, ImageUpload } from "@/components/editor";
 import { TagManager, TagPicker, TagBrowser } from "@/components/tags";
 import { NodeAttribution } from "@/components/provenance";
+import { ChatSidebar } from "@/components/chat";
 import type { Editor } from "@tiptap/react";
 
 export default function ProjectsPage() {
@@ -100,6 +102,9 @@ export default function ProjectsPage() {
   const [attributionFilter, setAttributionFilter] =
     React.useState<AttributionFilter>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
+
+  // Chat sidebar state
+  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(false);
 
   const handleFilterChange = React.useCallback(
     (tagIds: string[], operator: "AND" | "OR") => {
@@ -783,6 +788,15 @@ export default function ProjectsPage() {
                     )}
                   </div>
                   <button
+                    onClick={() => setChatSidebarOpen((prev) => !prev)}
+                    className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+                    title={t("openChat")}
+                    aria-label={t("openChat")}
+                    data-testid="chat-toggle-button"
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() =>
                       setNodeDeleteConfirm({
                         open: true,
@@ -1022,6 +1036,12 @@ export default function ProjectsPage() {
             </div>
           </div>
         )}
+
+        {/* Chat sidebar */}
+        <ChatSidebar
+          isOpen={chatSidebarOpen}
+          onClose={() => setChatSidebarOpen(false)}
+        />
       </div>
     );
   }

@@ -316,6 +316,7 @@
     },
     "lastModified": "最終更新",
     "items": "項目",
+    "openChat": "AIチャットを開く",
     "createSuccess": "プロジェクトを作成しました",
     "createError": "プロジェクトの作成に失敗しました",
     "updateSuccess": "プロジェクトを更新しました",

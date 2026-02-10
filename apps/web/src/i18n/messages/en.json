@@ -316,6 +316,7 @@
     },
     "lastModified": "Last modified",
     "items": "items",
+    "openChat": "Open AI Chat",
     "createSuccess": "Project created successfully",
     "createError": "Failed to create project",
     "updateSuccess": "Project updated successfully",
