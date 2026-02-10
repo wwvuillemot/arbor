@@ -228,6 +228,8 @@
   "chat": {
     "title": "AI Chat",
     "description": "Chat with AI to brainstorm ideas, get writing suggestions, and collaborate on your content.",
+    "close": "Close",
+    "minimize": "Minimize",
     "newThread": "New Thread",
     "noThreads": "No chat threads yet",
     "noMessages": "No messages yet. Start the conversation!",
