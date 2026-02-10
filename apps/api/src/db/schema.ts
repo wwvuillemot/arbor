@@ -6,6 +6,8 @@ import {
   jsonb,
   integer,
   bigint,
+  numeric,
+  boolean,
   timestamp,
   index,
   primaryKey,
@@ -378,7 +380,10 @@ export type NewNodeTag = typeof nodeTags.$inferInsert;
 /**
  * Chat Thread Agent Modes
  *
- * Different modes change the AI behavior and available tools:
+ * Built-in agent mode names for backward compatibility.
+ * Custom modes can have any valid name (alphanumeric + hyphens/underscores).
+ *
+ * Built-in modes:
  * - assistant: General-purpose helper with all tools
  * - planner: Focus on structure and organization
  * - editor: Content refinement and improvement
@@ -390,7 +395,10 @@ export const agentModeEnum = [
   "editor",
   "researcher",
 ] as const;
-export type AgentMode = (typeof agentModeEnum)[number];
+
+// AgentMode is now a string to support custom modes
+// The enum is kept for backward compatibility with existing code
+export type AgentMode = string;
 
 /**
  * Chat Message Roles
@@ -403,6 +411,60 @@ export type AgentMode = (typeof agentModeEnum)[number];
  */
 export const chatRoleEnum = ["user", "assistant", "system", "tool"] as const;
 export type ChatRole = (typeof chatRoleEnum)[number];
+
+/**
+ * Agent Modes Table
+ *
+ * Stores agent mode configurations (both built-in and custom).
+ * Each mode defines behavior, allowed tools, and guidelines for the AI.
+ *
+ * Built-in modes (isBuiltIn=true):
+ * - assistant: General-purpose helper with all tools
+ * - planner: Focus on structure and organization
+ * - editor: Content refinement and improvement
+ * - researcher: Information gathering and synthesis
+ *
+ * Custom modes can be created by users with specific tool restrictions.
+ */
+export const agentModes = pgTable(
+  "agent_modes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Unique identifier for the mode (e.g., "assistant", "planner", "my-custom-mode")
+    name: varchar("name", { length: 50 }).notNull().unique(),
+
+    // Human-readable display name
+    displayName: varchar("display_name", { length: 100 }).notNull(),
+
+    // Description of what this mode does
+    description: text("description").notNull(),
+
+    // Array of tool names this mode is allowed to use
+    allowedTools: jsonb("allowed_tools").notNull().$type<string[]>(),
+
+    // Specific behavioral guidelines for the LLM
+    guidelines: text("guidelines").notNull(),
+
+    // Suggested temperature for this mode (0.0 - 1.0)
+    temperature: numeric("temperature", { precision: 3, scale: 2 }).notNull(),
+
+    // Whether this is a built-in mode (cannot be deleted/modified)
+    isBuiltIn: boolean("is_built_in").default(false).notNull(),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    // Index for looking up modes by name
+    nameIdx: index("idx_agent_modes_name").on(table.name),
+  }),
+);
+
+// Type inference for TypeScript
+export type AgentModeRow = typeof agentModes.$inferSelect;
+export type NewAgentModeRow = typeof agentModes.$inferInsert;
 
 /**
  * Chat Threads Table

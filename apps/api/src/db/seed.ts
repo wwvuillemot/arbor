@@ -2,6 +2,121 @@ import { db, schema, closeConnection } from "./index";
 import { eq } from "drizzle-orm";
 
 /**
+ * Seed built-in agent modes
+ *
+ * Creates the 4 built-in agent modes:
+ * - assistant: General-purpose helper with all tools
+ * - planner: Focus on structure and organization
+ * - editor: Content refinement and improvement
+ * - researcher: Information gathering and synthesis
+ */
+export async function seedAgentModes() {
+  console.log("🤖 Seeding agent modes...");
+
+  try {
+    // Check if agent modes already exist
+    const existingModes = await db.select().from(schema.agentModes);
+
+    if (existingModes.length > 0) {
+      console.log("ℹ️  Agent modes already exist. Skipping seed.");
+      console.log(`   Found ${existingModes.length} existing mode(s):`);
+      existingModes.forEach((m) => console.log(`   - ${m.name}`));
+      return;
+    }
+
+    // Insert built-in agent modes
+    await db.insert(schema.agentModes).values([
+      {
+        name: "assistant",
+        displayName: "Assistant",
+        description:
+          "General-purpose writing assistant. Helps with brainstorming, drafting, editing, organizing, and any other writing tasks.",
+        allowedTools: [
+          "create_node",
+          "update_node",
+          "delete_node",
+          "move_node",
+          "list_nodes",
+          "search_nodes",
+          "search_semantic",
+          "add_tag",
+          "remove_tag",
+          "list_tags",
+          "export_node",
+          "export_project",
+        ],
+        guidelines: `- Be helpful and versatile across all writing tasks
+- Balance creativity with accuracy
+- Offer suggestions proactively when appropriate
+- Use all available tools to assist the user
+- Maintain a friendly, collaborative tone`,
+        temperature: "0.70",
+        isBuiltIn: true,
+      },
+      {
+        name: "planner",
+        displayName: "Planner",
+        description:
+          "Focuses on story structure, project organization, and outlining. Helps plan chapters, scenes, character arcs, and narrative flow.",
+        allowedTools: ["create_node", "move_node", "list_nodes", "add_tag"],
+        guidelines: `- Focus on high-level structure and organization
+- Think about narrative arcs, pacing, and flow
+- Suggest hierarchical structures for projects
+- Help create outlines and chapter plans
+- Prioritize logical reasoning over creative generation
+- Ask clarifying questions about story goals and structure`,
+        temperature: "0.40",
+        isBuiltIn: true,
+      },
+      {
+        name: "editor",
+        displayName: "Editor",
+        description:
+          "Content refinement specialist. Focuses on improving clarity, grammar, style, tone, and readability of existing text.",
+        allowedTools: ["update_node", "search_nodes", "list_nodes"],
+        guidelines: `- Focus on improving existing text, not generating new content
+- Pay attention to clarity, grammar, spelling, and punctuation
+- Maintain the author's voice while suggesting improvements
+- Provide specific, actionable feedback
+- Consider readability, sentence structure, and paragraph flow
+- Flag inconsistencies in tone or style`,
+        temperature: "0.30",
+        isBuiltIn: true,
+      },
+      {
+        name: "researcher",
+        displayName: "Researcher",
+        description:
+          "Information gathering and synthesis. Helps find relevant content within the project, identify patterns, and compile research notes.",
+        allowedTools: [
+          "search_semantic",
+          "search_nodes",
+          "list_nodes",
+          "list_tags",
+        ],
+        guidelines: `- Focus on finding and synthesizing information from the project
+- Cite specific nodes and content when referencing material
+- Identify patterns, themes, and connections across the project
+- Provide accurate, well-organized summaries
+- Suggest areas that need more research or development
+- Prioritize accuracy over creativity`,
+        temperature: "0.20",
+        isBuiltIn: true,
+      },
+    ]);
+
+    console.log("✓ Created 4 built-in agent modes");
+    console.log("  - assistant (temperature: 0.70)");
+    console.log("  - planner (temperature: 0.40)");
+    console.log("  - editor (temperature: 0.30)");
+    console.log("  - researcher (temperature: 0.20)");
+  } catch (error) {
+    console.error("❌ Agent mode seeding failed:", error);
+    throw error;
+  }
+}
+
+/**
  * Seed database with example projects
  *
  * Creates a sample hierarchy:
@@ -20,6 +135,9 @@ export async function seed(closeConnectionAfter = false) {
   console.log("🌱 Seeding database...");
 
   try {
+    // Seed agent modes first
+    await seedAgentModes();
+
     // Check if data already exists
     const existingProjects = await db
       .select()
