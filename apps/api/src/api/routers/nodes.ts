@@ -70,6 +70,18 @@ export const nodesRouter = router({
       return await nodeService.getNodesByParentId(input.parentId);
     }),
 
+  // Get all descendants of a node (recursive)
+  getDescendants: publicProcedure
+    .input(
+      z.object({
+        nodeId: z.string().uuid(),
+        maxDepth: z.number().int().positive().optional(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return await nodeService.getDescendants(input.nodeId, input.maxDepth);
+    }),
+
   // Create a new node
   create: publicProcedure
     .input(createNodeSchema)

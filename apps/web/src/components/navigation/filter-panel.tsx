@@ -140,7 +140,7 @@ export function FilterPanel({
                     <input
                       type="checkbox"
                       checked={selectedTagIds.includes(tag.id)}
-                      onChange={() => {}}
+                      onChange={() => { }}
                       className="h-4 w-4"
                     />
                     <span
@@ -191,10 +191,10 @@ export function FilterPanel({
 
       {/* Attribution Filter */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">
+        <span className="text-sm font-medium text-muted-foreground shrink-0">
           {tFilter("attribution")}:
         </span>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {(["all", "human", "ai-generated", "ai-assisted"] as const).map(
             (filter) => {
               // Map filter value to translation key
@@ -211,7 +211,7 @@ export function FilterPanel({
                   onClick={() => setAttributionFilter(filter)}
                   data-testid={`attribution-filter-${filter}`}
                   className={cn(
-                    "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                    "rounded-md px-2 py-1 text-xs font-medium transition-colors whitespace-nowrap",
                     attributionFilter === filter
                       ? "bg-primary text-primary-foreground"
                       : "border bg-background hover:bg-accent",

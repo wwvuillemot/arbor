@@ -188,6 +188,49 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
   },
 );
 
+/**
+ * Check if a node or any of its descendants match the current filters
+ */
+function hasMatchingDescendants(
+  nodeId: string,
+  allNodes: Map<string, TreeNode>,
+  filterNodeIds: Set<string> | null,
+  attributionFilter: AttributionFilter | undefined,
+): boolean {
+  const node = allNodes.get(nodeId);
+  if (!node) return false;
+
+  const isContainer = containerTypes.has(node.type);
+
+  // Check if this node itself matches
+  let nodeMatches = true;
+
+  // Tag-based filter
+  if (filterNodeIds != null && !isContainer) {
+    nodeMatches = nodeMatches && filterNodeIds.has(node.id);
+  }
+
+  // Attribution filter
+  if (attributionFilter && attributionFilter !== "all" && !isContainer) {
+    const level = getAttributionLevel(node.createdBy, node.updatedBy);
+    nodeMatches = nodeMatches && level === attributionFilter;
+  }
+
+  // If this is a leaf node, return whether it matches
+  if (!isContainer) {
+    return nodeMatches;
+  }
+
+  // For containers, check if any descendants match
+  const children = Array.from(allNodes.values()).filter(
+    (n) => n.parentId === nodeId,
+  );
+
+  return children.some((child) =>
+    hasMatchingDescendants(child.id, allNodes, filterNodeIds, attributionFilter),
+  );
+}
+
 /** Renders children of a given parent, fetching via tRPC */
 function ChildrenList({
   parentId,
@@ -225,6 +268,16 @@ function ChildrenList({
     { refetchOnWindowFocus: false, staleTime: 30_000 },
   );
 
+  // Fetch all descendants when filtering is active (needed to check if folders have matching children)
+  const descendantsQuery = trpc.nodes.getDescendants.useQuery(
+    { nodeId: parentId },
+    {
+      enabled: filterNodeIds != null || (attributionFilter != null && attributionFilter !== "all"),
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
+    },
+  );
+
   if (childrenQuery.isLoading) {
     return (
       <div
@@ -247,12 +300,31 @@ function ChildrenList({
     return null;
   }
 
+  // Build a map of all descendants for efficient lookup
+  const allNodesMap = React.useMemo(() => {
+    const map = new Map<string, TreeNode>();
+    if (descendantsQuery.data) {
+      descendantsQuery.data.forEach((node) => {
+        map.set(node.id, node as TreeNode);
+      });
+    }
+    // Also add direct children
+    childrenQuery.data.forEach((node) => {
+      map.set(node.id, node as TreeNode);
+    });
+    return map;
+  }, [descendantsQuery.data, childrenQuery.data]);
+
   // Apply filters to children
   const filteredChildren = childrenQuery.data.filter((child) => {
     const isContainer = containerTypes.has(child.type);
 
-    // Tag-based filter: show container nodes always (they'll show/hide based on descendants),
-    // but for leaf nodes, only show if they're in the filter set
+    // If filtering is active, check if container has any matching descendants
+    if (isContainer && (filterNodeIds != null || (attributionFilter && attributionFilter !== "all"))) {
+      return hasMatchingDescendants(child.id, allNodesMap, filterNodeIds, attributionFilter);
+    }
+
+    // Tag-based filter: for leaf nodes, only show if they're in the filter set
     if (filterNodeIds != null) {
       if (!isContainer && !filterNodeIds.has(child.id)) return false;
     }
