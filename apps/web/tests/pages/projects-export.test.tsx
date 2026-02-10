@@ -19,6 +19,9 @@ const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, refresh: vi.fn(), replace: vi.fn() }),
   usePathname: () => "/en/projects",
+  useSearchParams: () => ({
+    get: vi.fn(() => null),
+  }),
 }));
 
 // Mock next-intl

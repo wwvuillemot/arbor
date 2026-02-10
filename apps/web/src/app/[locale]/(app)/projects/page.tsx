@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   FolderTree,
@@ -38,6 +39,7 @@ import type { Editor } from "@tiptap/react";
 export default function ProjectsPage() {
   const utils = trpc.useUtils();
   const t = useTranslations("projects");
+  const searchParams = useSearchParams();
   const tFileTree = useTranslations("fileTree");
   const tCommon = useTranslations("common");
   const { addToast } = useToast();
@@ -103,8 +105,10 @@ export default function ProjectsPage() {
     React.useState<AttributionFilter>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  // Chat sidebar state
-  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(false);
+  // Chat sidebar state - check for ?chat=open query parameter
+  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(
+    searchParams?.get("chat") === "open",
+  );
 
   const handleFilterChange = React.useCallback(
     (tagIds: string[], operator: "AND" | "OR") => {
