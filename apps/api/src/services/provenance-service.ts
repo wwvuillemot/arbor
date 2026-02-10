@@ -191,6 +191,38 @@ export class ProvenanceService {
       .orderBy(desc(nodeHistory.version));
   }
 
+  // ─── Checkout (Read-Only) ─────────────────────────────────────────
+
+  /**
+   * Checkout a specific version of a node (read-only).
+   * Returns the content at that version without modifying the node.
+   */
+  async checkout(
+    nodeId: string,
+    version: number,
+  ): Promise<{
+    version: number;
+    content: unknown;
+    action: HistoryAction;
+    actorType: ActorType;
+    actorId: string | null;
+    createdAt: Date;
+  }> {
+    const entry = await this.getVersion(nodeId, version);
+    if (!entry) {
+      throw new Error(`Version ${version} not found for node ${nodeId}`);
+    }
+
+    return {
+      version: entry.version,
+      content: entry.contentAfter,
+      action: entry.action,
+      actorType: entry.actorType,
+      actorId: entry.actorId,
+      createdAt: entry.createdAt,
+    };
+  }
+
   // ─── Rollback ───────────────────────────────────────────────────────
 
   /**

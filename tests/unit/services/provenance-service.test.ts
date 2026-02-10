@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, resetTestDb } from "../../helpers/db";
 import { nodes, nodeHistory } from "@server/db/schema";
 import { ProvenanceService } from "@server/services/provenance-service";
+import { NodeService } from "@server/services/node-service";
 import { eq } from "drizzle-orm";
 
 const testDb = getTestDb();
 const provenanceService = new ProvenanceService();
+const nodeService = new NodeService();
 
 // Helper: create a test node and return its ID
 async function createTestNode(
@@ -664,6 +666,86 @@ describe("ProvenanceService", () => {
       const obj = { type: "doc", text: "hello" };
       const result = provenanceService.contentToText(obj);
       expect(result).toBe(JSON.stringify(obj, null, 2));
+    });
+  });
+
+  // ─── Checkout (Read-Only) ────────────────────────────────────────
+
+  describe("checkout", () => {
+    it("should return content at a specific version without modifying node", async () => {
+      // Use NodeService so provenance is auto-recorded
+      const project = await nodeService.createNode({
+        type: "project",
+        name: "Checkout Project",
+        createdBy: "user:test",
+        updatedBy: "user:test",
+      });
+      const node = await nodeService.createNode({
+        type: "note",
+        name: "Checkout Test",
+        parentId: project.id,
+        content: { text: "original" },
+        createdBy: "user:test",
+        updatedBy: "user:test",
+      });
+
+      // Make an update (creates version 2)
+      await nodeService.updateNode(node.id, {
+        content: { text: "version 2 content" },
+        updatedBy: "user:test",
+      });
+
+      // Checkout version 1 (read-only)
+      const v1 = await provenanceService.checkout(node.id, 1);
+      expect(v1.version).toBe(1);
+      expect(v1.content).toEqual({ text: "original" });
+      expect(v1.action).toBe("create");
+      expect(v1.actorType).toBe("user");
+
+      // Verify node was NOT modified
+      const currentNode = await nodeService.getNodeById(node.id);
+      expect(currentNode!.content).toEqual({ text: "version 2 content" });
+    });
+
+    it("should throw for non-existent version", async () => {
+      const project = await nodeService.createNode({
+        type: "project",
+        name: "Err Project",
+        createdBy: "user:test",
+        updatedBy: "user:test",
+      });
+      await expect(
+        provenanceService.checkout(project.id, 999),
+      ).rejects.toThrow("Version 999 not found");
+    });
+
+    it("should checkout version 2 after multiple updates", async () => {
+      const project = await nodeService.createNode({
+        type: "project",
+        name: "Multi Project",
+        createdBy: "user:test",
+        updatedBy: "user:test",
+      });
+      const node = await nodeService.createNode({
+        type: "note",
+        name: "Multi Update",
+        parentId: project.id,
+        content: { text: "v1" },
+        createdBy: "user:test",
+        updatedBy: "user:test",
+      });
+      await nodeService.updateNode(node.id, {
+        content: { text: "v2" },
+        updatedBy: "user:test",
+      });
+      await nodeService.updateNode(node.id, {
+        content: { text: "v3" },
+        updatedBy: "user:test",
+      });
+
+      const v2 = await provenanceService.checkout(node.id, 2);
+      expect(v2.version).toBe(2);
+      expect(v2.content).toEqual({ text: "v2" });
     });
   });
 });

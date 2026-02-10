@@ -99,6 +99,20 @@ export const provenanceRouter = router({
     }),
 
   /**
+   * Checkout a specific version (read-only view of content at that version)
+   */
+  checkout: publicProcedure
+    .input(
+      z.object({
+        nodeId: z.string().uuid(),
+        version: z.number().int().positive(),
+      }),
+    )
+    .query(async ({ input }) => {
+      return await provenanceService.checkout(input.nodeId, input.version);
+    }),
+
+  /**
    * Compare two versions of a node
    */
   compareVersions: publicProcedure

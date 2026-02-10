@@ -305,6 +305,40 @@ describe("Provenance Router", () => {
     });
   });
 
+  describe("checkout endpoint", () => {
+    it("should checkout a specific version via tRPC (read-only)", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("Checkout");
+      await nodeService.updateNode(project.id, {
+        content: { text: "v2 content" },
+        updatedBy: "user:test",
+      });
+
+      const v1 = await caller.provenance.checkout({
+        nodeId: project.id,
+        version: 1,
+      });
+      expect(v1.version).toBe(1);
+      expect(v1.action).toBe("create");
+
+      // Verify the node was NOT modified (checkout is read-only)
+      const current = await nodeService.getNodeById(project.id);
+      expect(current!.content).toEqual({ text: "v2 content" });
+    });
+
+    it("should throw for non-existent version on checkout", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("CheckoutErr");
+
+      await expect(
+        caller.provenance.checkout({
+          nodeId: project.id,
+          version: 999,
+        }),
+      ).rejects.toThrow("Version 999 not found");
+    });
+  });
+
   describe("compareVersions endpoint", () => {
     it("should compare two versions and return diff via tRPC", async () => {
       const caller = createCaller();
