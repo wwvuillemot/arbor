@@ -26,8 +26,8 @@ export function FilterPanel({
   onAttributionChange,
   className = "",
 }: FilterPanelProps) {
-  const tFilter = useTranslations("filterPanel");
-  const tAttribution = useTranslations("attributionFilter");
+  const tFilter = useTranslations("fileTree.filterPanel");
+  const tAttribution = useTranslations("fileTree.attributionFilter");
 
   // Local state
   const [searchQuery, setSearchQuery] = React.useState("");
@@ -140,7 +140,7 @@ export function FilterPanel({
                     <input
                       type="checkbox"
                       checked={selectedTagIds.includes(tag.id)}
-                      onChange={() => {}}
+                      onChange={() => { }}
                       className="h-4 w-4"
                     />
                     <span

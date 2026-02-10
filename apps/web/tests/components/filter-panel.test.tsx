@@ -37,26 +37,35 @@ vi.mock("@/lib/trpc", () => ({
 // Mock next-intl
 vi.mock("next-intl", () => ({
   useTranslations: (namespace?: string) => (key: string) => {
-    const translations: Record<string, Record<string, string>> = {
-      filterPanel: {
-        search: "Search nodes...",
-        tags: "Tags",
-        attribution: "Attribution",
-        clearAll: "Clear all",
-        and: "AND",
-        or: "OR",
-        selectTags: "Select tags...",
-      },
-      attributionFilter: {
-        all: "All",
-        human: "Human",
-        aiGenerated: "AI-generated",
-        aiAssisted: "AI-assisted",
+    const translations: Record<string, any> = {
+      fileTree: {
+        filterPanel: {
+          search: "Search nodes...",
+          tags: "Tags",
+          attribution: "Attribution",
+          clearAll: "Clear all",
+          and: "AND",
+          or: "OR",
+          selectTags: "Select tags...",
+        },
+        attributionFilter: {
+          all: "All",
+          human: "Human",
+          aiGenerated: "AI-generated",
+          aiAssisted: "AI-assisted",
+        },
       },
     };
 
-    if (namespace && translations[namespace]) {
-      return translations[namespace][key] || key;
+    // Support nested namespaces like "fileTree.filterPanel"
+    if (namespace) {
+      const parts = namespace.split(".");
+      let current: any = translations;
+      for (const part of parts) {
+        current = current[part];
+        if (!current) return key;
+      }
+      return current[key] || key;
     }
     return key;
   },
