@@ -116,34 +116,56 @@
       "dashboard": {
         "label": "ダッシュボードへ移動",
         "description": "ダッシュボードを表示",
-        "keywords": ["ホーム", "概要"]
+        "keywords": [
+          "ホーム",
+          "概要"
+        ]
       },
       "search": {
         "label": "検索へ移動",
         "description": "コンテンツを検索",
-        "keywords": ["検索", "探す"]
+        "keywords": [
+          "検索",
+          "探す"
+        ]
       },
       "projects": {
         "label": "プロジェクトへ移動",
         "description": "プロジェクトを閲覧",
-        "keywords": ["フォルダ", "ファイル", "プロジェクト"]
+        "keywords": [
+          "フォルダ",
+          "ファイル",
+          "プロジェクト"
+        ]
       },
       "chat": {
         "label": "AIチャットへ移動",
         "description": "AIアシスタントとチャット",
-        "keywords": ["AI", "アシスタント", "ヘルプ"]
+        "keywords": [
+          "AI",
+          "アシスタント",
+          "ヘルプ"
+        ]
       },
       "settings": {
         "label": "設定へ移動",
         "description": "設定を変更",
-        "keywords": ["設定", "環境設定", "オプション"]
+        "keywords": [
+          "設定",
+          "環境設定",
+          "オプション"
+        ]
       }
     },
     "help": {
       "about": {
         "label": "Arborについて",
         "description": "Arborの情報を表示",
-        "keywords": ["について", "情報", "バージョン"]
+        "keywords": [
+          "について",
+          "情報",
+          "バージョン"
+        ]
       }
     }
   },
@@ -448,6 +470,7 @@
     "unlinkEntity": "エンティティページのリンクを解除",
     "entityTag": "エンティティタグ",
     "browser": {
+      "browse": "閲覧",
       "cloudView": "クラウド表示",
       "listView": "リスト表示",
       "filtered": "タグでフィルター中",

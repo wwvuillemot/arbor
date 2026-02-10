@@ -649,7 +649,7 @@ export default function ProjectsPage() {
                 )}
                 data-testid="sidebar-tab-browse"
               >
-                Browse
+                {tTags("browser.browse")}
               </button>
               <button
                 onClick={() => setSidebarTagTab("manage")}
@@ -718,11 +718,11 @@ export default function ProjectsPage() {
                       className={cn(
                         "text-xs px-2 py-1 rounded",
                         autoSaveStatus === "saving" &&
-                          "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
+                        "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
                         autoSaveStatus === "saved" &&
-                          "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
+                        "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
                         autoSaveStatus === "error" &&
-                          "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
+                        "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
                         autoSaveStatus === "idle" && "hidden",
                       )}
                       data-testid="auto-save-status"
@@ -1069,7 +1069,7 @@ export default function ProjectsPage() {
                 className={cn(
                   "group relative rounded-lg border bg-card p-6 hover:shadow-md transition-shadow cursor-pointer",
                   isSelected &&
-                    "border-green-500 bg-green-50 dark:bg-green-950",
+                  "border-green-500 bg-green-50 dark:bg-green-950",
                 )}
               >
                 {/* Checkmark in upper-right corner */}
