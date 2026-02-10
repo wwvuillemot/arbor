@@ -84,7 +84,6 @@ describe("useNavigationCommands", () => {
     expect(commandIds).toContain("nav-dashboard");
     expect(commandIds).toContain("nav-search");
     expect(commandIds).toContain("nav-projects");
-    expect(commandIds).toContain("nav-chat");
     expect(commandIds).toContain("nav-settings");
   });
 
@@ -130,17 +129,6 @@ describe("useNavigationCommands", () => {
     command?.action();
 
     expect(mockPush).toHaveBeenCalledWith("/projects");
-  });
-
-  it("should navigate to chat when chat command is executed", () => {
-    renderHook(() => useNavigationCommands());
-
-    const command = commandRegistry
-      .getCommands()
-      .find((cmd) => cmd.id === "nav-chat");
-    command?.action();
-
-    expect(mockPush).toHaveBeenCalledWith("/chat");
   });
 
   it("should navigate to settings when settings command is executed", () => {

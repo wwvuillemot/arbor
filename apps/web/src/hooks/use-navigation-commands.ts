@@ -7,7 +7,6 @@ import {
   Search,
   LayoutDashboard,
   FolderTree,
-  MessageSquare,
   Settings,
 } from "lucide-react";
 import { commandRegistry } from "@/lib/command-registry";
@@ -74,16 +73,6 @@ export function useNavigationCommands() {
         keywords: getKeywords("projects"),
         shortcut: ["g", "p"],
         action: () => router.push("/projects"),
-      },
-      {
-        id: "nav-chat",
-        label: t("chat.label"),
-        description: t("chat.description"),
-        icon: MessageSquare,
-        group: "navigation",
-        keywords: getKeywords("chat"),
-        shortcut: ["g", "c"],
-        action: () => router.push("/chat"),
       },
       {
         id: "nav-settings",

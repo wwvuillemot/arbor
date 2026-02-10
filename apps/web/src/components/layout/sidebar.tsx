@@ -10,7 +10,6 @@ import {
   Search,
   LayoutDashboard,
   FolderTree,
-  MessageSquare,
   Settings,
   Command,
   type LucideIcon,
@@ -50,12 +49,6 @@ const navigationItems: SidebarItem[] = [
     labelKey: "projects",
     icon: FolderTree,
     href: "/projects",
-  },
-  {
-    id: "chat",
-    labelKey: "chat",
-    icon: MessageSquare,
-    href: "/chat",
   },
 ];
 
@@ -148,7 +141,7 @@ export function Sidebar({ className, defaultCollapsed = false }: SidebarProps) {
             "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
             "hover:bg-accent hover:text-accent-foreground",
             pathname.startsWith("/settings") &&
-              "bg-accent text-accent-foreground",
+            "bg-accent text-accent-foreground",
             isCollapsed && "justify-center px-2",
           )}
           title={isCollapsed ? t("settings") : undefined}

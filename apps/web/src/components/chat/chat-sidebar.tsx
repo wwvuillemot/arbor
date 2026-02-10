@@ -62,12 +62,7 @@ export function ChatSidebar({ isOpen, onToggle, className }: ChatSidebarProps) {
           className="h-full w-full flex items-center justify-center hover:bg-accent transition-colors group"
           title={t("title")}
         >
-          <div className="flex flex-col items-center gap-2 text-muted-foreground group-hover:text-accent-foreground">
-            <MessageSquare className="w-5 h-5" />
-            <span className="text-xs writing-mode-vertical-rl transform rotate-180">
-              {t("title")}
-            </span>
-          </div>
+          <MessageSquare className="w-5 h-5 text-muted-foreground group-hover:text-accent-foreground" />
         </button>
       )}
     </div>
