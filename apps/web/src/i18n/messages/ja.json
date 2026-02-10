@@ -116,34 +116,56 @@
       "dashboard": {
         "label": "ダッシュボードへ移動",
         "description": "ダッシュボードを表示",
-        "keywords": ["ホーム", "概要"]
+        "keywords": [
+          "ホーム",
+          "概要"
+        ]
       },
       "search": {
         "label": "検索へ移動",
         "description": "コンテンツを検索",
-        "keywords": ["検索", "探す"]
+        "keywords": [
+          "検索",
+          "探す"
+        ]
       },
       "projects": {
         "label": "プロジェクトへ移動",
         "description": "プロジェクトを閲覧",
-        "keywords": ["フォルダ", "ファイル", "プロジェクト"]
+        "keywords": [
+          "フォルダ",
+          "ファイル",
+          "プロジェクト"
+        ]
       },
       "chat": {
         "label": "AIチャットへ移動",
         "description": "AIアシスタントとチャット",
-        "keywords": ["AI", "アシスタント", "ヘルプ"]
+        "keywords": [
+          "AI",
+          "アシスタント",
+          "ヘルプ"
+        ]
       },
       "settings": {
         "label": "設定へ移動",
         "description": "設定を変更",
-        "keywords": ["設定", "環境設定", "オプション"]
+        "keywords": [
+          "設定",
+          "環境設定",
+          "オプション"
+        ]
       }
     },
     "help": {
       "about": {
         "label": "Arborについて",
         "description": "Arborの情報を表示",
-        "keywords": ["について", "情報", "バージョン"]
+        "keywords": [
+          "について",
+          "情報",
+          "バージョン"
+        ]
       }
     }
   },
@@ -437,6 +459,49 @@
       "loading": "読み込み中...",
       "noResults": "一致するノードがありません",
       "related": "関連タグ"
+    }
+  },
+  "provenance": {
+    "title": "バージョン履歴",
+    "attributionBadge": {
+      "aiGenerated": "AI生成",
+      "aiAssisted": "AIアシスト",
+      "humanCreated": "人間",
+      "system": "システム",
+      "tooltip": {
+        "actor": "アクター",
+        "model": "モデル"
+      }
+    },
+    "versionHistory": {
+      "title": "履歴",
+      "version": "バージョン",
+      "action": {
+        "create": "作成",
+        "update": "更新",
+        "delete": "削除",
+        "move": "移動",
+        "restore": "復元"
+      },
+      "noHistory": "バージョン履歴がありません",
+      "loading": "履歴を読み込み中...",
+      "checkout": "表示",
+      "rollback": "復元",
+      "compare": "比較",
+      "rollbackSuccess": "ロールバックに成功しました",
+      "rollbackError": "ロールバックに失敗しました",
+      "page": "ページ",
+      "of": "/"
+    },
+    "diffViewer": {
+      "title": "バージョン比較",
+      "additions": "追加",
+      "deletions": "削除",
+      "unchanged": "変更なし",
+      "loading": "差分を読み込み中...",
+      "noDiff": "差分がありません",
+      "versionA": "バージョンA",
+      "versionB": "バージョンB"
     }
   }
 }
