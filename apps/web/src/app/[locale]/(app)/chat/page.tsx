@@ -1,12 +1,5 @@
-import { useTranslations } from "next-intl";
+import { ChatPanel } from "@/components/chat";
 
 export default function ChatPage() {
-  const t = useTranslations("chat");
-
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">{t("title")}</h1>
-      <p className="text-muted-foreground">{t("description")}</p>
-    </div>
-  );
+  return <ChatPanel className="h-[calc(100vh-4rem)]" />;
 }

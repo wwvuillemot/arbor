@@ -205,7 +205,32 @@
   },
   "chat": {
     "title": "AIチャット",
-    "description": "AIとチャットしてアイデアをブレインストーミングし、執筆の提案を受け、コンテンツで協力します。"
+    "description": "AIとチャットしてアイデアをブレインストーミングし、執筆の提案を受け、コンテンツで協力します。",
+    "newThread": "新しいスレッド",
+    "noThreads": "チャットスレッドはまだありません",
+    "noMessages": "メッセージはまだありません。会話を始めましょう！",
+    "inputPlaceholder": "メッセージを入力...",
+    "send": "送信",
+    "deleteThread": "スレッドを削除",
+    "threadDeleted": "スレッドが削除されました",
+    "messageSent": "メッセージが送信されました",
+    "mode": {
+      "label": "モード",
+      "assistant": "アシスタント",
+      "planner": "プランナー",
+      "editor": "エディター",
+      "researcher": "リサーチャー"
+    },
+    "role": {
+      "user": "あなた",
+      "assistant": "AI",
+      "system": "システム",
+      "tool": "ツール"
+    },
+    "threads": "スレッド",
+    "messages": "メッセージ",
+    "tokens": "トークン使用",
+    "error": "メッセージの送信に失敗しました"
   },
   "search": {
     "title": "検索",

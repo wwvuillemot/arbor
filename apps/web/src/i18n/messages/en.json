@@ -205,7 +205,32 @@
   },
   "chat": {
     "title": "AI Chat",
-    "description": "Chat with AI to brainstorm ideas, get writing suggestions, and collaborate on your content."
+    "description": "Chat with AI to brainstorm ideas, get writing suggestions, and collaborate on your content.",
+    "newThread": "New Thread",
+    "noThreads": "No chat threads yet",
+    "noMessages": "No messages yet. Start the conversation!",
+    "inputPlaceholder": "Type your message...",
+    "send": "Send",
+    "deleteThread": "Delete Thread",
+    "threadDeleted": "Thread deleted",
+    "messageSent": "Message sent",
+    "mode": {
+      "label": "Mode",
+      "assistant": "Assistant",
+      "planner": "Planner",
+      "editor": "Editor",
+      "researcher": "Researcher"
+    },
+    "role": {
+      "user": "You",
+      "assistant": "AI",
+      "system": "System",
+      "tool": "Tool"
+    },
+    "threads": "Threads",
+    "messages": "Messages",
+    "tokens": "tokens used",
+    "error": "Failed to send message"
   },
   "search": {
     "title": "Search",
