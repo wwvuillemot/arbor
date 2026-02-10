@@ -94,7 +94,7 @@ describe("OpenAIProvider", () => {
   it("should return model list with GPT-4o", async () => {
     const provider = new OpenAIProvider("sk-test");
     const models = await provider.models();
-    expect(models.length).toBe(4);
+    expect(models.length).toBe(5);
     expect(models.every((m) => m.provider === "openai")).toBe(true);
     const gpt4o = models.find((m) => m.id === "gpt-4o");
     expect(gpt4o).toBeDefined();
@@ -485,16 +485,18 @@ describe("LocalLLMProvider", () => {
       expect(chunks.length).toBeGreaterThan(0);
     });
 
-    it("should return stub model in models()", async () => {
+    it("should return stub models including DeepSeek R1 in models()", async () => {
       const provider = new LocalLLMProvider(
         "http://unused",
         "stub-model",
         true,
       );
       const models = await provider.models();
-      expect(models).toHaveLength(1);
+      expect(models).toHaveLength(2);
       expect(models[0].id).toBe("stub");
       expect(models[0].provider).toBe("local");
+      expect(models[1].id).toBe("deepseek-r1");
+      expect(models[1].supportsReasoning).toBe(true);
     });
   });
 
@@ -637,8 +639,8 @@ describe("LLMService", () => {
     service.registerProvider(anthropic);
 
     const allModels = await service.getAllModels();
-    // 1 stub + 4 openai + 3 anthropic = 8
-    expect(allModels.length).toBe(8);
+    // 2 local (stub + deepseek-r1) + 5 openai (gpt-4o, gpt-4o-mini, o1, o3, o3-mini) + 3 anthropic = 10
+    expect(allModels.length).toBe(10);
     expect(allModels.some((m) => m.provider === "local")).toBe(true);
     expect(allModels.some((m) => m.provider === "openai")).toBe(true);
     expect(allModels.some((m) => m.provider === "anthropic")).toBe(true);
@@ -657,5 +659,159 @@ describe("LLMService", () => {
     const stub = new LocalLLMProvider("http://unused", "stub", true);
     const service = new LLMService(stub);
     expect(service.getProviderNames()).toEqual(["local"]);
+  });
+});
+
+// ─── Reasoning Model Support ─────────────────────────────────────────────────
+
+describe("Reasoning Model Support", () => {
+  describe("OpenAI reasoning models", () => {
+    it("should mark o1 as supporting reasoning", async () => {
+      const provider = new OpenAIProvider("sk-test");
+      const models = await provider.models();
+      const o1Model = models.find((m) => m.id === "o1");
+      expect(o1Model).toBeDefined();
+      expect(o1Model!.supportsReasoning).toBe(true);
+    });
+
+    it("should mark o3 as supporting reasoning", async () => {
+      const provider = new OpenAIProvider("sk-test");
+      const models = await provider.models();
+      const o3Model = models.find((m) => m.id === "o3");
+      expect(o3Model).toBeDefined();
+      expect(o3Model!.supportsReasoning).toBe(true);
+    });
+
+    it("should mark o3-mini as supporting reasoning", async () => {
+      const provider = new OpenAIProvider("sk-test");
+      const models = await provider.models();
+      const o3MiniModel = models.find((m) => m.id === "o3-mini");
+      expect(o3MiniModel).toBeDefined();
+      expect(o3MiniModel!.supportsReasoning).toBe(true);
+    });
+
+    it("should NOT mark gpt-4o as supporting reasoning", async () => {
+      const provider = new OpenAIProvider("sk-test");
+      const models = await provider.models();
+      const gpt4oModel = models.find((m) => m.id === "gpt-4o");
+      expect(gpt4oModel).toBeDefined();
+      expect(gpt4oModel!.supportsReasoning).toBeUndefined();
+    });
+
+    it("should extract reasoning from o1 chat response", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            model: "o1",
+            choices: [
+              {
+                message: {
+                  content: "The answer is 42.",
+                  reasoning_content: "Let me think step by step...",
+                },
+                finish_reason: "stop",
+              },
+            ],
+            usage: {
+              prompt_tokens: 10,
+              completion_tokens: 50,
+              total_tokens: 60,
+              completion_tokens_details: { reasoning_tokens: 30 },
+            },
+          }),
+          { status: 200 },
+        ),
+      );
+
+      const provider = new OpenAIProvider("sk-test");
+      const result = await provider.chat(
+        [{ role: "user", content: "What is the meaning of life?" }],
+        { model: "o1" },
+      );
+
+      expect(result.content).toBe("The answer is 42.");
+      expect(result.reasoning).toBe("Let me think step by step...");
+      expect(result.reasoningTokens).toBe(30);
+      expect(result.outputTokens).toBe(50);
+      fetchSpy.mockRestore();
+    });
+
+    it("should return null reasoning for non-reasoning models", async () => {
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            model: "gpt-4o",
+            choices: [
+              {
+                message: { content: "Hello!" },
+                finish_reason: "stop",
+              },
+            ],
+            usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+          }),
+          { status: 200 },
+        ),
+      );
+
+      const provider = new OpenAIProvider("sk-test");
+      const result = await provider.chat([{ role: "user", content: "Hi" }], {
+        model: "gpt-4o",
+      });
+
+      expect(result.content).toBe("Hello!");
+      expect(result.reasoning).toBeNull();
+      fetchSpy.mockRestore();
+    });
+  });
+
+  describe("DeepSeek R1 reasoning parsing", () => {
+    it("should parse <think> tags from content", () => {
+      const result = LocalLLMProvider.parseReasoningFromContent(
+        "<think>Step 1: analyze the problem\nStep 2: solve it</think>\nThe answer is 42.",
+      );
+      expect(result.reasoning).toBe(
+        "Step 1: analyze the problem\nStep 2: solve it",
+      );
+      expect(result.content).toBe("The answer is 42.");
+    });
+
+    it("should return null reasoning when no <think> tags", () => {
+      const result = LocalLLMProvider.parseReasoningFromContent(
+        "Just a normal response",
+      );
+      expect(result.reasoning).toBeNull();
+      expect(result.content).toBe("Just a normal response");
+    });
+
+    it("should return null for null content", () => {
+      const result = LocalLLMProvider.parseReasoningFromContent(null);
+      expect(result.reasoning).toBeNull();
+      expect(result.content).toBeNull();
+    });
+
+    it("should handle empty think tags", () => {
+      const result = LocalLLMProvider.parseReasoningFromContent(
+        "<think></think>\nHello",
+      );
+      expect(result.reasoning).toBeNull();
+      expect(result.content).toBe("Hello");
+    });
+
+    it("should handle think tags with only whitespace", () => {
+      const result = LocalLLMProvider.parseReasoningFromContent(
+        "<think>   \n  </think>\nResult here",
+      );
+      expect(result.reasoning).toBeNull();
+      expect(result.content).toBe("Result here");
+    });
+
+    it("should include DeepSeek R1 in local stub models with supportsReasoning", async () => {
+      const provider = new LocalLLMProvider("http://unused", "stub", true);
+      const models = await provider.models();
+      const deepseekModel = models.find((m) => m.id === "deepseek-r1");
+      expect(deepseekModel).toBeDefined();
+      expect(deepseekModel!.supportsReasoning).toBe(true);
+      expect(deepseekModel!.name).toBe("DeepSeek R1");
+    });
   });
 });

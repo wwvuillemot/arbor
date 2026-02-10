@@ -273,6 +273,89 @@ describe("ChatMessage", () => {
       "user",
     );
   });
+
+  // ─── Reasoning / Thinking Display ──────────────────────────────────
+
+  it("should show reasoning toggle when reasoning is present", () => {
+    const msgWithReasoning: ChatMessageData = {
+      ...baseMessage,
+      role: "assistant",
+      reasoning: "Let me think step by step...",
+    };
+    render(<ChatMessage message={msgWithReasoning} />);
+    expect(screen.getByTestId("reasoning-section")).toBeInTheDocument();
+    expect(screen.getByTestId("reasoning-toggle")).toBeInTheDocument();
+    expect(screen.getByTestId("reasoning-toggle")).toHaveTextContent(
+      "showReasoning",
+    );
+  });
+
+  it("should not show reasoning section when reasoning is null", () => {
+    render(<ChatMessage message={baseMessage} />);
+    expect(screen.queryByTestId("reasoning-section")).not.toBeInTheDocument();
+  });
+
+  it("should toggle reasoning content on click", () => {
+    const msgWithReasoning: ChatMessageData = {
+      ...baseMessage,
+      role: "assistant",
+      reasoning: "Step 1: analyze\nStep 2: solve",
+    };
+    render(<ChatMessage message={msgWithReasoning} />);
+
+    // Initially hidden
+    expect(screen.queryByTestId("reasoning-content")).not.toBeInTheDocument();
+
+    // Click to show
+    fireEvent.click(screen.getByTestId("reasoning-toggle"));
+    expect(screen.getByTestId("reasoning-content")).toBeInTheDocument();
+    expect(screen.getByTestId("reasoning-content")).toHaveTextContent(
+      "Step 1: analyze",
+    );
+    expect(screen.getByTestId("reasoning-toggle")).toHaveTextContent(
+      "hideReasoning",
+    );
+
+    // Click to hide
+    fireEvent.click(screen.getByTestId("reasoning-toggle"));
+    expect(screen.queryByTestId("reasoning-content")).not.toBeInTheDocument();
+  });
+
+  it("should show token breakdown when reasoningTokens present", () => {
+    const msgWithBreakdown: ChatMessageData = {
+      ...baseMessage,
+      role: "assistant",
+      tokensUsed: 80,
+      reasoningTokens: 50,
+      outputTokens: 30,
+    };
+    render(<ChatMessage message={msgWithBreakdown} />);
+    expect(screen.getByTestId("message-token-breakdown")).toBeInTheDocument();
+    expect(screen.getByTestId("message-token-breakdown")).toHaveTextContent(
+      "50",
+    );
+    expect(screen.getByTestId("message-token-breakdown")).toHaveTextContent(
+      "30",
+    );
+    expect(screen.getByTestId("message-token-breakdown")).toHaveTextContent(
+      "reasoningTokens",
+    );
+    expect(screen.getByTestId("message-token-breakdown")).toHaveTextContent(
+      "outputTokens",
+    );
+  });
+
+  it("should show regular token count when no reasoningTokens", () => {
+    const msgWithTokens: ChatMessageData = {
+      ...baseMessage,
+      tokensUsed: 42,
+    };
+    render(<ChatMessage message={msgWithTokens} />);
+    expect(screen.getByTestId("message-tokens")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("message-token-breakdown"),
+    ).not.toBeInTheDocument();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════

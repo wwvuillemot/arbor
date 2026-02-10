@@ -230,6 +230,11 @@
     "threads": "スレッド",
     "messages": "メッセージ",
     "tokens": "トークン使用",
+    "reasoning": "推論",
+    "showReasoning": "推論を表示",
+    "hideReasoning": "推論を非表示",
+    "reasoningTokens": "推論トークン",
+    "outputTokens": "出力トークン",
     "error": "メッセージの送信に失敗しました"
   },
   "search": {

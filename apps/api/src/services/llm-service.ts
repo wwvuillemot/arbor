@@ -47,16 +47,24 @@ export interface ChatResponse {
   tokensUsed: number;
   toolCalls?: ToolCall[];
   finishReason: "stop" | "tool_calls" | "length" | "error";
+  /** Reasoning/thinking content from reasoning models (o1, o3, DeepSeek R1, etc.) */
+  reasoning?: string | null;
+  /** Number of tokens used for reasoning/thinking */
+  reasoningTokens?: number;
+  /** Number of tokens used for output (excluding reasoning) */
+  outputTokens?: number;
 }
 
 export interface StreamChunk {
-  type: "text" | "tool_call" | "done" | "error";
+  type: "text" | "tool_call" | "done" | "error" | "reasoning";
   content?: string;
   toolCall?: Partial<ToolCall>;
   model?: string;
   tokensUsed?: number;
   finishReason?: string;
   error?: string;
+  /** Reasoning/thinking content chunk */
+  reasoning?: string;
 }
 
 export interface ModelInfo {
@@ -67,6 +75,8 @@ export interface ModelInfo {
   supportsTools: boolean;
   supportsVision: boolean;
   supportsStreaming: boolean;
+  /** Whether this model supports reasoning/thinking (e.g. o1, o3, DeepSeek R1) */
+  supportsReasoning?: boolean;
   costPer1kInput?: number;
   costPer1kOutput?: number;
 }
@@ -135,6 +145,9 @@ export function estimateMessagesTokenCount(messages: ChatMessage[]): number {
 
 // ─── OpenAI Provider ───────────────────────────────────────────────────────────
 
+/** Model IDs that support reasoning/thinking */
+const OPENAI_REASONING_MODELS = new Set(["o1", "o3", "o3-mini"]);
+
 const OPENAI_MODELS: ModelInfo[] = [
   {
     id: "gpt-4o",
@@ -166,8 +179,21 @@ const OPENAI_MODELS: ModelInfo[] = [
     supportsTools: false,
     supportsVision: true,
     supportsStreaming: true,
+    supportsReasoning: true,
     costPer1kInput: 0.015,
     costPer1kOutput: 0.06,
+  },
+  {
+    id: "o3",
+    name: "o3",
+    provider: "openai",
+    contextWindow: 200000,
+    supportsTools: true,
+    supportsVision: true,
+    supportsStreaming: true,
+    supportsReasoning: true,
+    costPer1kInput: 0.01,
+    costPer1kOutput: 0.04,
   },
   {
     id: "o3-mini",
@@ -177,6 +203,7 @@ const OPENAI_MODELS: ModelInfo[] = [
     supportsTools: false,
     supportsVision: false,
     supportsStreaming: true,
+    supportsReasoning: true,
     costPer1kInput: 0.0011,
     costPer1kOutput: 0.0044,
   },
@@ -229,6 +256,15 @@ export class OpenAIProvider implements LLMProvider {
     const data = (await response.json()) as OpenAIChatResponse;
     const choice = data.choices[0];
 
+    // Extract reasoning content from reasoning models (o1, o3, o3-mini)
+    const isReasoningModel = OPENAI_REASONING_MODELS.has(model);
+    const reasoningContent = isReasoningModel
+      ? (choice.message.reasoning_content ?? null)
+      : null;
+    const reasoningTokens =
+      data.usage?.completion_tokens_details?.reasoning_tokens;
+    const outputTokens = data.usage?.completion_tokens;
+
     return {
       content: choice.message.content,
       model: data.model,
@@ -243,6 +279,9 @@ export class OpenAIProvider implements LLMProvider {
         },
       })),
       finishReason: this.mapFinishReason(choice.finish_reason),
+      reasoning: reasoningContent,
+      reasoningTokens,
+      outputTokens,
     };
   }
 
@@ -312,6 +351,11 @@ export class OpenAIProvider implements LLMProvider {
             const parsed = JSON.parse(data) as OpenAIStreamChunk;
             const delta = parsed.choices?.[0]?.delta;
             if (!delta) continue;
+
+            // Reasoning content from o1/o3 models
+            if (delta.reasoning_content) {
+              yield { type: "reasoning", reasoning: delta.reasoning_content };
+            }
 
             if (delta.content) {
               yield { type: "text", content: delta.content };
@@ -427,6 +471,8 @@ interface OpenAIChatResponse {
   choices: Array<{
     message: {
       content: string | null;
+      /** Reasoning content from o1/o3 models */
+      reasoning_content?: string | null;
       tool_calls?: Array<{
         id: string;
         type: string;
@@ -439,6 +485,10 @@ interface OpenAIChatResponse {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
+    /** Detailed token breakdown (available for reasoning models) */
+    completion_tokens_details?: {
+      reasoning_tokens?: number;
+    };
   };
 }
 
@@ -447,6 +497,8 @@ interface OpenAIStreamChunk {
   choices?: Array<{
     delta: {
       content?: string;
+      /** Reasoning content chunk from o1/o3 models */
+      reasoning_content?: string;
       tool_calls?: Array<{
         id?: string;
         type?: string;
@@ -550,10 +602,13 @@ export class AnthropicProvider implements LLMProvider {
     const data = (await response.json()) as AnthropicResponse;
 
     let content: string | null = null;
+    let reasoning: string | null = null;
     const toolCalls: ToolCall[] = [];
 
     for (const block of data.content) {
-      if (block.type === "text") {
+      if (block.type === "thinking" && block.thinking) {
+        reasoning = (reasoning || "") + block.thinking;
+      } else if (block.type === "text") {
         content = (content || "") + block.text;
       } else if (block.type === "tool_use") {
         toolCalls.push({
@@ -574,6 +629,7 @@ export class AnthropicProvider implements LLMProvider {
         (data.usage?.input_tokens ?? 0) + (data.usage?.output_tokens ?? 0),
       toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
       finishReason: data.stop_reason === "tool_use" ? "tool_calls" : "stop",
+      reasoning,
     };
   }
 
@@ -646,7 +702,15 @@ export class AnthropicProvider implements LLMProvider {
             const parsed = JSON.parse(data) as AnthropicStreamEvent;
 
             if (parsed.type === "content_block_delta") {
-              if (parsed.delta?.type === "text_delta" && parsed.delta.text) {
+              if (
+                parsed.delta?.type === "thinking_delta" &&
+                parsed.delta.thinking
+              ) {
+                yield { type: "reasoning", reasoning: parsed.delta.thinking };
+              } else if (
+                parsed.delta?.type === "text_delta" &&
+                parsed.delta.text
+              ) {
                 yield { type: "text", content: parsed.delta.text };
               } else if (
                 parsed.delta?.type === "input_json_delta" &&
@@ -764,6 +828,8 @@ interface AnthropicResponse {
   content: Array<{
     type: string;
     text?: string;
+    /** Thinking/reasoning content from extended thinking */
+    thinking?: string;
     id?: string;
     name?: string;
     input?: unknown;
@@ -780,6 +846,8 @@ interface AnthropicStreamEvent {
   delta?: {
     type?: string;
     text?: string;
+    /** Thinking content chunk from extended thinking */
+    thinking?: string;
     partial_json?: string;
     stop_reason?: string;
   };
@@ -858,13 +926,40 @@ export class LocalLLMProvider implements LLMProvider {
     const data = (await response.json()) as OpenAIChatResponse;
     const choice = data.choices[0];
 
+    // DeepSeek R1 embeds reasoning in <think>...</think> tags within content
+    const rawContent = choice.message.content;
+    const parsed = LocalLLMProvider.parseReasoningFromContent(rawContent);
+
     return {
-      content: choice.message.content,
+      content: parsed.content,
       model: data.model,
       tokensUsed:
         (data.usage?.prompt_tokens ?? 0) + (data.usage?.completion_tokens ?? 0),
       finishReason: "stop",
+      reasoning: parsed.reasoning,
     };
+  }
+
+  /**
+   * Parse DeepSeek R1's <think>...</think> reasoning tags from content.
+   * Returns separated content and reasoning.
+   */
+  static parseReasoningFromContent(rawContent: string | null): {
+    content: string | null;
+    reasoning: string | null;
+  } {
+    if (!rawContent) return { content: null, reasoning: null };
+
+    const thinkMatch = rawContent.match(
+      /^<think>([\s\S]*?)<\/think>\s*([\s\S]*)$/,
+    );
+    if (thinkMatch) {
+      const reasoning = thinkMatch[1].trim() || null;
+      const content = thinkMatch[2].trim() || null;
+      return { content, reasoning };
+    }
+
+    return { content: rawContent, reasoning: null };
   }
 
   async *chatStream(
@@ -873,6 +968,9 @@ export class LocalLLMProvider implements LLMProvider {
   ): AsyncGenerator<StreamChunk> {
     if (this.stubMode) {
       const response = await this.stubChat(messages);
+      if (response.reasoning) {
+        yield { type: "reasoning", reasoning: response.reasoning };
+      }
       if (response.content) {
         // Simulate streaming by yielding word by word
         const words = response.content.split(" ");
@@ -975,6 +1073,16 @@ export class LocalLLMProvider implements LLMProvider {
           supportsTools: false,
           supportsVision: false,
           supportsStreaming: true,
+        },
+        {
+          id: "deepseek-r1",
+          name: "DeepSeek R1",
+          provider: "local",
+          contextWindow: 65536,
+          supportsTools: false,
+          supportsVision: false,
+          supportsStreaming: true,
+          supportsReasoning: true,
         },
       ];
     }

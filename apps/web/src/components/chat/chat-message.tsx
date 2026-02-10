@@ -2,7 +2,15 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Copy, User, Bot, Cpu, Wrench } from "lucide-react";
+import {
+  Copy,
+  User,
+  Bot,
+  Cpu,
+  Wrench,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface ChatMessageData {
@@ -13,6 +21,12 @@ export interface ChatMessageData {
   tokensUsed?: number | null;
   toolCalls?: unknown;
   createdAt: string;
+  /** Reasoning/thinking content from reasoning models */
+  reasoning?: string | null;
+  /** Number of tokens used for reasoning/thinking */
+  reasoningTokens?: number | null;
+  /** Number of tokens used for output (excluding reasoning) */
+  outputTokens?: number | null;
 }
 
 export interface ChatMessageProps {
@@ -41,6 +55,7 @@ const ROLE_COLORS: Record<string, string> = {
 export function ChatMessage({ message, className }: ChatMessageProps) {
   const t = useTranslations("chat");
   const [copied, setCopied] = React.useState(false);
+  const [showReasoning, setShowReasoning] = React.useState(false);
 
   const RoleIcon = ROLE_ICONS[message.role] || User;
   const roleColor = ROLE_COLORS[message.role] || ROLE_COLORS.user;
@@ -126,6 +141,32 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
           </div>
         )}
 
+        {/* Reasoning / Thinking section (collapsible) */}
+        {message.reasoning && (
+          <div className="mt-2" data-testid="reasoning-section">
+            <button
+              data-testid="reasoning-toggle"
+              onClick={() => setShowReasoning(!showReasoning)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showReasoning ? (
+                <ChevronUp className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+              {showReasoning ? t("hideReasoning") : t("showReasoning")}
+            </button>
+            {showReasoning && (
+              <div
+                data-testid="reasoning-content"
+                className="mt-1 p-2 bg-muted/50 rounded text-sm italic text-muted-foreground whitespace-pre-wrap"
+              >
+                {message.reasoning}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tool calls */}
         {toolCallsArray.length > 0 && (
           <div data-testid="message-tool-calls" className="mt-2">
@@ -144,13 +185,24 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
 
         {/* Footer: tokens + copy */}
         <div className="flex items-center gap-2 mt-1">
-          {message.tokensUsed != null && message.tokensUsed > 0 && (
+          {message.reasoningTokens != null && message.reasoningTokens > 0 ? (
             <span
-              data-testid="message-tokens"
+              data-testid="message-token-breakdown"
               className="text-xs text-muted-foreground"
             >
-              {message.tokensUsed} {t("tokens")}
+              {message.reasoningTokens} {t("reasoningTokens")},{" "}
+              {message.outputTokens ?? 0} {t("outputTokens")}
             </span>
+          ) : (
+            message.tokensUsed != null &&
+            message.tokensUsed > 0 && (
+              <span
+                data-testid="message-tokens"
+                className="text-xs text-muted-foreground"
+              >
+                {message.tokensUsed} {t("tokens")}
+              </span>
+            )
           )}
           {message.content && (
             <button

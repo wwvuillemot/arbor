@@ -230,6 +230,11 @@
     "threads": "Threads",
     "messages": "Messages",
     "tokens": "tokens used",
+    "reasoning": "Reasoning",
+    "showReasoning": "Show reasoning",
+    "hideReasoning": "Hide reasoning",
+    "reasoningTokens": "reasoning tokens",
+    "outputTokens": "output tokens",
     "error": "Failed to send message"
   },
   "search": {
