@@ -7,6 +7,8 @@ import {
   createTestFolder,
   createTestNote,
 } from "@tests/helpers/fixtures";
+import { TagService } from "@server/services/tag-service";
+import { NodeService } from "@server/services/node-service";
 
 describe("MCP Server", () => {
   let client: Client;
@@ -42,7 +44,16 @@ describe("MCP Server", () => {
       expect(toolNames).toContain("create_node");
       expect(toolNames).toContain("update_node");
       expect(toolNames).toContain("search_nodes");
-      expect(result.tools.length).toBe(3);
+      expect(toolNames).toContain("delete_node");
+      expect(toolNames).toContain("move_node");
+      expect(toolNames).toContain("list_nodes");
+      expect(toolNames).toContain("search_semantic");
+      expect(toolNames).toContain("add_tag");
+      expect(toolNames).toContain("remove_tag");
+      expect(toolNames).toContain("list_tags");
+      expect(toolNames).toContain("export_node");
+      expect(toolNames).toContain("export_project");
+      expect(result.tools.length).toBe(12);
     });
 
     it("should have proper descriptions for each tool", async () => {
@@ -279,6 +290,407 @@ describe("MCP Server", () => {
           arguments: { projectId: fakeId },
         }),
       ).rejects.toThrow();
+    });
+  });
+
+  // ─── delete_node Tool ────────────────────────────────────────────────
+
+  describe("delete_node tool", () => {
+    it("should delete an existing node", async () => {
+      const project = await createTestProject("To Delete");
+
+      const result = await client.callTool({
+        name: "delete_node",
+        arguments: { id: project.id },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text);
+      expect(parsed.deleted).toBe(true);
+      expect(parsed.id).toBe(project.id);
+
+      // Verify deletion
+      const nodeService = new NodeService();
+      const node = await nodeService.getNodeById(project.id);
+      expect(node).toBeNull();
+    });
+
+    it("should cascade delete children", async () => {
+      const project = await createTestProject("Parent To Delete");
+      await createTestNote("Child Note", project.id, "content");
+
+      const result = await client.callTool({
+        name: "delete_node",
+        arguments: { id: project.id },
+      });
+
+      expect(result.isError).toBeFalsy();
+    });
+  });
+
+  // ─── move_node Tool ─────────────────────────────────────────────────
+
+  describe("move_node tool", () => {
+    it("should move a node to a new parent", async () => {
+      const project1 = await createTestProject("Source Project");
+      const project2 = await createTestProject("Target Project");
+      const note = await createTestNote("Moving Note", project1.id, "content");
+
+      const result = await client.callTool({
+        name: "move_node",
+        arguments: { id: note.id, newParentId: project2.id },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const moved = JSON.parse(content[0].text);
+      expect(moved.parentId).toBe(project2.id);
+    });
+
+    it("should move a node with position", async () => {
+      const project = await createTestProject("Move Pos Project");
+      const folder = await createTestFolder("Target Folder", project.id);
+      const note = await createTestNote("Pos Note", project.id, "content");
+
+      const result = await client.callTool({
+        name: "move_node",
+        arguments: { id: note.id, newParentId: folder.id, position: 5 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const moved = JSON.parse(content[0].text);
+      expect(moved.parentId).toBe(folder.id);
+      expect(moved.position).toBe(5);
+    });
+  });
+
+  // ─── list_nodes Tool ────────────────────────────────────────────────
+
+  describe("list_nodes tool", () => {
+    it("should list children of a parent", async () => {
+      const project = await createTestProject("List Parent");
+      await createTestNote("Note A", project.id, "a");
+      await createTestNote("Note B", project.id, "b");
+      await createTestFolder("Folder C", project.id);
+
+      const result = await client.callTool({
+        name: "list_nodes",
+        arguments: { parentId: project.id },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const children = JSON.parse(content[0].text);
+      expect(children.length).toBe(3);
+    });
+
+    it("should filter children by type", async () => {
+      const project = await createTestProject("Filter Parent");
+      await createTestNote("Note 1", project.id, "n1");
+      await createTestNote("Note 2", project.id, "n2");
+      await createTestFolder("Folder 1", project.id);
+
+      const result = await client.callTool({
+        name: "list_nodes",
+        arguments: { parentId: project.id, type: "note" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const children = JSON.parse(content[0].text);
+      expect(children.length).toBe(2);
+      expect(children.every((c: any) => c.type === "note")).toBe(true);
+    });
+
+    it("should return empty array for parent with no children", async () => {
+      const project = await createTestProject("Empty Parent");
+
+      const result = await client.callTool({
+        name: "list_nodes",
+        arguments: { parentId: project.id },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const children = JSON.parse(content[0].text);
+      expect(children.length).toBe(0);
+    });
+  });
+
+  // ─── search_semantic Tool ───────────────────────────────────────────
+
+  describe("search_semantic tool", () => {
+    it("should search nodes by keyword", async () => {
+      const project = await createTestProject("Semantic Search Project");
+      await createTestNote("Dragon Lore", project.id, "Dragons breathe fire");
+      await createTestNote("Elf History", project.id, "Elves live forever");
+
+      const result = await client.callTool({
+        name: "search_semantic",
+        arguments: { query: "Dragon" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const results = JSON.parse(content[0].text);
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(results[0].name).toContain("Dragon");
+    });
+
+    it("should respect topK limit", async () => {
+      const project = await createTestProject("TopK Project");
+      await createTestNote("Alpha Note", project.id, "alpha content");
+      await createTestNote("Alpha Two", project.id, "alpha details");
+      await createTestNote("Alpha Three", project.id, "alpha more");
+
+      const result = await client.callTool({
+        name: "search_semantic",
+        arguments: { query: "Alpha", topK: 2 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const results = JSON.parse(content[0].text);
+      expect(results.length).toBeLessThanOrEqual(2);
+    });
+
+    it("should return empty array for no matches", async () => {
+      const result = await client.callTool({
+        name: "search_semantic",
+        arguments: { query: "xyznonexistent12345" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const results = JSON.parse(content[0].text);
+      expect(results.length).toBe(0);
+    });
+  });
+
+  // ─── add_tag Tool ──────────────────────────────────────────────────
+
+  describe("add_tag tool", () => {
+    it("should create and add a new tag to a node", async () => {
+      const project = await createTestProject("Tag Project");
+      const note = await createTestNote("Tag Note", project.id, "content");
+
+      const result = await client.callTool({
+        name: "add_tag",
+        arguments: { nodeId: note.id, tagName: "important" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text);
+      expect(parsed.tagged).toBe(true);
+      expect(parsed.tag.name).toBe("important");
+
+      // Verify tag is on the node
+      const tagService = new TagService();
+      const nodeTags = await tagService.getNodeTags(note.id);
+      expect(nodeTags).toHaveLength(1);
+      expect(nodeTags[0].name).toBe("important");
+    });
+
+    it("should reuse existing tag by name", async () => {
+      const tagService = new TagService();
+      const existingTag = await tagService.createTag({
+        name: "reuse-me",
+        type: "general",
+      });
+
+      const project = await createTestProject("Reuse Tag Project");
+      const note = await createTestNote("Reuse Note", project.id, "content");
+
+      const result = await client.callTool({
+        name: "add_tag",
+        arguments: { nodeId: note.id, tagName: "reuse-me" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text);
+      expect(parsed.tag.id).toBe(existingTag.id);
+    });
+
+    it("should create tag with specified type", async () => {
+      const project = await createTestProject("Type Tag Project");
+      const note = await createTestNote("Char Note", project.id, "content");
+
+      const result = await client.callTool({
+        name: "add_tag",
+        arguments: {
+          nodeId: note.id,
+          tagName: "Hero",
+          tagType: "character",
+        },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text);
+      expect(parsed.tag.type).toBe("character");
+    });
+  });
+
+  // ─── remove_tag Tool ───────────────────────────────────────────────
+
+  describe("remove_tag tool", () => {
+    it("should remove an existing tag from a node", async () => {
+      const tagService = new TagService();
+      const project = await createTestProject("Remove Tag Project");
+      const note = await createTestNote("Remove Note", project.id, "content");
+      const tag = await tagService.createTag({ name: "to-remove" });
+      await tagService.addTagToNode(note.id, tag.id);
+
+      const result = await client.callTool({
+        name: "remove_tag",
+        arguments: { nodeId: note.id, tagName: "to-remove" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text);
+      expect(parsed.removed).toBe(true);
+
+      // Verify removal
+      const nodeTags = await tagService.getNodeTags(note.id);
+      expect(nodeTags).toHaveLength(0);
+    });
+
+    it("should return removed=false for non-existent tag on node", async () => {
+      const project = await createTestProject("No Tag Project");
+      const note = await createTestNote("No Tag Note", project.id, "content");
+
+      const result = await client.callTool({
+        name: "remove_tag",
+        arguments: { nodeId: note.id, tagName: "nonexistent" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const parsed = JSON.parse(content[0].text);
+      expect(parsed.removed).toBe(false);
+    });
+  });
+
+  // ─── list_tags Tool ────────────────────────────────────────────────
+
+  describe("list_tags tool", () => {
+    it("should list all tags", async () => {
+      const tagService = new TagService();
+      await tagService.createTag({ name: "tag-a", type: "general" });
+      await tagService.createTag({ name: "tag-b", type: "character" });
+      await tagService.createTag({ name: "tag-c", type: "location" });
+
+      const result = await client.callTool({
+        name: "list_tags",
+        arguments: {},
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const allTags = JSON.parse(content[0].text);
+      expect(allTags.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("should filter tags by type", async () => {
+      const tagService = new TagService();
+      await tagService.createTag({ name: "warrior", type: "character" });
+      await tagService.createTag({ name: "castle", type: "location" });
+      await tagService.createTag({ name: "mage", type: "character" });
+
+      const result = await client.callTool({
+        name: "list_tags",
+        arguments: { type: "character" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const filteredTags = JSON.parse(content[0].text);
+      expect(filteredTags.every((t: any) => t.type === "character")).toBe(true);
+      expect(filteredTags.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("should return empty array when no tags exist of type", async () => {
+      const result = await client.callTool({
+        name: "list_tags",
+        arguments: { type: "event" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      const allTags = JSON.parse(content[0].text);
+      expect(allTags.length).toBe(0);
+    });
+  });
+
+  // ─── export_node Tool ──────────────────────────────────────────────
+
+  describe("export_node tool", () => {
+    it("should export a node as markdown by default", async () => {
+      const project = await createTestProject("Export Project");
+      const note = await createTestNote("Export Note", project.id, "content");
+
+      const result = await client.callTool({
+        name: "export_node",
+        arguments: { nodeId: note.id },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0].text).toContain("Export Note");
+    });
+
+    it("should export a node as HTML", async () => {
+      const project = await createTestProject("HTML Export Project");
+      const note = await createTestNote("HTML Note", project.id, "content");
+
+      const result = await client.callTool({
+        name: "export_node",
+        arguments: { nodeId: note.id, format: "html" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0].text).toContain("<html");
+    });
+  });
+
+  // ─── export_project Tool ──────────────────────────────────────────
+
+  describe("export_project tool", () => {
+    it("should export a project as markdown", async () => {
+      const project = await createTestProject("Full Export");
+      await createTestNote("Chapter 1", project.id, "chapter content");
+      await createTestFolder("Research", project.id);
+
+      const result = await client.callTool({
+        name: "export_project",
+        arguments: { projectId: project.id },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0].text).toContain("Full Export");
+      expect(content[0].text).toContain("Chapter 1");
+    });
+
+    it("should export a project as HTML", async () => {
+      const project = await createTestProject("HTML Full Export");
+      await createTestNote("Scene 1", project.id, "scene content");
+
+      const result = await client.callTool({
+        name: "export_project",
+        arguments: { projectId: project.id, format: "html" },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0].text).toContain("<html");
+      expect(content[0].text).toContain("HTML Full Export");
     });
   });
 });

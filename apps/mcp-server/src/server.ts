@@ -4,6 +4,10 @@ import {
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { NodeService } from "@server/services/node-service";
+import { TagService } from "@server/services/tag-service";
+import { ExportService } from "@server/services/export-service";
+import { SearchService } from "@server/services/search-service";
+import { LocalEmbeddingProvider } from "@server/services/embedding-service";
 import { db } from "@server/db/index";
 import { nodes } from "@server/db/schema";
 import { ilike, eq, and } from "drizzle-orm";
@@ -14,7 +18,16 @@ import { ilike, eq, and } from "drizzle-orm";
  * Tools:
  *   - create_node: Create a new node in the hierarchy
  *   - update_node: Update an existing node by ID
+ *   - delete_node: Delete a node by ID
+ *   - move_node: Move a node to a new parent
+ *   - list_nodes: List child nodes of a parent
  *   - search_nodes: Search for nodes by name and/or type
+ *   - search_semantic: Semantic keyword search across nodes
+ *   - add_tag: Add a tag to a node (creates tag if needed)
+ *   - remove_tag: Remove a tag from a node
+ *   - list_tags: List all tags
+ *   - export_node: Export a node as markdown or HTML
+ *   - export_project: Export a project as markdown or HTML
  *
  * Resources:
  *   - node://{id}: Read a single node by ID
@@ -31,6 +44,9 @@ export function createMcpServer(): McpServer {
   });
 
   const nodeService = new NodeService();
+  const tagService = new TagService();
+  const exportService = new ExportService();
+  const searchService = new SearchService(new LocalEmbeddingProvider());
 
   // ─── Tools ───────────────────────────────────────────────────────────
 
@@ -138,6 +154,247 @@ export function createMcpServer(): McpServer {
 
       return {
         content: [{ type: "text" as const, text: JSON.stringify(results) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "delete_node",
+    {
+      title: "Delete Node",
+      description: "Delete a node by its ID (cascades to children)",
+      inputSchema: {
+        id: z.string().uuid(),
+      },
+    },
+    async ({ id }) => {
+      await nodeService.deleteNode(id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ deleted: true, id }),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "move_node",
+    {
+      title: "Move Node",
+      description: "Move a node to a new parent with optional position",
+      inputSchema: {
+        id: z.string().uuid(),
+        newParentId: z.string().uuid(),
+        position: z.number().int().optional(),
+      },
+    },
+    async ({ id, newParentId, position }) => {
+      const node = await nodeService.moveNode(id, newParentId, position);
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(node) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "list_nodes",
+    {
+      title: "List Nodes",
+      description: "List child nodes of a parent, optionally filtered by type",
+      inputSchema: {
+        parentId: z.string().uuid(),
+        type: z
+          .enum([
+            "project",
+            "folder",
+            "note",
+            "link",
+            "ai_suggestion",
+            "audio_note",
+          ])
+          .optional(),
+      },
+    },
+    async ({ parentId, type }) => {
+      let children = await nodeService.getNodesByParentId(parentId);
+      if (type) {
+        children = children.filter((c) => c.type === type);
+      }
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(children) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "search_semantic",
+    {
+      title: "Semantic Search",
+      description:
+        "Search nodes using keyword matching across names and content",
+      inputSchema: {
+        query: z.string().min(1),
+        topK: z.number().int().min(1).max(100).optional(),
+        projectId: z.string().uuid().optional(),
+      },
+    },
+    async ({ query, topK, projectId }) => {
+      const results = await searchService.keywordSearch(
+        query,
+        { projectId, excludeDeleted: true },
+        { limit: topK || 10 },
+      );
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify(
+              results.map((r) => ({ ...r.node, score: r.score })),
+            ),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "add_tag",
+    {
+      title: "Add Tag",
+      description: "Add a tag to a node (creates the tag if it doesn't exist)",
+      inputSchema: {
+        nodeId: z.string().uuid(),
+        tagName: z.string().min(1),
+        tagType: z
+          .enum(["general", "character", "location", "event", "concept"])
+          .optional(),
+      },
+    },
+    async ({ nodeId, tagName, tagType }) => {
+      // Find existing tag by name or create a new one
+      const allTags = await tagService.getAllTags();
+      let tag = allTags.find((t) => t.name === tagName);
+      if (!tag) {
+        tag = await tagService.createTag({
+          name: tagName,
+          type: tagType || "general",
+        });
+      }
+      await tagService.addTagToNode(nodeId, tag.id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ tagged: true, nodeId, tag }),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "remove_tag",
+    {
+      title: "Remove Tag",
+      description: "Remove a tag from a node by tag name",
+      inputSchema: {
+        nodeId: z.string().uuid(),
+        tagName: z.string().min(1),
+      },
+    },
+    async ({ nodeId, tagName }) => {
+      const nodeTagsList = await tagService.getNodeTags(nodeId);
+      const tag = nodeTagsList.find((t) => t.name === tagName);
+      if (!tag) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                removed: false,
+                reason: `Tag "${tagName}" not found on node`,
+              }),
+            },
+          ],
+        };
+      }
+      await tagService.removeTagFromNode(nodeId, tag.id);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ removed: true, nodeId, tagName }),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerTool(
+    "list_tags",
+    {
+      title: "List Tags",
+      description: "List all tags, optionally filtered by type",
+      inputSchema: {
+        type: z
+          .enum(["general", "character", "location", "event", "concept"])
+          .optional(),
+      },
+    },
+    async ({ type }) => {
+      const allTags = type
+        ? await tagService.getAllTags(type)
+        : await tagService.getAllTags();
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(allTags) }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "export_node",
+    {
+      title: "Export Node",
+      description: "Export a node's content in markdown or HTML format",
+      inputSchema: {
+        nodeId: z.string().uuid(),
+        format: z.enum(["markdown", "html"]).optional(),
+      },
+    },
+    async ({ nodeId, format }) => {
+      const fmt = format || "markdown";
+      const content =
+        fmt === "html"
+          ? await exportService.exportNodeAsHtml(nodeId)
+          : await exportService.exportNodeAsMarkdown(nodeId);
+      return {
+        content: [{ type: "text" as const, text: content }],
+      };
+    },
+  );
+
+  server.registerTool(
+    "export_project",
+    {
+      title: "Export Project",
+      description:
+        "Export a project and all its contents in markdown or HTML format",
+      inputSchema: {
+        projectId: z.string().uuid(),
+        format: z.enum(["markdown", "html"]).optional(),
+      },
+    },
+    async ({ projectId, format }) => {
+      const fmt = format || "markdown";
+      const content =
+        fmt === "html"
+          ? await exportService.exportProjectAsHtml(projectId)
+          : await exportService.exportProjectAsMarkdown(projectId);
+      return {
+        content: [{ type: "text" as const, text: content }],
       };
     },
   );
