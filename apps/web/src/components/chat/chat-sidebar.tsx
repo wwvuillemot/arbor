@@ -57,4 +57,3 @@ export function ChatSidebar({ isOpen, onClose, className }: ChatSidebarProps) {
     </div>
   );
 }
-

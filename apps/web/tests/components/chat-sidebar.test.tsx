@@ -131,4 +131,3 @@ describe("ChatSidebar", () => {
     expect(sidebar).toHaveClass("border-l");
   });
 });
-

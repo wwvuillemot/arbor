@@ -140,7 +140,7 @@ export function FilterPanel({
                     <input
                       type="checkbox"
                       checked={selectedTagIds.includes(tag.id)}
-                      onChange={() => { }}
+                      onChange={() => {}}
                       className="h-4 w-4"
                     />
                     <span
