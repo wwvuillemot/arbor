@@ -8,7 +8,7 @@ import type { AttributionFilter } from "@/components/file-tree";
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     tags: {
-      getAllTags: {
+      getAll: {
         useQuery: vi.fn(() => ({
           data: [
             { id: "tag-1", name: "Fantasy", color: "#3b82f6", type: "general" },

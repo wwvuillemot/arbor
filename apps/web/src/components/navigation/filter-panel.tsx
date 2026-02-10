@@ -38,7 +38,7 @@ export function FilterPanel({
   const [tagPopoverOpen, setTagPopoverOpen] = React.useState(false);
 
   // Fetch all tags
-  const tagsQuery = trpc.tags.getAllTags.useQuery();
+  const tagsQuery = trpc.tags.getAll.useQuery();
   const allTags = tagsQuery.data || [];
 
   // Debounced search
