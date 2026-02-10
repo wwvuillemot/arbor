@@ -481,6 +481,12 @@
       "versionA": "バージョンA",
       "versionB": "バージョンB"
     },
+    "nodeAttribution": {
+      "aiGenerated": "AI生成コンテンツ",
+      "aiAssisted": "AIアシスト編集",
+      "humanEdited": "人間が編集",
+      "lastUpdated": "最終更新"
+    },
     "auditLog": {
       "title": "監査ログ",
       "description": "プロジェクト全体の変更タイムライン",

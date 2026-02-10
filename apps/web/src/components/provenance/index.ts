@@ -6,3 +6,4 @@ export {
 export { VersionHistory, type VersionHistoryProps } from "./version-history";
 export { DiffViewer, type DiffViewerProps } from "./diff-viewer";
 export { AuditLog, type AuditLogProps } from "./audit-log";
+export { NodeAttribution, type NodeAttributionProps } from "./node-attribution";

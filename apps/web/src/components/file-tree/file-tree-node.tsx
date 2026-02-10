@@ -21,8 +21,27 @@ export interface TreeNode {
   position: number | null;
   content: unknown;
   metadata: unknown;
+  createdBy?: string;
+  updatedBy?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Determine actor type from a provenance string like "user:alice" or "llm:gpt-4o"
+ */
+function getActorType(provenance?: string): "user" | "llm" | "system" | null {
+  if (!provenance) return null;
+  if (provenance.startsWith("llm:")) return "llm";
+  if (provenance.startsWith("user:")) return "user";
+  if (provenance.startsWith("system:")) return "system";
+  return null;
+}
+
+/** Extract model/actor display name from provenance string */
+function getActorDisplayName(provenance?: string): string | null {
+  if (!provenance || !provenance.includes(":")) return null;
+  return provenance.split(":").slice(1).join(":");
 }
 
 export type DropPosition = "before" | "inside" | "after";
@@ -309,6 +328,42 @@ export function FileTreeNode({
             {node.name}
           </span>
         )}
+
+        {/* LLM Attribution badge */}
+        {(() => {
+          const actorType = getActorType(node.updatedBy);
+          if (actorType !== "llm") return null;
+          const modelName = getActorDisplayName(node.updatedBy);
+          const formattedTime = node.updatedAt
+            ? new Date(node.updatedAt).toLocaleString()
+            : null;
+          return (
+            <span
+              className="flex-shrink-0 text-xs leading-none cursor-default relative group"
+              data-testid={`tree-node-attribution-${node.id}`}
+              title={modelName ? `AI: ${modelName}` : "AI-assisted"}
+              aria-label={
+                modelName ? `AI-assisted by ${modelName}` : "AI-assisted"
+              }
+            >
+              ✨{/* Tooltip with model + timestamp */}
+              <span
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-xs rounded bg-popover text-popover-foreground border shadow-md whitespace-nowrap z-50 hidden group-hover:block"
+                data-testid={`tree-node-attribution-tooltip-${node.id}`}
+              >
+                <span className="font-medium">{modelName || "AI"}</span>
+                {formattedTime && (
+                  <span
+                    className="block text-muted-foreground text-[10px]"
+                    data-testid={`tree-node-attribution-time-${node.id}`}
+                  >
+                    {formattedTime}
+                  </span>
+                )}
+              </span>
+            </span>
+          );
+        })()}
       </div>
       {/* Drop indicator: after */}
       {dropIndicator === "after" && (

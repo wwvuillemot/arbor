@@ -481,6 +481,12 @@
       "versionA": "Version A",
       "versionB": "Version B"
     },
+    "nodeAttribution": {
+      "aiGenerated": "AI-generated content",
+      "aiAssisted": "AI-assisted edit",
+      "humanEdited": "Human edited",
+      "lastUpdated": "Last updated"
+    },
     "auditLog": {
       "title": "Audit Log",
       "description": "Timeline of all changes across your project",

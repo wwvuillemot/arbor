@@ -179,6 +179,7 @@ import {
 import { VersionHistory } from "@/components/provenance/version-history";
 import { DiffViewer } from "@/components/provenance/diff-viewer";
 import { AuditLog } from "@/components/provenance/audit-log";
+import { NodeAttribution } from "@/components/provenance/node-attribution";
 
 // === AttributionBadge Tests ===
 
@@ -602,5 +603,130 @@ describe("AuditLog", () => {
     const pdfButton = screen.getByTestId("audit-export-pdf");
     fireEvent.click(pdfButton);
     expect(pdfButton).toBeInTheDocument();
+  });
+});
+
+// === NodeAttribution Tests ===
+
+describe("NodeAttribution", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should render nothing when no updatedBy is provided", () => {
+    const { container } = render(<NodeAttribution />);
+    expect(
+      container.querySelector("[data-testid='node-attribution']"),
+    ).toBeNull();
+  });
+
+  it("should render nothing when updatedBy is empty string", () => {
+    const { container } = render(<NodeAttribution updatedBy="" />);
+    expect(
+      container.querySelector("[data-testid='node-attribution']"),
+    ).toBeNull();
+  });
+
+  it("should render AI-generated label when both createdBy and updatedBy are llm", () => {
+    render(
+      <NodeAttribution
+        createdBy="llm:gpt-4o"
+        updatedBy="llm:gpt-4o"
+        updatedAt="2024-06-15T12:00:00Z"
+      />,
+    );
+    expect(screen.getByTestId("node-attribution")).toBeInTheDocument();
+    expect(screen.getByTestId("node-attribution-level")).toHaveTextContent(
+      "aiGenerated",
+    );
+  });
+
+  it("should render AI-assisted label when createdBy is user but updatedBy is llm", () => {
+    render(
+      <NodeAttribution
+        createdBy="user:alice"
+        updatedBy="llm:gpt-4o"
+        updatedAt="2024-06-15T12:00:00Z"
+      />,
+    );
+    expect(screen.getByTestId("node-attribution")).toBeInTheDocument();
+    expect(screen.getByTestId("node-attribution-level")).toHaveTextContent(
+      "aiAssisted",
+    );
+  });
+
+  it("should render human-edited label when updatedBy is user", () => {
+    render(
+      <NodeAttribution
+        createdBy="user:alice"
+        updatedBy="user:alice"
+        updatedAt="2024-06-15T12:00:00Z"
+      />,
+    );
+    expect(screen.getByTestId("node-attribution")).toBeInTheDocument();
+    expect(screen.getByTestId("node-attribution-level")).toHaveTextContent(
+      "humanEdited",
+    );
+  });
+
+  it("should display timestamp when updatedAt is provided", () => {
+    render(
+      <NodeAttribution
+        createdBy="user:alice"
+        updatedBy="llm:gpt-4o"
+        updatedAt="2024-06-15T12:00:00Z"
+      />,
+    );
+    const timeEl = screen.getByTestId("node-attribution-time");
+    expect(timeEl).toBeInTheDocument();
+    expect(timeEl.textContent).toBeTruthy();
+  });
+
+  it("should not display timestamp when updatedAt is not provided", () => {
+    render(<NodeAttribution createdBy="user:alice" updatedBy="llm:gpt-4o" />);
+    expect(
+      screen.queryByTestId("node-attribution-time"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should include AttributionBadge for the actor type", () => {
+    render(<NodeAttribution createdBy="user:alice" updatedBy="llm:gpt-4o" />);
+    // AttributionBadge renders with data-testid="attribution-badge-llm"
+    expect(screen.getByTestId("attribution-badge-llm")).toBeInTheDocument();
+  });
+
+  it("should render with system actor type", () => {
+    render(
+      <NodeAttribution
+        createdBy="system:migration"
+        updatedBy="system:auto-save"
+      />,
+    );
+    expect(screen.getByTestId("node-attribution")).toBeInTheDocument();
+    expect(screen.getByTestId("node-attribution-level")).toHaveTextContent(
+      "humanEdited",
+    );
+    expect(screen.getByTestId("attribution-badge-system")).toBeInTheDocument();
+  });
+
+  it("should render AI-assisted when createdBy is undefined but updatedBy is llm", () => {
+    render(<NodeAttribution updatedBy="llm:claude-3" />);
+    expect(screen.getByTestId("node-attribution")).toBeInTheDocument();
+    // When createdBy is undefined, parseActorType returns null, so it's "ai-assisted"
+    expect(screen.getByTestId("node-attribution-level")).toHaveTextContent(
+      "aiAssisted",
+    );
+  });
+
+  it("should apply custom className", () => {
+    render(
+      <NodeAttribution
+        createdBy="user:alice"
+        updatedBy="user:alice"
+        className="my-custom-class"
+      />,
+    );
+    const el = screen.getByTestId("node-attribution");
+    expect(el.className).toContain("my-custom-class");
   });
 });

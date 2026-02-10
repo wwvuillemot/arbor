@@ -28,6 +28,7 @@ import {
 } from "@/components/file-tree";
 import { TiptapEditor, ImageUpload } from "@/components/editor";
 import { TagManager, TagPicker, TagBrowser } from "@/components/tags";
+import { NodeAttribution } from "@/components/provenance";
 import type { Editor } from "@tiptap/react";
 
 export default function ProjectsPage() {
@@ -722,6 +723,17 @@ export default function ProjectsPage() {
               </div>
               {selectedNodeQuery.data.type === "note" ? (
                 <>
+                  <NodeAttribution
+                    updatedBy={
+                      (selectedNodeQuery.data as { updatedBy?: string })
+                        .updatedBy
+                    }
+                    updatedAt={selectedNodeQuery.data.updatedAt}
+                    createdBy={
+                      (selectedNodeQuery.data as { createdBy?: string })
+                        .createdBy
+                    }
+                  />
                   <TiptapEditor
                     content={
                       (selectedNodeQuery.data.content as Record<

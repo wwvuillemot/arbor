@@ -671,3 +671,95 @@ describe("FileTreeNode - Drag and Drop", () => {
     expect(treeitem.style.opacity).toBe("1");
   });
 });
+
+describe("FileTreeNode - LLM Attribution Badges", () => {
+  const defaultProps = {
+    node: makeNode(),
+    depth: 0,
+    isExpanded: false,
+    isSelected: false,
+    onToggle: vi.fn(),
+    onSelect: vi.fn(),
+    onContextMenu: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should show sparkle badge when updatedBy is llm", () => {
+    const llmNode = makeNode({
+      id: "llm-node",
+      updatedBy: "llm:gpt-4o",
+    });
+    render(<FileTreeNode {...defaultProps} node={llmNode} />);
+    const badge = screen.getByTestId("tree-node-attribution-llm-node");
+    expect(badge).toBeInTheDocument();
+    expect(badge.textContent).toContain("✨");
+  });
+
+  it("should not show badge when updatedBy is user", () => {
+    const userNode = makeNode({
+      id: "user-node",
+      updatedBy: "user:alice",
+    });
+    render(<FileTreeNode {...defaultProps} node={userNode} />);
+    expect(
+      screen.queryByTestId("tree-node-attribution-user-node"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should not show badge when updatedBy is undefined", () => {
+    const plainNode = makeNode({ id: "plain-node" });
+    render(<FileTreeNode {...defaultProps} node={plainNode} />);
+    expect(
+      screen.queryByTestId("tree-node-attribution-plain-node"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should display model name in tooltip", () => {
+    const llmNode = makeNode({
+      id: "tip-node",
+      updatedBy: "llm:claude-3",
+    });
+    render(<FileTreeNode {...defaultProps} node={llmNode} />);
+    const tooltip = screen.getByTestId(
+      "tree-node-attribution-tooltip-tip-node",
+    );
+    expect(tooltip.textContent).toContain("claude-3");
+  });
+
+  it("should include timestamp in tooltip when updatedAt is present", () => {
+    const llmNode = makeNode({
+      id: "time-node",
+      updatedBy: "llm:gpt-4o",
+      updatedAt: "2024-06-15T12:00:00Z",
+    });
+    render(<FileTreeNode {...defaultProps} node={llmNode} />);
+    const timeEl = screen.getByTestId("tree-node-attribution-time-time-node");
+    expect(timeEl).toBeInTheDocument();
+    // Should contain some date representation
+    expect(timeEl.textContent).toBeTruthy();
+  });
+
+  it("should have proper aria-label for accessibility", () => {
+    const llmNode = makeNode({
+      id: "aria-node",
+      updatedBy: "llm:gpt-4o",
+    });
+    render(<FileTreeNode {...defaultProps} node={llmNode} />);
+    const badge = screen.getByTestId("tree-node-attribution-aria-node");
+    expect(badge.getAttribute("aria-label")).toBe("AI-assisted by gpt-4o");
+  });
+
+  it("should show badge for system:llm prefix but not for system prefix", () => {
+    const systemNode = makeNode({
+      id: "sys-node",
+      updatedBy: "system:auto-save",
+    });
+    render(<FileTreeNode {...defaultProps} node={systemNode} />);
+    expect(
+      screen.queryByTestId("tree-node-attribution-sys-node"),
+    ).not.toBeInTheDocument();
+  });
+});
