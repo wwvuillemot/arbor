@@ -278,6 +278,24 @@ function ChildrenList({
     },
   );
 
+  // Build a map of all descendants for efficient lookup
+  // IMPORTANT: This must be called before any early returns to satisfy Rules of Hooks
+  const allNodesMap = React.useMemo(() => {
+    const map = new Map<string, TreeNode>();
+    if (descendantsQuery.data) {
+      descendantsQuery.data.forEach((node) => {
+        map.set(node.id, node as TreeNode);
+      });
+    }
+    // Also add direct children
+    if (childrenQuery.data) {
+      childrenQuery.data.forEach((node) => {
+        map.set(node.id, node as TreeNode);
+      });
+    }
+    return map;
+  }, [descendantsQuery.data, childrenQuery.data]);
+
   if (childrenQuery.isLoading) {
     return (
       <div
@@ -299,21 +317,6 @@ function ChildrenList({
     }
     return null;
   }
-
-  // Build a map of all descendants for efficient lookup
-  const allNodesMap = React.useMemo(() => {
-    const map = new Map<string, TreeNode>();
-    if (descendantsQuery.data) {
-      descendantsQuery.data.forEach((node) => {
-        map.set(node.id, node as TreeNode);
-      });
-    }
-    // Also add direct children
-    childrenQuery.data.forEach((node) => {
-      map.set(node.id, node as TreeNode);
-    });
-    return map;
-  }, [descendantsQuery.data, childrenQuery.data]);
 
   // Apply filters to children
   const filteredChildren = childrenQuery.data.filter((child) => {

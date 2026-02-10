@@ -450,7 +450,7 @@
     },
     "attributionFilter": {
       "label": "Filter by",
-      "all": "All",
+      "all": "Any",
       "human": "Human",
       "aiGenerated": "AI-generated",
       "aiAssisted": "AI-assisted",
