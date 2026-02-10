@@ -2,6 +2,11 @@ import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { ChatService } from "../../services/chat-service";
 import { agentModeEnum, chatRoleEnum } from "../../db/schema";
+import {
+  getAllAgentModes,
+  getAgentModeConfig,
+  buildSystemPrompt,
+} from "../../services/agent-mode-service";
 
 const chatService = new ChatService();
 
@@ -156,5 +161,43 @@ export const chatRouter = router({
     )
     .query(async ({ input }) => {
       return await chatService.getRecentMessages(input.threadId, input.limit);
+    }),
+
+  // ─── Agent Mode Endpoints ─────────────────────────────────────────
+
+  /**
+   * List all available agent modes
+   */
+  listAgentModes: publicProcedure.query(() => {
+    return getAllAgentModes();
+  }),
+
+  /**
+   * Get a specific agent mode configuration
+   */
+  getAgentMode: publicProcedure
+    .input(z.object({ mode: z.enum(agentModeEnum) }))
+    .query(({ input }) => {
+      const config = getAgentModeConfig(input.mode);
+      if (!config) {
+        throw new Error(`Unknown agent mode: ${input.mode}`);
+      }
+      return config;
+    }),
+
+  /**
+   * Build the system prompt for an agent mode, optionally with project context
+   */
+  buildSystemPrompt: publicProcedure
+    .input(
+      z.object({
+        mode: z.enum(agentModeEnum),
+        projectName: z.string().optional(),
+      }),
+    )
+    .query(({ input }) => {
+      return {
+        prompt: buildSystemPrompt(input.mode, input.projectName),
+      };
     }),
 });
