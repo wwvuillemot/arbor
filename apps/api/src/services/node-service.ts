@@ -1,7 +1,24 @@
 import { db } from "../db/index";
 import { nodes } from "../db/schema";
-import type { NodeType, AuthorType } from "../db/schema";
+import type { NodeType, AuthorType, ActorType } from "../db/schema";
 import { eq, isNull, and, asc } from "drizzle-orm";
+import { ProvenanceService } from "./provenance-service";
+
+const provenanceService = new ProvenanceService();
+
+/**
+ * Parse a provenance string ("user:{id}" or "llm:{model}") into actor type and ID.
+ */
+function parseProvenance(provenance?: string): {
+  actorType: ActorType;
+  actorId: string;
+} {
+  if (!provenance) return { actorType: "user", actorId: "user:system" };
+  if (provenance.startsWith("llm:")) {
+    return { actorType: "llm", actorId: provenance };
+  }
+  return { actorType: "user", actorId: provenance };
+}
 
 export interface CreateNodeParams {
   type: NodeType;
@@ -60,6 +77,20 @@ export class NodeService {
       })
       .returning();
 
+    // Record provenance
+    const { actorType, actorId } = parseProvenance(
+      params.createdBy || params.updatedBy,
+    );
+    await provenanceService.recordChange({
+      nodeId: node.id,
+      actorType,
+      actorId,
+      action: "create",
+      contentBefore: null,
+      contentAfter: node.content,
+      metadata: { name: node.name, type: node.type },
+    });
+
     return node;
   }
 
@@ -103,6 +134,8 @@ export class NodeService {
       throw new Error("Node not found");
     }
 
+    const contentBefore = existing.content;
+
     const [updated] = await db
       .update(nodes)
       .set({
@@ -114,13 +147,47 @@ export class NodeService {
       .where(eq(nodes.id, id))
       .returning();
 
+    // Record provenance for content or name changes
+    const { actorType, actorId } = parseProvenance(
+      updates.updatedBy || existing.updatedBy,
+    );
+    await provenanceService.recordChange({
+      nodeId: id,
+      actorType,
+      actorId,
+      action: "update",
+      contentBefore,
+      contentAfter: updated.content,
+      metadata: {
+        updatedFields: Object.keys(updates).filter((k) => k !== "updatedBy"),
+      },
+    });
+
     return updated;
   }
 
   /**
-   * Delete a node (cascade delete handled by database)
+   * Delete a node (cascade delete handled by database).
+   * Optionally accepts deletedBy for provenance tracking.
    */
-  async deleteNode(id: string) {
+  async deleteNode(id: string, deletedBy?: string) {
+    // Capture content before deletion for provenance
+    const existing = await this.getNodeById(id);
+    if (existing) {
+      const { actorType, actorId } = parseProvenance(
+        deletedBy || existing.updatedBy,
+      );
+      await provenanceService.recordChange({
+        nodeId: id,
+        actorType,
+        actorId,
+        action: "delete",
+        contentBefore: existing.content,
+        contentAfter: null,
+        metadata: { name: existing.name, type: existing.type },
+      });
+    }
+
     await db.delete(nodes).where(eq(nodes.id, id));
   }
 
@@ -168,11 +235,29 @@ export class NodeService {
       updateData.position = position;
     }
 
+    const oldParentId = node.parentId;
+
     const [updated] = await db
       .update(nodes)
       .set(updateData)
       .where(eq(nodes.id, nodeId))
       .returning();
+
+    // Record provenance for move
+    const { actorType, actorId } = parseProvenance(node.updatedBy);
+    await provenanceService.recordChange({
+      nodeId,
+      actorType,
+      actorId,
+      action: "move",
+      contentBefore: node.content,
+      contentAfter: updated.content,
+      metadata: {
+        oldParentId,
+        newParentId,
+        position: position ?? updated.position,
+      },
+    });
 
     return updated;
   }

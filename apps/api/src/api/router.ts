@@ -10,6 +10,7 @@ import { tagsRouter } from "./routers/tags";
 import { searchRouter } from "./routers/search";
 import { ragRouter } from "./routers/rag";
 import { chatRouter } from "./routers/chat";
+import { provenanceRouter } from "./routers/provenance";
 
 /**
  * Main application router
@@ -27,6 +28,7 @@ export const appRouter = router({
   search: searchRouter,
   rag: ragRouter,
   chat: chatRouter,
+  provenance: provenanceRouter,
 
   // Health check endpoint
   health: publicProcedure.query(() => ({
