@@ -73,6 +73,16 @@ vi.mock("@/components/tags", () => ({
   TagBrowser: () => <div data-testid="tag-browser" />,
 }));
 
+// Mock provenance components
+vi.mock("@/components/provenance", () => ({
+  NodeAttribution: () => <div data-testid="node-attribution" />,
+}));
+
+// Mock FilterPanel component
+vi.mock("@/components/navigation", () => ({
+  FilterPanel: () => <div data-testid="filter-panel" />,
+}));
+
 // Mock FileTree component - calls onSelectNode on mount to simulate selecting a node
 vi.mock("@/components/file-tree", () => ({
   FileTree: React.forwardRef(
@@ -154,6 +164,15 @@ vi.mock("@/lib/trpc", () => {
     },
     tags: {
       getNodesByTags: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
+    search: {
+      keywordSearch: {
         useQuery: vi.fn(() => ({
           data: [],
           isLoading: false,

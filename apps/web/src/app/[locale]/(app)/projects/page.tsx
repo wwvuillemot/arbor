@@ -27,6 +27,7 @@ import {
   type ContextMenuAction,
   type DropPosition,
 } from "@/components/file-tree";
+import { FilterPanel } from "@/components/navigation";
 import { TiptapEditor, ImageUpload } from "@/components/editor";
 import { TagManager, TagPicker, TagBrowser } from "@/components/tags";
 import { NodeAttribution } from "@/components/provenance";
@@ -98,6 +99,7 @@ export default function ProjectsPage() {
   const [tagOperator, setTagOperator] = React.useState<"AND" | "OR">("OR");
   const [attributionFilter, setAttributionFilter] =
     React.useState<AttributionFilter>("all");
+  const [searchQuery, setSearchQuery] = React.useState("");
 
   const handleFilterChange = React.useCallback(
     (tagIds: string[], operator: "AND" | "OR") => {
@@ -132,11 +134,53 @@ export default function ProjectsPage() {
     { enabled: selectedTagIds.length > 0, refetchOnWindowFocus: false },
   );
 
+  // Fetch nodes matching search query
+  const searchResultsQuery = trpc.search.keywordSearch.useQuery(
+    {
+      query: searchQuery,
+      filters: { projectId: currentProjectId ?? undefined },
+      options: { limit: 100 },
+    },
+    {
+      enabled: searchQuery.length > 0 && !!currentProjectId,
+      refetchOnWindowFocus: false,
+    },
+  );
+
   const filterNodeIds = React.useMemo(() => {
-    if (selectedTagIds.length === 0) return null;
-    if (!filteredNodesQuery.data) return new Set<string>();
-    return new Set(filteredNodesQuery.data.map((n) => n.id));
-  }, [selectedTagIds.length, filteredNodesQuery.data]);
+    const hasTagFilter = selectedTagIds.length > 0;
+    const hasSearchFilter = searchQuery.length > 0;
+
+    // No filters active
+    if (!hasTagFilter && !hasSearchFilter) return null;
+
+    // Combine tag and search results
+    const tagNodeIds =
+      hasTagFilter && filteredNodesQuery.data
+        ? new Set(filteredNodesQuery.data.map((n) => n.id))
+        : null;
+    const searchNodeIds =
+      hasSearchFilter && searchResultsQuery.data
+        ? new Set(searchResultsQuery.data.map((r) => r.node.id))
+        : null;
+
+    // If both filters are active, intersect the results
+    if (tagNodeIds && searchNodeIds) {
+      const intersection = new Set<string>();
+      for (const id of tagNodeIds) {
+        if (searchNodeIds.has(id)) intersection.add(id);
+      }
+      return intersection;
+    }
+
+    // Return whichever filter is active
+    return tagNodeIds || searchNodeIds || new Set<string>();
+  }, [
+    selectedTagIds.length,
+    filteredNodesQuery.data,
+    searchQuery.length,
+    searchResultsQuery.data,
+  ]);
 
   // Mutations
   const createMutation = trpc.nodes.create.useMutation({
@@ -558,42 +602,16 @@ export default function ProjectsPage() {
               <Pencil className="w-3 h-3" />
             </button>
           </div>
-          {/* Attribution filter bar */}
-          <div
-            className="flex items-center gap-1 px-2 py-1 border-b"
-            data-testid="attribution-filter-bar"
-          >
-            <span className="text-xs text-muted-foreground">
-              {tFileTree("attributionFilter.label")}:
-            </span>
-            {(
-              [
-                { value: "all", label: tFileTree("attributionFilter.all") },
-                { value: "human", label: tFileTree("attributionFilter.human") },
-                {
-                  value: "ai-generated",
-                  label: tFileTree("attributionFilter.aiGenerated"),
-                },
-                {
-                  value: "ai-assisted",
-                  label: tFileTree("attributionFilter.aiAssisted"),
-                },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setAttributionFilter(opt.value)}
-                className={cn(
-                  "text-xs px-1.5 py-0.5 rounded transition-colors",
-                  attributionFilter === opt.value
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent",
-                )}
-                data-testid={`attribution-filter-${opt.value}`}
-              >
-                {opt.label}
-              </button>
-            ))}
+          {/* Unified filter panel */}
+          <div className="border-b">
+            <FilterPanel
+              onSearchChange={setSearchQuery}
+              onTagsChange={(tagIds, operator) => {
+                setSelectedTagIds(tagIds);
+                setTagOperator(operator);
+              }}
+              onAttributionChange={setAttributionFilter}
+            />
           </div>
           <FileTree
             ref={fileTreeRef}
@@ -631,7 +649,7 @@ export default function ProjectsPage() {
                 )}
                 data-testid="sidebar-tab-browse"
               >
-                {tTags("browser.filtered").replace(" by tags", "")}
+                Browse
               </button>
               <button
                 onClick={() => setSidebarTagTab("manage")}
@@ -650,7 +668,6 @@ export default function ProjectsPage() {
               {sidebarTagTab === "browse" ? (
                 <TagBrowser
                   onSelectNode={(nodeId) => setSelectedNodeId(nodeId)}
-                  onFilterChange={handleFilterChange}
                 />
               ) : (
                 <TagManager />
