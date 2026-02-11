@@ -116,6 +116,21 @@ export function ChatPanel({
     }
   }, [messagesQuery.data]);
 
+  // ─── Auto-send after thread creation ─────────────────────────────────
+  React.useEffect(() => {
+    // If we just created a thread and have a pending message, send it
+    if (selectedThreadId && inputValue.trim() && masterKey && !sendMessage.isPending) {
+      const shouldSend = createThread.isSuccess && !sendMessage.isSuccess;
+      if (shouldSend) {
+        sendMessage.mutate({
+          threadId: selectedThreadId,
+          content: inputValue.trim(),
+          masterKey,
+        });
+      }
+    }
+  }, [selectedThreadId, inputValue, masterKey, createThread.isSuccess, sendMessage]);
+
   // ─── Handlers ────────────────────────────────────────────────────────
   const handleNewThread = React.useCallback(() => {
     createThread.mutate({
@@ -133,13 +148,25 @@ export function ChatPanel({
   );
 
   const handleSend = React.useCallback(() => {
-    if (!inputValue.trim() || !selectedThreadId || !masterKey) return;
+    if (!inputValue.trim() || !masterKey) return;
+
+    // If no thread is selected, create one first
+    if (!selectedThreadId) {
+      createThread.mutate({
+        name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
+        agentMode: agentMode as "assistant" | "planner" | "editor" | "researcher",
+        model: selectedModel,
+      });
+      // The message will be sent after the thread is created (see useEffect below)
+      return;
+    }
+
     sendMessage.mutate({
       threadId: selectedThreadId,
       content: inputValue.trim(),
       masterKey,
     });
-  }, [inputValue, selectedThreadId, masterKey, sendMessage]);
+  }, [inputValue, selectedThreadId, masterKey, sendMessage, createThread, agentMode, selectedModel, t]);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
@@ -296,7 +323,6 @@ export function ChatPanel({
             placeholder={t("inputPlaceholder")}
             rows={1}
             className="flex-1 text-sm border rounded px-3 py-1.5 resize-none bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-            disabled={!selectedThreadId}
           />
 
           {/* Send button */}
@@ -305,9 +331,9 @@ export function ChatPanel({
             onClick={handleSend}
             disabled={
               !inputValue.trim() ||
-              !selectedThreadId ||
               !masterKey ||
-              sendMessage.isPending
+              sendMessage.isPending ||
+              createThread.isPending
             }
             className="p-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title={t("send")}

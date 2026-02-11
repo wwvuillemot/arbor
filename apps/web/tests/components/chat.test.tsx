@@ -455,9 +455,10 @@ describe("ChatPanel", () => {
     expect(screen.getByTestId("send-btn")).toBeInTheDocument();
   });
 
-  it("should disable chat input when no thread is selected", () => {
+  it("should enable chat input even when no thread is selected", () => {
     render(<ChatPanel />);
-    expect(screen.getByTestId("chat-input")).toBeDisabled();
+    // Input should be enabled to allow users to start typing immediately
+    expect(screen.getByTestId("chat-input")).not.toBeDisabled();
   });
 
   it("should create a new thread when new thread button is clicked", () => {
