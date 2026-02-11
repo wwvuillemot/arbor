@@ -11,6 +11,7 @@ import { searchRouter } from "./routers/search";
 import { ragRouter } from "./routers/rag";
 import { chatRouter } from "./routers/chat";
 import { provenanceRouter } from "./routers/provenance";
+import { llmRouter } from "./routers/llm";
 
 /**
  * Main application router
@@ -29,6 +30,7 @@ export const appRouter = router({
   rag: ragRouter,
   chat: chatRouter,
   provenance: provenanceRouter,
+  llm: llmRouter,
 
   // Health check endpoint
   health: publicProcedure.query(() => ({

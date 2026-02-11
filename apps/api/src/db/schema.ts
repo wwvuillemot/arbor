@@ -490,6 +490,10 @@ export const chatThreads = pgTable(
       .default("assistant")
       .notNull(),
 
+    // LLM model to use for this thread (e.g., "gpt-4o", "claude-3.5-sonnet")
+    // If null, uses the provider's default model
+    model: varchar("model", { length: 100 }),
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
