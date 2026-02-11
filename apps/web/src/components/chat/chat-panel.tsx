@@ -7,8 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import { ModelSelector } from "./model-selector";
-
-const AGENT_MODES = ["assistant", "planner", "editor", "researcher"] as const;
+import { AgentModeSelector } from "./agent-mode-selector";
 
 export interface ChatPanelProps {
   className?: string;
@@ -101,9 +100,13 @@ export function ChatPanel({
   });
 
   const sendMessage = trpc.chat.sendMessage.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Message sent successfully:", data);
       messagesQuery.refetch();
       setInputValue("");
+    },
+    onError: (error) => {
+      console.error("Failed to send message:", error);
     },
   });
 
@@ -294,53 +297,49 @@ export function ChatPanel({
         {/* ─── Input Area ──────────────────────────────────────────── */}
         <div
           data-testid="input-area"
-          className="border-t p-3 flex items-end gap-2"
+          className="border-t p-3 flex flex-col gap-2"
         >
-          <div className="flex flex-col gap-1">
-            {/* Mode selector */}
-            <select
-              data-testid="mode-selector"
-              value={agentMode}
-              onChange={(e) => setAgentMode(e.target.value)}
-              className="text-xs border rounded px-2 py-1.5 bg-background"
+          {/* Text input and send button */}
+          <div className="flex items-end gap-2">
+            {/* Text input */}
+            <textarea
+              data-testid="chat-input"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t("inputPlaceholder")}
+              rows={3}
+              className="flex-1 text-sm border rounded px-3 py-2 resize-none bg-background focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+            />
+
+            {/* Send button */}
+            <button
+              data-testid="send-btn"
+              onClick={handleSend}
+              disabled={
+                !inputValue.trim() ||
+                !masterKey ||
+                sendMessage.isPending ||
+                createThread.isPending
+              }
+              className="p-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title={t("send")}
             >
-              {AGENT_MODES.map((mode) => (
-                <option key={mode} value={mode}>
-                  {t(`mode.${mode}`)}
-                </option>
-              ))}
-            </select>
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Selectors row */}
+          <div className="flex items-center gap-2">
+            {/* Agent mode selector */}
+            <AgentModeSelector
+              value={agentMode}
+              onChange={setAgentMode}
+            />
 
             {/* Model selector */}
             <ModelSelector value={selectedModel} onChange={setSelectedModel} />
           </div>
-
-          {/* Text input */}
-          <textarea
-            data-testid="chat-input"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={t("inputPlaceholder")}
-            rows={1}
-            className="flex-1 text-sm border rounded px-3 py-1.5 resize-none bg-background focus:outline-none focus:ring-1 focus:ring-ring"
-          />
-
-          {/* Send button */}
-          <button
-            data-testid="send-btn"
-            onClick={handleSend}
-            disabled={
-              !inputValue.trim() ||
-              !masterKey ||
-              sendMessage.isPending ||
-              createThread.isPending
-            }
-            className="p-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title={t("send")}
-          >
-            <Send className="w-4 h-4" />
-          </button>
         </div>
       </div>
     </div>

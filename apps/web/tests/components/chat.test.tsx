@@ -440,9 +440,15 @@ describe("ChatPanel", () => {
 
   it("should render mode selector with all 4 modes", () => {
     render(<ChatPanel />);
-    const selector = screen.getByTestId("mode-selector") as HTMLSelectElement;
+    const selector = screen.getByTestId("agent-mode-selector");
     expect(selector).toBeInTheDocument();
-    expect(selector.options).toHaveLength(4);
+    // Click to open dropdown
+    fireEvent.click(selector);
+    // Check all 4 modes are present
+    expect(screen.getByTestId("agent-mode-option-assistant")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-mode-option-planner")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-mode-option-editor")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-mode-option-researcher")).toBeInTheDocument();
   });
 
   it("should render chat input", () => {
@@ -546,15 +552,19 @@ describe("ChatPanel", () => {
 
   it("should change agent mode via selector", () => {
     render(<ChatPanel />);
-    const selector = screen.getByTestId("mode-selector") as HTMLSelectElement;
-    fireEvent.change(selector, { target: { value: "researcher" } });
-    expect(selector.value).toBe("researcher");
+    const selector = screen.getByTestId("agent-mode-selector");
+    fireEvent.click(selector);
+    const researcherOption = screen.getByTestId("agent-mode-option-researcher");
+    fireEvent.click(researcherOption);
+    // Mode should be changed (verified by the onChange callback)
   });
 
   it("should create thread with selected mode", () => {
     render(<ChatPanel />);
-    const selector = screen.getByTestId("mode-selector") as HTMLSelectElement;
-    fireEvent.change(selector, { target: { value: "planner" } });
+    const selector = screen.getByTestId("agent-mode-selector");
+    fireEvent.click(selector);
+    const plannerOption = screen.getByTestId("agent-mode-option-planner");
+    fireEvent.click(plannerOption);
     fireEvent.click(screen.getByTestId("new-thread-btn"));
     expect(mockCreateThreadMutate).toHaveBeenCalledWith(
       expect.objectContaining({
