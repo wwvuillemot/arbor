@@ -26,8 +26,12 @@ const settingsService = new SettingsService();
 /**
  * Initialize LLM service with configured providers
  * Uses API keys from settings if available, otherwise uses stub mode
+ * Automatically selects the correct provider based on the model
  */
-async function initializeLLMService(masterKey: string): Promise<LLMService> {
+async function initializeLLMService(
+  masterKey: string,
+  modelId?: string | null,
+): Promise<LLMService> {
   // Start with local provider (always available, can be stub mode)
   const localProvider = new LocalLLMProvider(
     "http://localhost:11434/v1",
@@ -36,18 +40,24 @@ async function initializeLLMService(masterKey: string): Promise<LLMService> {
   );
   const llmService = new LLMService(localProvider);
 
+  let hasOpenAI = false;
+  let hasAnthropic = false;
+
   try {
     // Try to get OpenAI API key
     const openaiKey = await settingsService.getSetting(
       "openai_api_key",
       masterKey,
     );
-    console.log("OpenAI key retrieved:", openaiKey ? "YES (length: " + openaiKey.length + ")" : "NO");
+    console.log(
+      "OpenAI key retrieved:",
+      openaiKey ? "YES (length: " + openaiKey.length + ")" : "NO",
+    );
     if (openaiKey && openaiKey.trim() !== "") {
       const openaiProvider = new OpenAIProvider(openaiKey);
       llmService.registerProvider(openaiProvider);
-      llmService.setActiveProvider("openai"); // Prefer OpenAI if available
-      console.log("✅ OpenAI provider registered and set as active");
+      hasOpenAI = true;
+      console.log("✅ OpenAI provider registered");
     }
   } catch (err) {
     console.warn("Failed to initialize OpenAI provider:", err);
@@ -59,20 +69,46 @@ async function initializeLLMService(masterKey: string): Promise<LLMService> {
       "anthropic_api_key",
       masterKey,
     );
-    console.log("Anthropic key retrieved:", anthropicKey ? "YES (length: " + anthropicKey.length + ")" : "NO");
+    console.log(
+      "Anthropic key retrieved:",
+      anthropicKey ? "YES (length: " + anthropicKey.length + ")" : "NO",
+    );
     if (anthropicKey && anthropicKey.trim() !== "") {
       const anthropicProvider = new AnthropicProvider(anthropicKey);
       llmService.registerProvider(anthropicProvider);
-      // If OpenAI wasn't available, use Anthropic
-      if (llmService.getActiveProvider().name === "local") {
-        llmService.setActiveProvider("anthropic");
-        console.log("✅ Anthropic provider registered and set as active");
-      } else {
-        console.log("✅ Anthropic provider registered (OpenAI is active)");
-      }
+      hasAnthropic = true;
+      console.log("✅ Anthropic provider registered");
     }
   } catch (err) {
     console.warn("Failed to initialize Anthropic provider:", err);
+  }
+
+  // Auto-select provider based on model
+  if (modelId) {
+    if (modelId.startsWith("gpt-") || modelId.startsWith("o1") || modelId.startsWith("o3")) {
+      if (hasOpenAI) {
+        llmService.setActiveProvider("openai");
+        console.log("🎯 Selected OpenAI provider for model:", modelId);
+      } else {
+        console.warn("⚠️ Model requires OpenAI but no API key configured");
+      }
+    } else if (modelId.startsWith("claude-")) {
+      if (hasAnthropic) {
+        llmService.setActiveProvider("anthropic");
+        console.log("🎯 Selected Anthropic provider for model:", modelId);
+      } else {
+        console.warn("⚠️ Model requires Anthropic but no API key configured");
+      }
+    }
+  } else {
+    // No model specified, prefer OpenAI > Anthropic > Local
+    if (hasOpenAI) {
+      llmService.setActiveProvider("openai");
+      console.log("🎯 Default to OpenAI provider");
+    } else if (hasAnthropic) {
+      llmService.setActiveProvider("anthropic");
+      console.log("🎯 Default to Anthropic provider");
+    }
   }
 
   console.log("🔧 Active LLM provider:", llmService.getActiveProvider().name);
@@ -254,13 +290,13 @@ export const chatRouter = router({
 
       console.log("📤 Messages being sent to LLM:", JSON.stringify(llmMessages.map(m => ({ role: m.role, content: m.content, contentType: typeof m.content })), null, 2));
 
-      // Initialize LLM service with API keys
-      const llmService = await initializeLLMService(masterKey);
+      // Initialize LLM service with API keys and auto-select provider based on model
+      const llmService = await initializeLLMService(masterKey, thread.model);
 
       // Call the LLM with error handling and fallback to stub mode
       let response;
       try {
-        console.log("🤖 Calling LLM with provider:", llmService.getActiveProvider().name);
+        console.log("🤖 Calling LLM with provider:", llmService.getActiveProvider().name, "model:", thread.model ?? "default");
         response = await llmService.chat(llmMessages, {
           model: thread.model ?? undefined,
           systemPrompt,
