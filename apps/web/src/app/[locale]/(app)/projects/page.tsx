@@ -108,35 +108,35 @@ export default function ProjectsPage() {
   // Chat sidebar state - persisted as app preference
   const { getPreference, setPreference, isLoading: preferencesLoading } = useAppPreferences();
 
-  // Extract query param value once using useMemo to prevent re-renders
-  const chatQueryParam = React.useMemo(() => {
-    return searchParams?.get("chat") === "open";
-  }, [searchParams]);
+  // Read query param once and store in ref (doesn't change during component lifecycle)
+  const queryParamRef = React.useRef(searchParams?.get("chat") === "open");
 
-  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(() => {
-    // Initialize from query param if present, otherwise will be set from preference
-    return chatQueryParam;
-  });
-  const [hasInitializedFromPreference, setHasInitializedFromPreference] = React.useState(false);
+  // Use ref to track if we've initialized from preference (doesn't cause re-renders)
+  const hasInitializedRef = React.useRef(false);
 
-  // Initialize from preference once loaded (only if no query param)
+  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(false);
+
+  // Initialize from preference once loaded
   React.useEffect(() => {
-    if (!preferencesLoading && !hasInitializedFromPreference && !chatQueryParam) {
-      const savedPreference = getPreference("chatSidebarOpen", false) as boolean;
-      setChatSidebarOpen(savedPreference);
-      setHasInitializedFromPreference(true);
-    } else if (!preferencesLoading && !hasInitializedFromPreference && chatQueryParam) {
-      // If query param is present, just mark as initialized
-      setHasInitializedFromPreference(true);
+    if (!preferencesLoading && !hasInitializedRef.current) {
+      if (queryParamRef.current) {
+        // Query param takes precedence
+        setChatSidebarOpen(true);
+      } else {
+        // Load from preference
+        const savedPreference = getPreference("chatSidebarOpen", false) as boolean;
+        setChatSidebarOpen(savedPreference);
+      }
+      hasInitializedRef.current = true;
     }
-  }, [preferencesLoading, hasInitializedFromPreference, chatQueryParam, getPreference]);
+  }, [preferencesLoading, getPreference]);
 
   // Persist chat sidebar state when it changes (but only after initial load)
   React.useEffect(() => {
-    if (hasInitializedFromPreference) {
+    if (hasInitializedRef.current) {
       setPreference("chatSidebarOpen", chatSidebarOpen);
     }
-  }, [chatSidebarOpen, setPreference, hasInitializedFromPreference]);
+  }, [chatSidebarOpen, setPreference]);
 
   const handleFilterChange = React.useCallback(
     (tagIds: string[], operator: "AND" | "OR") => {
