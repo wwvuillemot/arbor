@@ -6,6 +6,7 @@ import { X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import type { AgentModeConfig } from "./agent-mode-manager";
+import { ToolSelector } from "./tool-selector";
 
 export interface AgentModeDialogProps {
   open: boolean;
@@ -241,32 +242,11 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
           {/* Allowed Tools */}
           <div>
-            <label
-              htmlFor="allowedTools"
-              className="block text-sm font-medium mb-2"
-            >
+            <label className="block text-sm font-medium mb-2">
               {t("form.allowedTools")}
             </label>
-            <textarea
-              id="allowedTools"
-              value={allowedTools.join(", ")}
-              onChange={(e) =>
-                setAllowedTools(
-                  e.target.value
-                    .split(",")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                )
-              }
-              placeholder={t("form.allowedToolsPlaceholder")}
-              rows={3}
-              className={cn(
-                "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                "placeholder:text-muted-foreground resize-none",
-              )}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
+            <ToolSelector value={allowedTools} onChange={setAllowedTools} />
+            <p className="text-xs text-muted-foreground mt-2">
               {t("form.allowedToolsHint")}
             </p>
           </div>
