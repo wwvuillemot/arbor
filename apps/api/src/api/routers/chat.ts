@@ -42,10 +42,12 @@ async function initializeLLMService(masterKey: string): Promise<LLMService> {
       "openai_api_key",
       masterKey,
     );
+    console.log("OpenAI key retrieved:", openaiKey ? "YES (length: " + openaiKey.length + ")" : "NO");
     if (openaiKey && openaiKey.trim() !== "") {
       const openaiProvider = new OpenAIProvider(openaiKey);
       llmService.registerProvider(openaiProvider);
       llmService.setActiveProvider("openai"); // Prefer OpenAI if available
+      console.log("✅ OpenAI provider registered and set as active");
     }
   } catch (err) {
     console.warn("Failed to initialize OpenAI provider:", err);
@@ -57,18 +59,23 @@ async function initializeLLMService(masterKey: string): Promise<LLMService> {
       "anthropic_api_key",
       masterKey,
     );
+    console.log("Anthropic key retrieved:", anthropicKey ? "YES (length: " + anthropicKey.length + ")" : "NO");
     if (anthropicKey && anthropicKey.trim() !== "") {
       const anthropicProvider = new AnthropicProvider(anthropicKey);
       llmService.registerProvider(anthropicProvider);
       // If OpenAI wasn't available, use Anthropic
       if (llmService.getActiveProvider().name === "local") {
         llmService.setActiveProvider("anthropic");
+        console.log("✅ Anthropic provider registered and set as active");
+      } else {
+        console.log("✅ Anthropic provider registered (OpenAI is active)");
       }
     }
   } catch (err) {
     console.warn("Failed to initialize Anthropic provider:", err);
   }
 
+  console.log("🔧 Active LLM provider:", llmService.getActiveProvider().name);
   return llmService;
 }
 
@@ -249,13 +256,15 @@ export const chatRouter = router({
       // Call the LLM with error handling and fallback to stub mode
       let response;
       try {
+        console.log("🤖 Calling LLM with provider:", llmService.getActiveProvider().name);
         response = await llmService.chat(llmMessages, {
           model: thread.model ?? undefined,
           systemPrompt,
         });
+        console.log("✅ LLM response received:", response.content.substring(0, 100) + "...");
       } catch (error) {
         // If the API call fails (e.g., invalid API key), fall back to stub mode
-        console.warn("LLM API call failed, falling back to stub mode:", error);
+        console.warn("❌ LLM API call failed, falling back to stub mode:", error);
         const stubProvider = new LocalLLMProvider(
           "http://localhost:11434/v1",
           "llama3.2",
@@ -266,6 +275,7 @@ export const chatRouter = router({
           model: thread.model ?? undefined,
           systemPrompt,
         });
+        console.log("🔄 Using stub response");
       }
 
       // Store the user message

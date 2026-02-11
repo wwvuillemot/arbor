@@ -370,9 +370,9 @@ export class OpenAIProvider implements LLMProvider {
                     type: "function",
                     function: tc.function
                       ? {
-                          name: tc.function.name || "",
-                          arguments: tc.function.arguments || "",
-                        }
+                        name: tc.function.name || "",
+                        arguments: tc.function.arguments || "",
+                      }
                       : undefined,
                   },
                 };
@@ -417,7 +417,7 @@ export class OpenAIProvider implements LLMProvider {
     for (const msg of messages) {
       const openaiMsg: OpenAIMessage = {
         role: msg.role,
-        content: msg.content,
+        content: msg.content ?? "", // OpenAI requires content to be a string, not null
       };
       if (msg.toolCalls) {
         openaiMsg.tool_calls = msg.toolCalls.map((tc) => ({
@@ -809,14 +809,14 @@ type AnthropicContentBlock =
   | { type: "text"; text: string; id?: never; name?: never; input?: never }
   | { type: "tool_use"; id: string; name: string; input: unknown; text?: never }
   | {
-      type: "tool_result";
-      tool_use_id: string;
-      content: string;
-      text?: never;
-      id?: never;
-      name?: never;
-      input?: never;
-    };
+    type: "tool_result";
+    tool_use_id: string;
+    content: string;
+    text?: never;
+    id?: never;
+    name?: never;
+    input?: never;
+  };
 
 interface AnthropicMessage {
   role: "user" | "assistant";

@@ -41,38 +41,16 @@ export function ChatPanel({
   // Get master key for API key decryption
   const [masterKey, setMasterKey] = React.useState<string | null>(null);
 
-  // Get master key on mount
-  React.useEffect(() => {
-    async function getMasterKey() {
-      try {
-        if (typeof window !== "undefined" && "__TAURI__" in window) {
-          try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const tauri = (window as any).__TAURI__;
-            if (tauri && tauri.core && tauri.core.invoke) {
-              const key = (await tauri.core.invoke(
-                "get_or_generate_master_key",
-              )) as string;
-              setMasterKey(key);
-            } else {
-              throw new Error("Tauri invoke not available");
-            }
-          } catch (importError) {
-            console.warn("Tauri API not available:", importError);
-            setMasterKey("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=");
-          }
-        } else {
-          // Development mode: use a test key
-          console.warn("Not in Tauri environment, using test master key");
-          setMasterKey("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=");
-        }
-      } catch (error) {
-        console.error("Failed to get master key:", error);
-      }
-    }
+  // Get master key from database via tRPC
+  const masterKeyQuery = trpc.preferences.getMasterKey.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
 
-    getMasterKey();
-  }, []);
+  React.useEffect(() => {
+    if (masterKeyQuery.data?.masterKey) {
+      setMasterKey(masterKeyQuery.data.masterKey);
+    }
+  }, [masterKeyQuery.data]);
 
   // ─── Queries ─────────────────────────────────────────────────────────
   const threadsQuery = trpc.chat.listThreads.useQuery(undefined, {
