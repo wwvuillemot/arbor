@@ -75,4 +75,15 @@ export const llmRouter = router({
     const llmService = await getInitializedLLMService();
     return await llmService.getAllModels();
   }),
+
+  /**
+   * Check if a model supports temperature control
+   * Reasoning models (o1, o3, DeepSeek R1, etc.) do not support temperature
+   */
+  supportsTemperature: publicProcedure
+    .input(z.object({ modelId: z.string() }))
+    .query(async ({ input }) => {
+      const llmService = await getInitializedLLMService();
+      return await llmService.supportsTemperature(input.modelId);
+    }),
 });

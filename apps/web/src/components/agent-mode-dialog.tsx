@@ -227,9 +227,12 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
                 {temperature.toFixed(2)}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t("form.temperatureHint")}
-            </p>
+            <div className="text-xs text-muted-foreground mt-1 space-y-1">
+              <p>{t("form.temperatureHint")}</p>
+              <p className="text-amber-600 dark:text-amber-500">
+                ⚠️ Note: Reasoning models (o1, o3, o3-mini, DeepSeek R1) do not support temperature control and will ignore this setting.
+              </p>
+            </div>
           </div>
 
           {/* Allowed Tools */}

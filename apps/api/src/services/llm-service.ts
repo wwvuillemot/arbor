@@ -1224,4 +1224,19 @@ export class LLMService {
   countTokens(messages: ChatMessage[]): number {
     return this.activeProvider.countTokens(messages);
   }
+
+  /**
+   * Check if a model supports temperature control
+   * Reasoning models (o1, o3, DeepSeek R1, etc.) do not support temperature
+   */
+  async supportsTemperature(modelId: string): Promise<boolean> {
+    const allModels = await this.getAllModels();
+    const model = allModels.find((m) => m.id === modelId);
+    if (!model) {
+      // Unknown model, assume it supports temperature
+      return true;
+    }
+    // Reasoning models don't support temperature
+    return !model.supportsReasoning;
+  }
 }

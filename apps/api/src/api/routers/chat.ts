@@ -271,6 +271,12 @@ export const chatRouter = router({
       // Get conversation history
       const history = await chatService.getMessages(threadId);
 
+      // Get agent mode config for temperature and system prompt
+      const agentModeConfig = await getAgentModeConfig(thread.agentMode);
+      if (!agentModeConfig) {
+        throw new Error(`Unknown agent mode: ${thread.agentMode}`);
+      }
+
       // Build system prompt based on agent mode
       const systemPrompt = await buildSystemPrompt(thread.agentMode);
 
@@ -294,13 +300,20 @@ export const chatRouter = router({
       // Initialize LLM service with API keys and auto-select provider based on model
       const llmService = await initializeLLMService(masterKey, thread.model);
 
+      // Check if the model supports temperature
+      const supportsTemp = thread.model
+        ? await llmService.supportsTemperature(thread.model)
+        : true;
+
       // Call the LLM with error handling and fallback to stub mode
       let response;
       try {
-        console.log("🤖 Calling LLM with provider:", llmService.getActiveProvider().name, "model:", thread.model ?? "default");
+        console.log("🤖 Calling LLM with provider:", llmService.getActiveProvider().name, "model:", thread.model ?? "default", "temperature:", supportsTemp ? agentModeConfig.temperature : "N/A (reasoning model)");
         response = await llmService.chat(llmMessages, {
           model: thread.model ?? undefined,
           systemPrompt,
+          // Only send temperature if the model supports it
+          temperature: supportsTemp ? agentModeConfig.temperature : undefined,
         });
         console.log("✅ LLM response received:", response.content.substring(0, 100) + "...");
       } catch (error) {
@@ -315,6 +328,7 @@ export const chatRouter = router({
         response = await stubService.chat(llmMessages, {
           model: thread.model ?? undefined,
           systemPrompt,
+          temperature: agentModeConfig.temperature,
         });
         console.log("🔄 Using stub response");
       }
