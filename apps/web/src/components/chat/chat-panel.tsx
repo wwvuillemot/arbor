@@ -35,6 +35,7 @@ export function ChatPanel({
   const [inputValue, setInputValue] = React.useState("");
   const [agentMode, setAgentMode] = React.useState<string>("assistant");
   const [selectedModel, setSelectedModel] = React.useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = React.useState<string | null>(null);
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -118,18 +119,16 @@ export function ChatPanel({
 
   // ─── Auto-send after thread creation ─────────────────────────────────
   React.useEffect(() => {
-    // If we just created a thread and have a pending message, send it
-    if (selectedThreadId && inputValue.trim() && masterKey && !sendMessage.isPending) {
-      const shouldSend = createThread.isSuccess && !sendMessage.isSuccess;
-      if (shouldSend) {
-        sendMessage.mutate({
-          threadId: selectedThreadId,
-          content: inputValue.trim(),
-          masterKey,
-        });
-      }
+    // If we have a pending message and a thread was just created, send it
+    if (pendingMessage && selectedThreadId && masterKey) {
+      sendMessage.mutate({
+        threadId: selectedThreadId,
+        content: pendingMessage,
+        masterKey,
+      });
+      setPendingMessage(null); // Clear pending message
     }
-  }, [selectedThreadId, inputValue, masterKey, createThread.isSuccess, sendMessage]);
+  }, [pendingMessage, selectedThreadId, masterKey, sendMessage]);
 
   // ─── Handlers ────────────────────────────────────────────────────────
   const handleNewThread = React.useCallback(() => {
@@ -150,14 +149,15 @@ export function ChatPanel({
   const handleSend = React.useCallback(() => {
     if (!inputValue.trim() || !masterKey) return;
 
-    // If no thread is selected, create one first
+    // If no thread is selected, create one first and save the message as pending
     if (!selectedThreadId) {
+      setPendingMessage(inputValue.trim());
       createThread.mutate({
         name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
         agentMode: agentMode as "assistant" | "planner" | "editor" | "researcher",
         model: selectedModel,
       });
-      // The message will be sent after the thread is created (see useEffect below)
+      // The message will be sent after the thread is created (see useEffect above)
       return;
     }
 

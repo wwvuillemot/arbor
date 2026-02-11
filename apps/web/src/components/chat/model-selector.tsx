@@ -119,7 +119,7 @@ export function ModelSelector({
       {/* Dropdown */}
       {isOpen && (
         <div
-          className="absolute top-full left-0 mt-1 z-50 min-w-[280px] rounded-md border bg-popover shadow-md"
+          className="absolute bottom-full left-0 mb-1 z-50 min-w-[280px] rounded-md border bg-popover shadow-md"
           data-testid="model-selector-dropdown"
         >
           {/* Default option */}
@@ -169,12 +169,12 @@ export function ModelSelector({
                     {(model.supportsReasoning ||
                       model.supportsVision ||
                       model.supportsTools) && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        {model.supportsReasoning && <span>🧠 Reasoning</span>}
-                        {model.supportsVision && <span>👁️ Vision</span>}
-                        {model.supportsTools && <span>🔧 Tools</span>}
-                      </div>
-                    )}
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          {model.supportsReasoning && <span>🧠 Reasoning</span>}
+                          {model.supportsVision && <span>👁️ Vision</span>}
+                          {model.supportsTools && <span>🔧 Tools</span>}
+                        </div>
+                      )}
                   </button>
                 ))}
               </div>

@@ -192,6 +192,18 @@ vi.mock("@/lib/trpc", () => {
       upload: { useMutation: vi.fn(() => makeMutation()) },
       getDownloadUrl: { useMutation: vi.fn(() => makeMutation()) },
     },
+    preferences: {
+      getAllAppPreferences: {
+        useQuery: vi.fn(() => ({
+          data: {},
+          isLoading: false,
+          error: null,
+        })),
+      },
+      setAppPreference: { useMutation: vi.fn(() => makeMutation()) },
+      setAppPreferences: { useMutation: vi.fn(() => makeMutation()) },
+      deleteAppPreference: { useMutation: vi.fn(() => makeMutation()) },
+    },
     useUtils: vi.fn(() => ({
       nodes: {
         getAllProjects: { invalidate: vi.fn(), refetch: vi.fn() },

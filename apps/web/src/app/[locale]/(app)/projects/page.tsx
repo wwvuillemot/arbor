@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { useCurrentProject } from "@/hooks/use-current-project";
 import { useAutoSave, type AutoSaveStatus } from "@/hooks/use-auto-save";
 import { useToast } from "@/contexts/toast-context";
+import { useAppPreferences } from "@/hooks/use-app-preferences";
 import {
   FileTree,
   type FileTreeHandle,
@@ -104,10 +105,17 @@ export default function ProjectsPage() {
     React.useState<AttributionFilter>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  // Chat sidebar state - check for ?chat=open query parameter
+  // Chat sidebar state - persisted as app preference
+  const { getPreference, setPreference } = useAppPreferences();
   const [chatSidebarOpen, setChatSidebarOpen] = React.useState(
-    searchParams?.get("chat") === "open",
+    // Check query parameter first, then preference, default to false
+    searchParams?.get("chat") === "open" || (getPreference("chatSidebarOpen", false) as boolean),
   );
+
+  // Persist chat sidebar state when it changes
+  React.useEffect(() => {
+    setPreference("chatSidebarOpen", chatSidebarOpen);
+  }, [chatSidebarOpen, setPreference]);
 
   const handleFilterChange = React.useCallback(
     (tagIds: string[], operator: "AND" | "OR") => {
@@ -726,11 +734,11 @@ export default function ProjectsPage() {
                       className={cn(
                         "text-xs px-2 py-1 rounded",
                         autoSaveStatus === "saving" &&
-                          "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
+                        "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
                         autoSaveStatus === "saved" &&
-                          "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
+                        "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
                         autoSaveStatus === "error" &&
-                          "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
+                        "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
                         autoSaveStatus === "idle" && "hidden",
                       )}
                       data-testid="auto-save-status"
@@ -1083,7 +1091,7 @@ export default function ProjectsPage() {
                 className={cn(
                   "group relative rounded-lg border bg-card p-6 hover:shadow-md transition-shadow cursor-pointer",
                   isSelected &&
-                    "border-green-500 bg-green-50 dark:bg-green-950",
+                  "border-green-500 bg-green-50 dark:bg-green-950",
                 )}
               >
                 {/* Checkmark in upper-right corner */}
