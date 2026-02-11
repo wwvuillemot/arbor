@@ -106,13 +106,17 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
 
   // Chat sidebar state - persisted as app preference
-  const { getPreference, setPreference, isLoading: preferencesLoading } = useAppPreferences();
+  const { preferences, isLoading: preferencesLoading } = useAppPreferences();
+  const setPreferenceMutation = trpc.preferences.setAppPreference.useMutation();
 
   // Read query param once and store in ref (doesn't change during component lifecycle)
   const queryParamRef = React.useRef(searchParams?.get("chat") === "open");
 
   // Use ref to track if we've initialized from preference (doesn't cause re-renders)
   const hasInitializedRef = React.useRef(false);
+
+  // Store the previous value to avoid unnecessary mutations
+  const prevChatSidebarOpenRef = React.useRef<boolean | null>(null);
 
   const [chatSidebarOpen, setChatSidebarOpen] = React.useState(false);
 
@@ -122,21 +126,24 @@ export default function ProjectsPage() {
       if (queryParamRef.current) {
         // Query param takes precedence
         setChatSidebarOpen(true);
+        prevChatSidebarOpenRef.current = true;
       } else {
         // Load from preference
-        const savedPreference = getPreference("chatSidebarOpen", false) as boolean;
-        setChatSidebarOpen(savedPreference);
+        const savedPreference = preferences?.chatSidebarOpen ?? false;
+        setChatSidebarOpen(savedPreference as boolean);
+        prevChatSidebarOpenRef.current = savedPreference as boolean;
       }
       hasInitializedRef.current = true;
     }
-  }, [preferencesLoading, getPreference]);
+  }, [preferencesLoading, preferences]);
 
-  // Persist chat sidebar state when it changes (but only after initial load)
+  // Persist chat sidebar state when it changes (but only after initial load and only if value changed)
   React.useEffect(() => {
-    if (hasInitializedRef.current) {
-      setPreference("chatSidebarOpen", chatSidebarOpen);
+    if (hasInitializedRef.current && prevChatSidebarOpenRef.current !== chatSidebarOpen) {
+      prevChatSidebarOpenRef.current = chatSidebarOpen;
+      setPreferenceMutation.mutate({ key: "chatSidebarOpen", value: chatSidebarOpen });
     }
-  }, [chatSidebarOpen, setPreference]);
+  }, [chatSidebarOpen]);
 
   const handleFilterChange = React.useCallback(
     (tagIds: string[], operator: "AND" | "OR") => {
