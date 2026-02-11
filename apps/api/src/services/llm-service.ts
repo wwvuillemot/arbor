@@ -228,9 +228,14 @@ export class OpenAIProvider implements LLMProvider {
     options?: ChatOptions,
   ): Promise<ChatResponse> {
     const model = options?.model || this.defaultModel;
+    const formattedMessages = this.formatMessages(messages, options?.systemPrompt);
+
+    // Debug logging
+    console.log("🔍 Formatted messages for OpenAI:", JSON.stringify(formattedMessages, null, 2));
+
     const body: Record<string, unknown> = {
       model,
-      messages: this.formatMessages(messages, options?.systemPrompt),
+      messages: formattedMessages,
     };
 
     if (options?.temperature !== undefined)

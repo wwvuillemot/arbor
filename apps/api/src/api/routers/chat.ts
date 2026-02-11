@@ -235,9 +235,11 @@ export const chatRouter = router({
       const history = await chatService.getMessages(threadId);
 
       // Build system prompt based on agent mode
-      const systemPrompt = buildSystemPrompt(thread.agentMode);
+      const systemPrompt = await buildSystemPrompt(thread.agentMode);
 
       // Convert database messages to LLM format
+      console.log("📝 Raw history from database:", JSON.stringify(history.map(m => ({ role: m.role, content: m.content, contentType: typeof m.content })), null, 2));
+
       const llmMessages: LLMChatMessage[] = history.map((msg) => ({
         role: msg.role as "user" | "assistant" | "system" | "tool",
         content: msg.content,
@@ -249,6 +251,8 @@ export const chatRouter = router({
         role: "user",
         content,
       });
+
+      console.log("📤 Messages being sent to LLM:", JSON.stringify(llmMessages.map(m => ({ role: m.role, content: m.content, contentType: typeof m.content })), null, 2));
 
       // Initialize LLM service with API keys
       const llmService = await initializeLLMService(masterKey);
