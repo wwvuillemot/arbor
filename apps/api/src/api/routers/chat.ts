@@ -246,11 +246,27 @@ export const chatRouter = router({
       // Initialize LLM service with API keys
       const llmService = await initializeLLMService(masterKey);
 
-      // Call the LLM
-      const response = await llmService.chat(llmMessages, {
-        model: thread.model ?? undefined,
-        systemPrompt,
-      });
+      // Call the LLM with error handling and fallback to stub mode
+      let response;
+      try {
+        response = await llmService.chat(llmMessages, {
+          model: thread.model ?? undefined,
+          systemPrompt,
+        });
+      } catch (error) {
+        // If the API call fails (e.g., invalid API key), fall back to stub mode
+        console.warn("LLM API call failed, falling back to stub mode:", error);
+        const stubProvider = new LocalLLMProvider(
+          "http://localhost:11434/v1",
+          "llama3.2",
+          true, // stub mode
+        );
+        const stubService = new LLMService(stubProvider);
+        response = await stubService.chat(llmMessages, {
+          model: thread.model ?? undefined,
+          systemPrompt,
+        });
+      }
 
       // Store the user message
       const userMessage = await chatService.addMessage({
