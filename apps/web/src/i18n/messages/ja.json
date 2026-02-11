@@ -295,7 +295,10 @@
     "hideReasoning": "推論を非表示",
     "reasoningTokens": "推論トークン",
     "outputTokens": "出力トークン",
-    "error": "メッセージの送信に失敗しました"
+    "error": "メッセージの送信に失敗しました",
+    "loadingModels": "モデルを読み込み中...",
+    "defaultModel": "デフォルト",
+    "useProviderDefault": "プロバイダーのデフォルトを使用"
   },
   "search": {
     "title": "検索",

@@ -295,7 +295,10 @@
     "hideReasoning": "Hide reasoning",
     "reasoningTokens": "reasoning tokens",
     "outputTokens": "output tokens",
-    "error": "Failed to send message"
+    "error": "Failed to send message",
+    "loadingModels": "Loading models...",
+    "defaultModel": "Default",
+    "useProviderDefault": "Use provider default"
   },
   "search": {
     "title": "Search",
