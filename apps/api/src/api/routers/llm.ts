@@ -1,13 +1,66 @@
+import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
-import { LLMService, LocalLLMProvider } from "../../services/llm-service";
+import {
+  LLMService,
+  LocalLLMProvider,
+  OpenAIProvider,
+  AnthropicProvider,
+} from "../../services/llm-service";
+import { SettingsService } from "../../services/settings-service";
+import { PreferencesService } from "../../services/preferences-service";
 
-// Initialize LLM service with stub provider for testing
-const stubProvider = new LocalLLMProvider(
-  "http://localhost:11434/v1",
-  "llama3.2",
-  true, // stubMode
-);
-const llmService = new LLMService(stubProvider);
+const settingsService = new SettingsService();
+const preferencesService = new PreferencesService();
+
+/**
+ * Initialize LLM service with all available providers based on configured API keys
+ */
+async function getInitializedLLMService(): Promise<LLMService> {
+  // Start with local provider (always available, can be stub mode)
+  const localProvider = new LocalLLMProvider(
+    "http://localhost:11434/v1",
+    "llama3.2",
+    true, // stub mode by default
+  );
+  const llmService = new LLMService(localProvider);
+
+  try {
+    // Get master key for decrypting API keys
+    const masterKey = await preferencesService.getOrGenerateMasterKey();
+
+    // Try to register OpenAI provider
+    try {
+      const openaiKey = await settingsService.getSetting(
+        "openai_api_key",
+        masterKey,
+      );
+      if (openaiKey && openaiKey.trim() !== "") {
+        const openaiProvider = new OpenAIProvider(openaiKey);
+        llmService.registerProvider(openaiProvider);
+      }
+    } catch (err) {
+      console.warn("Failed to initialize OpenAI provider:", err);
+    }
+
+    // Try to register Anthropic provider
+    try {
+      const anthropicKey = await settingsService.getSetting(
+        "anthropic_api_key",
+        masterKey,
+      );
+      if (anthropicKey && anthropicKey.trim() !== "") {
+        const anthropicProvider = new AnthropicProvider(anthropicKey);
+        llmService.registerProvider(anthropicProvider);
+      }
+    } catch (err) {
+      console.warn("Failed to initialize Anthropic provider:", err);
+    }
+  } catch (err) {
+    console.warn("Failed to get master key for LLM service:", err);
+  }
+
+  return llmService;
+}
 
 /**
  * LLM Router
@@ -19,6 +72,7 @@ export const llmRouter = router({
    * List all available models across all configured providers
    */
   listAvailableModels: publicProcedure.query(async () => {
+    const llmService = await getInitializedLLMService();
     return await llmService.getAllModels();
   }),
 });
