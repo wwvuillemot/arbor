@@ -140,6 +140,25 @@ vi.mock("@/lib/trpc", () => {
         })),
       },
     },
+    llm: {
+      listAvailableModels: {
+        useQuery: vi.fn(() => ({
+          data: [
+            {
+              id: "gpt-4o",
+              name: "GPT-4o",
+              provider: "openai",
+              contextWindow: 128000,
+              supportsTools: true,
+              supportsVision: true,
+              supportsStreaming: true,
+            },
+          ],
+          isLoading: false,
+          error: null,
+        })),
+      },
+    },
     useUtils: vi.fn(() => ({})),
   };
 

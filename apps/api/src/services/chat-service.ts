@@ -13,6 +13,7 @@ export interface CreateThreadParams {
   name: string;
   projectId?: string | null;
   agentMode?: AgentMode;
+  model?: string | null;
 }
 
 export interface UpdateThreadParams {
@@ -49,6 +50,7 @@ export class ChatService {
         name: params.name,
         projectId: params.projectId ?? null,
         agentMode: params.agentMode || "assistant",
+        model: params.model ?? null,
       })
       .returning();
 

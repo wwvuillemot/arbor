@@ -6,6 +6,7 @@ import { Plus, Trash2, Send, MessageSquare, Bot } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
+import { ModelSelector } from "./model-selector";
 
 const AGENT_MODES = ["assistant", "planner", "editor", "researcher"] as const;
 
@@ -30,6 +31,7 @@ export function ChatPanel({ className, showThreadSidebar = true }: ChatPanelProp
   );
   const [inputValue, setInputValue] = React.useState("");
   const [agentMode, setAgentMode] = React.useState<string>("assistant");
+  const [selectedModel, setSelectedModel] = React.useState<string | null>(null);
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -80,8 +82,9 @@ export function ChatPanel({ className, showThreadSidebar = true }: ChatPanelProp
     createThread.mutate({
       name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
       agentMode: agentMode as "assistant" | "planner" | "editor" | "researcher",
+      model: selectedModel,
     });
-  }, [createThread, agentMode, t]);
+  }, [createThread, agentMode, selectedModel, t]);
 
   const handleDeleteThread = React.useCallback(
     (threadId: string) => {
@@ -226,19 +229,27 @@ export function ChatPanel({ className, showThreadSidebar = true }: ChatPanelProp
           data-testid="input-area"
           className="border-t p-3 flex items-end gap-2"
         >
-          {/* Mode selector */}
-          <select
-            data-testid="mode-selector"
-            value={agentMode}
-            onChange={(e) => setAgentMode(e.target.value)}
-            className="text-xs border rounded px-2 py-1.5 bg-background"
-          >
-            {AGENT_MODES.map((mode) => (
-              <option key={mode} value={mode}>
-                {t(`mode.${mode}`)}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-col gap-1">
+            {/* Mode selector */}
+            <select
+              data-testid="mode-selector"
+              value={agentMode}
+              onChange={(e) => setAgentMode(e.target.value)}
+              className="text-xs border rounded px-2 py-1.5 bg-background"
+            >
+              {AGENT_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {t(`mode.${mode}`)}
+                </option>
+              ))}
+            </select>
+
+            {/* Model selector */}
+            <ModelSelector
+              value={selectedModel}
+              onChange={setSelectedModel}
+            />
+          </div>
 
           {/* Text input */}
           <textarea

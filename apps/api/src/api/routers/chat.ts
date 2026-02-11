@@ -31,6 +31,7 @@ export const chatRouter = router({
         name: z.string().min(1).max(255),
         projectId: z.string().uuid().nullable().optional(),
         agentMode: z.enum(agentModeEnum).optional(),
+        model: z.string().max(100).nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
