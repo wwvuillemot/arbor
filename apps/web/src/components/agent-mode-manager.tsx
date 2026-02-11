@@ -136,19 +136,22 @@ export function AgentModeManager() {
               </div>
 
               {/* Actions */}
-              {!mode.isBuiltIn && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleEdit(mode)}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium",
-                      "border border-input bg-background hover:bg-muted hover:text-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    )}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    {t("edit")}
-                  </button>
+              <div className="flex items-center gap-2">
+                {/* Edit button - now available for ALL modes */}
+                <button
+                  onClick={() => handleEdit(mode)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm font-medium",
+                    "border border-input bg-background hover:bg-muted hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  )}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  {t("edit")}
+                </button>
+
+                {/* Delete button - only for custom modes */}
+                {!mode.isBuiltIn && (
                   <button
                     onClick={() => handleDelete(mode.id)}
                     className={cn(
@@ -164,8 +167,8 @@ export function AgentModeManager() {
                       ? t("confirmDelete")
                       : t("delete")}
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         ))}

@@ -121,8 +121,8 @@ export async function createAgentMode(params: {
 }
 
 /**
- * Update an existing custom agent mode
- * @throws Error if mode doesn't exist or if trying to modify a built-in mode
+ * Update an existing agent mode (including built-in modes)
+ * @throws Error if mode doesn't exist
  */
 export async function updateAgentMode(
   id: string,
@@ -134,7 +134,7 @@ export async function updateAgentMode(
     temperature: number;
   }>,
 ): Promise<AgentModeConfig> {
-  // Check if mode exists and is not built-in
+  // Check if mode exists
   const [existing] = await db
     .select()
     .from(agentModes)
@@ -144,11 +144,7 @@ export async function updateAgentMode(
     throw new Error(`Agent mode not found: ${id}`);
   }
 
-  if (existing.isBuiltIn) {
-    throw new Error(
-      `Cannot modify built-in mode: ${existing.name}. Built-in modes are read-only.`,
-    );
-  }
+  // Built-in modes can now be edited!
 
   // Validate temperature if provided
   if (params.temperature !== undefined) {
