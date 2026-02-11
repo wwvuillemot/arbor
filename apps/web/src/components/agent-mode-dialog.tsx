@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import type { AgentModeConfig } from "./agent-mode-manager";
 import { ToolSelector } from "./tool-selector";
+import { MarkdownEditor } from "./markdown-editor";
 
 export interface AgentModeDialogProps {
   open: boolean;
@@ -187,24 +188,15 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
           {/* Guidelines */}
           <div>
-            <label
-              htmlFor="guidelines"
-              className="block text-sm font-medium mb-2"
-            >
+            <label className="block text-sm font-medium mb-2">
               {t("form.guidelines")} <span className="text-destructive">*</span>
             </label>
-            <textarea
-              id="guidelines"
+            <MarkdownEditor
               value={guidelines}
-              onChange={(e) => setGuidelines(e.target.value)}
+              onChange={setGuidelines}
               placeholder={t("form.guidelinesPlaceholder")}
               required
-              rows={4}
-              className={cn(
-                "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                "placeholder:text-muted-foreground resize-none",
-              )}
+              rows={8}
             />
             <p className="text-xs text-muted-foreground mt-1">
               {t("form.guidelinesHint")}
