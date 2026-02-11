@@ -14,7 +14,12 @@
  */
 
 import { db } from "../db/index";
-import { agentModes, type AgentMode, type AgentModeRow, type NewAgentModeRow } from "../db/schema";
+import {
+  agentModes,
+  type AgentMode,
+  type AgentModeRow,
+  type NewAgentModeRow,
+} from "../db/schema";
 import { eq } from "drizzle-orm";
 import type { ToolDefinition } from "./llm-service";
 
@@ -156,9 +161,12 @@ export async function updateAgentMode(
     updatedAt: new Date(),
   };
 
-  if (params.displayName !== undefined) updates.displayName = params.displayName;
-  if (params.description !== undefined) updates.description = params.description;
-  if (params.allowedTools !== undefined) updates.allowedTools = params.allowedTools;
+  if (params.displayName !== undefined)
+    updates.displayName = params.displayName;
+  if (params.description !== undefined)
+    updates.description = params.description;
+  if (params.allowedTools !== undefined)
+    updates.allowedTools = params.allowedTools;
   if (params.guidelines !== undefined) updates.guidelines = params.guidelines;
   if (params.temperature !== undefined)
     updates.temperature = params.temperature.toFixed(2);
@@ -233,10 +241,7 @@ export async function getAgentModeConfig(
 export async function getAgentModeById(
   id: string,
 ): Promise<AgentModeConfig | null> {
-  const [row] = await db
-    .select()
-    .from(agentModes)
-    .where(eq(agentModes.id, id));
+  const [row] = await db.select().from(agentModes).where(eq(agentModes.id, id));
 
   return row ? rowToConfig(row) : null;
 }

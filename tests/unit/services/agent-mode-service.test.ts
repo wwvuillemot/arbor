@@ -233,9 +233,9 @@ describe("filterToolsForMode", () => {
   });
 
   it("should throw for unknown mode", async () => {
-    await expect(filterToolsForMode("unknown" as any, allTools)).rejects.toThrow(
-      "Unknown agent mode: unknown",
-    );
+    await expect(
+      filterToolsForMode("unknown" as any, allTools),
+    ).rejects.toThrow("Unknown agent mode: unknown");
   });
 });
 
@@ -295,13 +295,17 @@ describe("isToolAllowedForMode", () => {
   it("should return true for allowed tool in assistant mode", async () => {
     expect(await isToolAllowedForMode("assistant", "create_node")).toBe(true);
     expect(await isToolAllowedForMode("assistant", "delete_node")).toBe(true);
-    expect(await isToolAllowedForMode("assistant", "search_semantic")).toBe(true);
+    expect(await isToolAllowedForMode("assistant", "search_semantic")).toBe(
+      true,
+    );
   });
 
   it("should return false for disallowed tool in planner mode", async () => {
     expect(await isToolAllowedForMode("planner", "delete_node")).toBe(false);
     expect(await isToolAllowedForMode("planner", "update_node")).toBe(false);
-    expect(await isToolAllowedForMode("planner", "search_semantic")).toBe(false);
+    expect(await isToolAllowedForMode("planner", "search_semantic")).toBe(
+      false,
+    );
   });
 
   it("should return true for allowed tool in planner mode", async () => {
@@ -311,10 +315,14 @@ describe("isToolAllowedForMode", () => {
   });
 
   it("should return false for unknown mode", async () => {
-    expect(await isToolAllowedForMode("unknown" as any, "create_node")).toBe(false);
+    expect(await isToolAllowedForMode("unknown" as any, "create_node")).toBe(
+      false,
+    );
   });
 
   it("should return false for nonexistent tool", async () => {
-    expect(await isToolAllowedForMode("assistant", "nonexistent_tool")).toBe(false);
+    expect(await isToolAllowedForMode("assistant", "nonexistent_tool")).toBe(
+      false,
+    );
   });
 });

@@ -227,7 +227,12 @@ function hasMatchingDescendants(
   );
 
   return children.some((child) =>
-    hasMatchingDescendants(child.id, allNodes, filterNodeIds, attributionFilter),
+    hasMatchingDescendants(
+      child.id,
+      allNodes,
+      filterNodeIds,
+      attributionFilter,
+    ),
   );
 }
 
@@ -272,7 +277,9 @@ function ChildrenList({
   const descendantsQuery = trpc.nodes.getDescendants.useQuery(
     { nodeId: parentId },
     {
-      enabled: filterNodeIds != null || (attributionFilter != null && attributionFilter !== "all"),
+      enabled:
+        filterNodeIds != null ||
+        (attributionFilter != null && attributionFilter !== "all"),
       refetchOnWindowFocus: false,
       staleTime: 30_000,
     },
@@ -323,8 +330,17 @@ function ChildrenList({
     const isContainer = containerTypes.has(child.type);
 
     // If filtering is active, check if container has any matching descendants
-    if (isContainer && (filterNodeIds != null || (attributionFilter && attributionFilter !== "all"))) {
-      return hasMatchingDescendants(child.id, allNodesMap, filterNodeIds, attributionFilter);
+    if (
+      isContainer &&
+      (filterNodeIds != null ||
+        (attributionFilter && attributionFilter !== "all"))
+    ) {
+      return hasMatchingDescendants(
+        child.id,
+        allNodesMap,
+        filterNodeIds,
+        attributionFilter,
+      );
     }
 
     // Tag-based filter: for leaf nodes, only show if they're in the filter set

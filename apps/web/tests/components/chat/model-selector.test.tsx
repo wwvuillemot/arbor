@@ -73,9 +73,7 @@ function renderWithProviders(ui: React.ReactElement) {
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>
-      {ui}
-    </QueryClientProvider>,
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
   );
 }
 
@@ -103,7 +101,9 @@ describe("ModelSelector", () => {
     } as any);
 
     renderWithProviders(<ModelSelector value={null} onChange={mockOnChange} />);
-    expect(screen.getByTestId("model-selector-button")).toHaveTextContent("Default");
+    expect(screen.getByTestId("model-selector-button")).toHaveTextContent(
+      "Default",
+    );
   });
 
   it("should render with specific model selected", () => {
@@ -112,8 +112,12 @@ describe("ModelSelector", () => {
       isLoading: false,
     } as any);
 
-    renderWithProviders(<ModelSelector value="gpt-4o" onChange={mockOnChange} />);
-    expect(screen.getByTestId("model-selector-button")).toHaveTextContent("GPT-4o");
+    renderWithProviders(
+      <ModelSelector value="gpt-4o" onChange={mockOnChange} />,
+    );
+    expect(screen.getByTestId("model-selector-button")).toHaveTextContent(
+      "GPT-4o",
+    );
   });
 
   it("should open dropdown when button is clicked", () => {
@@ -177,7 +181,9 @@ describe("ModelSelector", () => {
       isLoading: false,
     } as any);
 
-    renderWithProviders(<ModelSelector value="gpt-4o" onChange={mockOnChange} />);
+    renderWithProviders(
+      <ModelSelector value="gpt-4o" onChange={mockOnChange} />,
+    );
 
     const button = screen.getByTestId("model-selector-button");
     fireEvent.click(button);
@@ -223,7 +229,9 @@ describe("ModelSelector", () => {
     fireEvent.mouseDown(document.body);
 
     await waitFor(() => {
-      expect(screen.queryByTestId("model-selector-dropdown")).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId("model-selector-dropdown"),
+      ).not.toBeInTheDocument();
     });
   });
 });

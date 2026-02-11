@@ -25,7 +25,11 @@ export interface ModelSelectorProps {
   className?: string;
 }
 
-export function ModelSelector({ value, onChange, className }: ModelSelectorProps) {
+export function ModelSelector({
+  value,
+  onChange,
+  className,
+}: ModelSelectorProps) {
   const t = useTranslations("chat");
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -35,14 +39,18 @@ export function ModelSelector({ value, onChange, className }: ModelSelectorProps
   // Close dropdown when clicking outside
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
 
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen]);
 
@@ -158,7 +166,9 @@ export function ModelSelector({ value, onChange, className }: ModelSelectorProps
                         {formatContextWindow(model.contextWindow)}
                       </span>
                     </div>
-                    {(model.supportsReasoning || model.supportsVision || model.supportsTools) && (
+                    {(model.supportsReasoning ||
+                      model.supportsVision ||
+                      model.supportsTools) && (
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         {model.supportsReasoning && <span>🧠 Reasoning</span>}
                         {model.supportsVision && <span>👁️ Vision</span>}

@@ -22,4 +22,3 @@ export const llmRouter = router({
     return await llmService.getAllModels();
   }),
 });
-

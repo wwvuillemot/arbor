@@ -23,7 +23,10 @@ export interface ChatPanelProps {
  * - Main area: Message history (scrollable, auto-scroll to bottom)
  * - Bottom: Input box with send button and mode selector
  */
-export function ChatPanel({ className, showThreadSidebar = true }: ChatPanelProps) {
+export function ChatPanel({
+  className,
+  showThreadSidebar = true,
+}: ChatPanelProps) {
   const t = useTranslations("chat");
 
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
@@ -245,10 +248,7 @@ export function ChatPanel({ className, showThreadSidebar = true }: ChatPanelProp
             </select>
 
             {/* Model selector */}
-            <ModelSelector
-              value={selectedModel}
-              onChange={setSelectedModel}
-            />
+            <ModelSelector value={selectedModel} onChange={setSelectedModel} />
           </div>
 
           {/* Text input */}

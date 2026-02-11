@@ -10,7 +10,9 @@ vi.mock("next-intl", () => ({
 
 // Mock AgentModeManager component
 vi.mock("@/components/agent-mode-manager", () => ({
-  AgentModeManager: () => <div data-testid="agent-mode-manager">Agent Mode Manager</div>,
+  AgentModeManager: () => (
+    <div data-testid="agent-mode-manager">Agent Mode Manager</div>
+  ),
 }));
 
 describe("AgentModesPage", () => {
@@ -27,4 +29,3 @@ describe("AgentModesPage", () => {
     expect(screen.getByTestId("agent-mode-manager")).toBeInTheDocument();
   });
 });
-

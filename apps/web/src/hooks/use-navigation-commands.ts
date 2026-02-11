@@ -3,12 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations, useMessages } from "next-intl";
-import {
-  Search,
-  LayoutDashboard,
-  FolderTree,
-  Settings,
-} from "lucide-react";
+import { Search, LayoutDashboard, FolderTree, Settings } from "lucide-react";
 import { commandRegistry } from "@/lib/command-registry";
 
 export function useNavigationCommands() {

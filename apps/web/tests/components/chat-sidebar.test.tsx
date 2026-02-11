@@ -106,7 +106,9 @@ describe("ChatSidebar", () => {
   });
 
   it("should always render (open or closed)", () => {
-    const { rerender } = render(<ChatSidebar isOpen={true} onToggle={mockOnToggle} />);
+    const { rerender } = render(
+      <ChatSidebar isOpen={true} onToggle={mockOnToggle} />,
+    );
     expect(screen.getByTestId("chat-sidebar")).toBeInTheDocument();
 
     rerender(<ChatSidebar isOpen={false} onToggle={mockOnToggle} />);

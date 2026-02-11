@@ -23,10 +23,18 @@ export interface AgentModeConfig {
 export function AgentModeManager() {
   const t = useTranslations("settings.agentModes");
   const [dialogOpen, setDialogOpen] = React.useState(false);
-  const [editingMode, setEditingMode] = React.useState<AgentModeConfig | null>(null);
-  const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
+  const [editingMode, setEditingMode] = React.useState<AgentModeConfig | null>(
+    null,
+  );
+  const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(
+    null,
+  );
 
-  const { data: modes, isLoading, refetch } = trpc.chat.listAgentModes.useQuery();
+  const {
+    data: modes,
+    isLoading,
+    refetch,
+  } = trpc.chat.listAgentModes.useQuery();
   const deleteMutation = trpc.chat.deleteAgentMode.useMutation({
     onSuccess: () => {
       refetch();
@@ -100,7 +108,9 @@ export function AgentModeManager() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-semibold">{mode.displayName}</h3>
+                    <h3 className="text-lg font-semibold">
+                      {mode.displayName}
+                    </h3>
                     {mode.isBuiltIn && (
                       <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                         {t("builtIn")}
@@ -150,7 +160,9 @@ export function AgentModeManager() {
                     )}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                    {deleteConfirmId === mode.id ? t("confirmDelete") : t("delete")}
+                    {deleteConfirmId === mode.id
+                      ? t("confirmDelete")
+                      : t("delete")}
                   </button>
                 </div>
               )}
@@ -168,4 +180,3 @@ export function AgentModeManager() {
     </div>
   );
 }
-

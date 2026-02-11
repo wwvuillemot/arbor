@@ -75,8 +75,8 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
         });
       }
       onClose(true);
-    } catch (err: any) {
-      setError(err.message || t("errorSaving"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("errorSaving"));
     }
   };
 
@@ -105,7 +105,10 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form
+          onSubmit={handleSubmit}
+          className="flex-1 overflow-y-auto p-6 space-y-6"
+        >
           {/* Name (only for create) */}
           {!isEditing && (
             <div>
@@ -134,8 +137,12 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
           {/* Display Name */}
           <div>
-            <label htmlFor="displayName" className="block text-sm font-medium mb-2">
-              {t("form.displayName")} <span className="text-destructive">*</span>
+            <label
+              htmlFor="displayName"
+              className="block text-sm font-medium mb-2"
+            >
+              {t("form.displayName")}{" "}
+              <span className="text-destructive">*</span>
             </label>
             <input
               id="displayName"
@@ -155,8 +162,12 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
           {/* Description */}
           <div>
-            <label htmlFor="description" className="block text-sm font-medium mb-2">
-              {t("form.description")} <span className="text-destructive">*</span>
+            <label
+              htmlFor="description"
+              className="block text-sm font-medium mb-2"
+            >
+              {t("form.description")}{" "}
+              <span className="text-destructive">*</span>
             </label>
             <textarea
               id="description"
@@ -175,7 +186,10 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
           {/* Guidelines */}
           <div>
-            <label htmlFor="guidelines" className="block text-sm font-medium mb-2">
+            <label
+              htmlFor="guidelines"
+              className="block text-sm font-medium mb-2"
+            >
               {t("form.guidelines")} <span className="text-destructive">*</span>
             </label>
             <textarea
@@ -198,8 +212,12 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
           {/* Temperature */}
           <div>
-            <label htmlFor="temperature" className="block text-sm font-medium mb-2">
-              {t("form.temperature")} <span className="text-destructive">*</span>
+            <label
+              htmlFor="temperature"
+              className="block text-sm font-medium mb-2"
+            >
+              {t("form.temperature")}{" "}
+              <span className="text-destructive">*</span>
             </label>
             <div className="flex items-center gap-4">
               <input
@@ -223,7 +241,10 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
           {/* Allowed Tools */}
           <div>
-            <label htmlFor="allowedTools" className="block text-sm font-medium mb-2">
+            <label
+              htmlFor="allowedTools"
+              className="block text-sm font-medium mb-2"
+            >
               {t("form.allowedTools")}
             </label>
             <textarea
@@ -291,4 +312,3 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
     </div>
   );
 }
-

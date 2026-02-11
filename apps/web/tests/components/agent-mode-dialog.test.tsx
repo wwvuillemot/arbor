@@ -65,7 +65,9 @@ describe("AgentModeDialog", () => {
   });
 
   it("should render edit form when mode is provided", () => {
-    render(<AgentModeDialog open={true} mode={mockMode} onClose={mockOnClose} />);
+    render(
+      <AgentModeDialog open={true} mode={mockMode} onClose={mockOnClose} />,
+    );
 
     expect(screen.getByText("editMode")).toBeInTheDocument();
     expect(screen.queryByLabelText(/form\.name/)).not.toBeInTheDocument(); // Name field hidden in edit mode
@@ -75,12 +77,16 @@ describe("AgentModeDialog", () => {
   });
 
   it("should populate form fields with mode data in edit mode", () => {
-    render(<AgentModeDialog open={true} mode={mockMode} onClose={mockOnClose} />);
+    render(
+      <AgentModeDialog open={true} mode={mockMode} onClose={mockOnClose} />,
+    );
 
     expect(screen.getByDisplayValue("Custom Mode")).toBeInTheDocument();
     expect(screen.getByDisplayValue("A custom mode")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Custom guidelines")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("create_node, update_node")).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue("create_node, update_node"),
+    ).toBeInTheDocument();
   });
 
   it("should call createMutation when creating new mode", async () => {
@@ -122,7 +128,9 @@ describe("AgentModeDialog", () => {
   it("should call updateMutation when editing existing mode", async () => {
     mockUpdateMutation.mockResolvedValue({});
 
-    render(<AgentModeDialog open={true} mode={mockMode} onClose={mockOnClose} />);
+    render(
+      <AgentModeDialog open={true} mode={mockMode} onClose={mockOnClose} />,
+    );
 
     // Change display name
     const displayNameInput = screen.getByDisplayValue("Custom Mode");
@@ -184,4 +192,3 @@ describe("AgentModeDialog", () => {
     });
   });
 });
-
