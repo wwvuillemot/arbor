@@ -9,6 +9,42 @@ vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
 }));
 
+// Mock MarkdownEditor component (uses TipTap which doesn't work well in jsdom)
+vi.mock("@/components/markdown-editor", () => ({
+  MarkdownEditor: ({ value, onChange, placeholder }: any) => (
+    <textarea
+      data-testid="markdown-editor"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+    />
+  ),
+}));
+
+// Mock ToolSelector component (simplify for testing)
+vi.mock("@/components/tool-selector", () => ({
+  ToolSelector: ({ value, onChange }: any) => (
+    <div data-testid="tool-selector">
+      {["create_node", "update_node", "delete_node"].map((tool) => (
+        <label key={tool}>
+          {tool}
+          <input
+            type="checkbox"
+            checked={value.includes(tool)}
+            onChange={(e) => {
+              if (e.target.checked) {
+                onChange([...value, tool]);
+              } else {
+                onChange(value.filter((t: string) => t !== tool));
+              }
+            }}
+          />
+        </label>
+      ))}
+    </div>
+  ),
+}));
+
 describe("AgentModeDialog", () => {
   const mockOnClose = vi.fn();
   const mockCreateMutation = vi.fn();
@@ -60,7 +96,8 @@ describe("AgentModeDialog", () => {
     expect(screen.getByLabelText(/form\.name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/form\.displayName/)).toBeInTheDocument();
     expect(screen.getByLabelText(/form\.description/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/form\.guidelines/)).toBeInTheDocument();
+    // Guidelines now uses TipTap editor (mocked as textarea with testid)
+    expect(screen.getByTestId("markdown-editor")).toBeInTheDocument();
     expect(screen.getByLabelText(/form\.temperature/)).toBeInTheDocument();
   });
 
@@ -84,9 +121,9 @@ describe("AgentModeDialog", () => {
     expect(screen.getByDisplayValue("Custom Mode")).toBeInTheDocument();
     expect(screen.getByDisplayValue("A custom mode")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Custom guidelines")).toBeInTheDocument();
-    expect(
-      screen.getByDisplayValue("create_node, update_node"),
-    ).toBeInTheDocument();
+    // Tools are now checkboxes, not a comma-separated text input
+    expect(screen.getByLabelText(/create_node/)).toBeChecked();
+    expect(screen.getByLabelText(/update_node/)).toBeChecked();
   });
 
   it("should call createMutation when creating new mode", async () => {
@@ -104,7 +141,7 @@ describe("AgentModeDialog", () => {
     fireEvent.change(screen.getByLabelText(/form\.description/), {
       target: { value: "New description" },
     });
-    fireEvent.change(screen.getByLabelText(/form\.guidelines/), {
+    fireEvent.change(screen.getByTestId("markdown-editor"), {
       target: { value: "New guidelines" },
     });
 
@@ -179,7 +216,7 @@ describe("AgentModeDialog", () => {
     fireEvent.change(screen.getByLabelText(/form\.description/), {
       target: { value: "Description" },
     });
-    fireEvent.change(screen.getByLabelText(/form\.guidelines/), {
+    fireEvent.change(screen.getByTestId("markdown-editor"), {
       target: { value: "Guidelines" },
     });
 

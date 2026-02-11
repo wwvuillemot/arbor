@@ -1,134 +1,204 @@
 "use client";
 
 import * as React from "react";
-import { Eye, Edit3 } from "lucide-react";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Placeholder from "@tiptap/extension-placeholder";
 import { cn } from "@/lib/utils";
+import {
+  Bold,
+  Italic,
+  Code,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  Quote,
+} from "lucide-react";
 
 export interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  rows?: number;
   required?: boolean;
   className?: string;
+  minHeight?: string;
 }
 
 /**
- * Simple markdown editor with preview mode
- * Uses basic markdown rendering for preview
+ * Reusable TipTap-based markdown editor with live formatting
+ * - Shows formatted content as you type
+ * - Persists as markdown text on the backend
+ * - Includes toolbar for formatting
  */
 export function MarkdownEditor({
   value,
   onChange,
-  placeholder,
-  rows = 6,
+  placeholder = "Start typing...",
   required = false,
   className,
+  minHeight = "200px",
 }: MarkdownEditorProps) {
-  const [mode, setMode] = React.useState<"edit" | "preview">("edit");
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions: [
+      StarterKit.configure({
+        // Enable markdown shortcuts
+        heading: {
+          levels: [1, 2, 3],
+        },
+      }),
+      Placeholder.configure({
+        placeholder,
+      }),
+    ],
+    content: value,
+    editorProps: {
+      attributes: {
+        class: cn(
+          "prose prose-sm max-w-none focus:outline-none",
+          "px-3 py-2",
+        ),
+        style: `min-height: ${minHeight}`,
+      },
+    },
+    onUpdate: ({ editor: currentEditor }) => {
+      // Get plain text from editor (markdown format)
+      const markdown = currentEditor.getText();
+      onChange(markdown);
+    },
+  });
 
-  // Simple markdown to HTML conversion (basic support)
-  const renderMarkdown = (text: string): string => {
-    let html = text;
+  // Sync content when value changes externally
+  React.useEffect(() => {
+    if (editor && value !== editor.getText()) {
+      editor.commands.setContent(value);
+    }
+  }, [editor, value]);
 
-    // Headers
-    html = html.replace(/^### (.*$)/gim, "<h3 class='text-base font-semibold mt-3 mb-2'>$1</h3>");
-    html = html.replace(/^## (.*$)/gim, "<h2 class='text-lg font-semibold mt-4 mb-2'>$1</h2>");
-    html = html.replace(/^# (.*$)/gim, "<h1 class='text-xl font-bold mt-4 mb-3'>$1</h1>");
+  if (!editor) {
+    return null;
+  }
 
-    // Bold
-    html = html.replace(/\*\*(.*?)\*\*/g, "<strong class='font-semibold'>$1</strong>");
-    html = html.replace(/__(.*?)__/g, "<strong class='font-semibold'>$1</strong>");
+  const ToolbarButton = ({
+    onClick,
+    isActive,
+    title,
+    children,
+  }: {
+    onClick: () => void;
+    isActive?: boolean;
+    title: string;
+    children: React.ReactNode;
+  }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={cn(
+        "p-1.5 rounded transition-colors",
+        isActive
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  );
 
-    // Italic
-    html = html.replace(/\*(.*?)\*/g, "<em class='italic'>$1</em>");
-    html = html.replace(/_(.*?)_/g, "<em class='italic'>$1</em>");
-
-    // Code inline
-    html = html.replace(/`(.*?)`/g, "<code class='bg-muted px-1 py-0.5 rounded text-sm font-mono'>$1</code>");
-
-    // Lists
-    html = html.replace(/^\* (.*$)/gim, "<li class='ml-4'>• $1</li>");
-    html = html.replace(/^- (.*$)/gim, "<li class='ml-4'>• $1</li>");
-
-    // Line breaks
-    html = html.replace(/\n/g, "<br />");
-
-    return html;
-  };
+  const iconSize = 16;
 
   return (
-    <div className={cn("space-y-2", className)}>
-      {/* Mode Toggle */}
-      <div className="flex items-center gap-2 border-b border-border pb-2">
-        <button
-          type="button"
-          onClick={() => setMode("edit")}
-          className={cn(
-            "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-            mode === "edit"
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted",
-          )}
+    <div className={cn("border border-input rounded-md overflow-hidden bg-background", className)}>
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 p-2 border-b bg-muted/30 flex-wrap">
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          isActive={editor.isActive("heading", { level: 1 })}
+          title="Heading 1"
         >
-          <Edit3 className="w-3.5 h-3.5" />
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode("preview")}
-          className={cn(
-            "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-            mode === "preview"
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted",
-          )}
+          <Heading1 size={iconSize} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          isActive={editor.isActive("heading", { level: 2 })}
+          title="Heading 2"
         >
-          <Eye className="w-3.5 h-3.5" />
-          Preview
-        </button>
+          <Heading2 size={iconSize} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          isActive={editor.isActive("heading", { level: 3 })}
+          title="Heading 3"
+        >
+          <Heading3 size={iconSize} />
+        </ToolbarButton>
+
+        <div className="w-px h-6 bg-border mx-1" />
+
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          isActive={editor.isActive("bold")}
+          title="Bold (Ctrl+B)"
+        >
+          <Bold size={iconSize} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          isActive={editor.isActive("italic")}
+          title="Italic (Ctrl+I)"
+        >
+          <Italic size={iconSize} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleCode().run()}
+          isActive={editor.isActive("code")}
+          title="Inline Code"
+        >
+          <Code size={iconSize} />
+        </ToolbarButton>
+
+        <div className="w-px h-6 bg-border mx-1" />
+
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleBulletList().run()}
+          isActive={editor.isActive("bulletList")}
+          title="Bullet List"
+        >
+          <List size={iconSize} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleOrderedList().run()}
+          isActive={editor.isActive("orderedList")}
+          title="Numbered List"
+        >
+          <ListOrdered size={iconSize} />
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
+          isActive={editor.isActive("blockquote")}
+          title="Blockquote"
+        >
+          <Quote size={iconSize} />
+        </ToolbarButton>
       </div>
 
-      {/* Editor / Preview */}
-      {mode === "edit" ? (
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          required={required}
-          rows={rows}
-          className={cn(
-            "w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            "placeholder:text-muted-foreground resize-none",
-          )}
-        />
-      ) : (
-        <div
-          className={cn(
-            "w-full rounded-md border border-input bg-muted/30 px-3 py-2 text-sm min-h-[150px]",
-            "prose prose-sm max-w-none",
-          )}
-          dangerouslySetInnerHTML={{
-            __html: value ? renderMarkdown(value) : "<span class='text-muted-foreground italic'>No content to preview</span>",
-          }}
-        />
-      )}
+      {/* Editor Content */}
+      <EditorContent editor={editor} className="markdown-editor-content" />
 
       {/* Markdown Hints */}
-      {mode === "edit" && (
-        <div className="text-xs text-muted-foreground space-y-1">
-          <div className="font-medium">Markdown formatting:</div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-            <div><code className="bg-muted px-1 rounded"># Heading</code> - Large heading</div>
-            <div><code className="bg-muted px-1 rounded">**bold**</code> - Bold text</div>
-            <div><code className="bg-muted px-1 rounded">## Heading</code> - Medium heading</div>
-            <div><code className="bg-muted px-1 rounded">*italic*</code> - Italic text</div>
-            <div><code className="bg-muted px-1 rounded">- item</code> - List item</div>
-            <div><code className="bg-muted px-1 rounded">`code`</code> - Inline code</div>
-          </div>
+      <div className="text-xs text-muted-foreground px-3 py-2 border-t bg-muted/10">
+        <div className="font-medium mb-1">Markdown shortcuts:</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+          <div><code className="bg-muted px-1 rounded"># Space</code> - Heading 1</div>
+          <div><code className="bg-muted px-1 rounded">**text**</code> - Bold</div>
+          <div><code className="bg-muted px-1 rounded">## Space</code> - Heading 2</div>
+          <div><code className="bg-muted px-1 rounded">*text*</code> - Italic</div>
+          <div><code className="bg-muted px-1 rounded">- Space</code> - Bullet list</div>
+          <div><code className="bg-muted px-1 rounded">`code`</code> - Inline code</div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

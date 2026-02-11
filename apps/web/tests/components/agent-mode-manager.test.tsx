@@ -110,13 +110,15 @@ describe("AgentModeManager", () => {
     expect(builtInBadges).toHaveLength(1);
   });
 
-  it("should show edit and delete buttons only for custom modes", () => {
+  it("should show edit buttons for all modes, delete only for custom modes", () => {
     render(<AgentModeManager />);
 
     const editButtons = screen.getAllByText("edit");
     const deleteButtons = screen.getAllByText("delete");
 
-    expect(editButtons).toHaveLength(1);
+    // Both built-in and custom modes can be edited now
+    expect(editButtons).toHaveLength(2);
+    // Only custom modes can be deleted
     expect(deleteButtons).toHaveLength(1);
   });
 
@@ -132,8 +134,9 @@ describe("AgentModeManager", () => {
   it("should open edit dialog when edit button is clicked", () => {
     render(<AgentModeManager />);
 
-    const editButton = screen.getByText("edit");
-    fireEvent.click(editButton);
+    const editButtons = screen.getAllByText("edit");
+    // Click the first edit button (built-in mode)
+    fireEvent.click(editButtons[0]);
 
     expect(screen.getByTestId("agent-mode-dialog")).toBeInTheDocument();
   });
