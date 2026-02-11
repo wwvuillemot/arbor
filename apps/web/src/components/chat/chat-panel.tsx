@@ -152,6 +152,7 @@ export function ChatPanel({
     // If no thread is selected, create one first and save the message as pending
     if (!selectedThreadId) {
       setPendingMessage(inputValue.trim());
+      setInputValue(""); // Clear input immediately
       createThread.mutate({
         name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
         agentMode: agentMode as "assistant" | "planner" | "editor" | "researcher",

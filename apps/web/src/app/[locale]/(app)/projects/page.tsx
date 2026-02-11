@@ -104,10 +104,26 @@ export default function ProjectsPage() {
     React.useState<AttributionFilter>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
 
-  // Chat sidebar state - check for ?chat=open query parameter
-  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(
-    searchParams?.get("chat") === "open",
-  );
+  // Chat sidebar state - persisted in localStorage
+  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(() => {
+    // Check query parameter first
+    if (searchParams?.get("chat") === "open") {
+      return true;
+    }
+    // Then check localStorage
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("chatSidebarOpen");
+      return saved === "true";
+    }
+    return false;
+  });
+
+  // Persist to localStorage when state changes
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("chatSidebarOpen", String(chatSidebarOpen));
+    }
+  }, [chatSidebarOpen]);
 
   const handleFilterChange = React.useCallback(
     (tagIds: string[], operator: "AND" | "OR") => {
