@@ -106,16 +106,37 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = React.useState("");
 
   // Chat sidebar state - persisted as app preference
-  const { getPreference, setPreference } = useAppPreferences();
-  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(
-    // Check query parameter first, then preference, default to false
-    searchParams?.get("chat") === "open" || (getPreference("chatSidebarOpen", false) as boolean),
-  );
+  const { getPreference, setPreference, isLoading: preferencesLoading } = useAppPreferences();
 
-  // Persist chat sidebar state when it changes
+  // Extract query param value once using useMemo to prevent re-renders
+  const chatQueryParam = React.useMemo(() => {
+    return searchParams?.get("chat") === "open";
+  }, [searchParams]);
+
+  const [chatSidebarOpen, setChatSidebarOpen] = React.useState(() => {
+    // Initialize from query param if present, otherwise will be set from preference
+    return chatQueryParam;
+  });
+  const [hasInitializedFromPreference, setHasInitializedFromPreference] = React.useState(false);
+
+  // Initialize from preference once loaded (only if no query param)
   React.useEffect(() => {
-    setPreference("chatSidebarOpen", chatSidebarOpen);
-  }, [chatSidebarOpen, setPreference]);
+    if (!preferencesLoading && !hasInitializedFromPreference && !chatQueryParam) {
+      const savedPreference = getPreference("chatSidebarOpen", false) as boolean;
+      setChatSidebarOpen(savedPreference);
+      setHasInitializedFromPreference(true);
+    } else if (!preferencesLoading && !hasInitializedFromPreference && chatQueryParam) {
+      // If query param is present, just mark as initialized
+      setHasInitializedFromPreference(true);
+    }
+  }, [preferencesLoading, hasInitializedFromPreference, chatQueryParam, getPreference]);
+
+  // Persist chat sidebar state when it changes (but only after initial load)
+  React.useEffect(() => {
+    if (hasInitializedFromPreference) {
+      setPreference("chatSidebarOpen", chatSidebarOpen);
+    }
+  }, [chatSidebarOpen, setPreference, hasInitializedFromPreference]);
 
   const handleFilterChange = React.useCallback(
     (tagIds: string[], operator: "AND" | "OR") => {
