@@ -38,6 +38,42 @@ export function ChatPanel({
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
+  // Get master key for API key decryption
+  const [masterKey, setMasterKey] = React.useState<string | null>(null);
+
+  // Get master key on mount
+  React.useEffect(() => {
+    async function getMasterKey() {
+      try {
+        if (typeof window !== "undefined" && "__TAURI__" in window) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const tauri = (window as any).__TAURI__;
+            if (tauri && tauri.core && tauri.core.invoke) {
+              const key = (await tauri.core.invoke(
+                "get_or_generate_master_key",
+              )) as string;
+              setMasterKey(key);
+            } else {
+              throw new Error("Tauri invoke not available");
+            }
+          } catch (importError) {
+            console.warn("Tauri API not available:", importError);
+            setMasterKey("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=");
+          }
+        } else {
+          // Development mode: use a test key
+          console.warn("Not in Tauri environment, using test master key");
+          setMasterKey("YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=");
+        }
+      } catch (error) {
+        console.error("Failed to get master key:", error);
+      }
+    }
+
+    getMasterKey();
+  }, []);
+
   // ─── Queries ─────────────────────────────────────────────────────────
   const threadsQuery = trpc.chat.listThreads.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -63,7 +99,7 @@ export function ChatPanel({
     },
   });
 
-  const addMessage = trpc.chat.addMessage.useMutation({
+  const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: () => {
       messagesQuery.refetch();
       setInputValue("");
@@ -97,13 +133,13 @@ export function ChatPanel({
   );
 
   const handleSend = React.useCallback(() => {
-    if (!inputValue.trim() || !selectedThreadId) return;
-    addMessage.mutate({
+    if (!inputValue.trim() || !selectedThreadId || !masterKey) return;
+    sendMessage.mutate({
       threadId: selectedThreadId,
-      role: "user",
       content: inputValue.trim(),
+      masterKey,
     });
-  }, [inputValue, selectedThreadId, addMessage]);
+  }, [inputValue, selectedThreadId, masterKey, sendMessage]);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
@@ -268,7 +304,10 @@ export function ChatPanel({
             data-testid="send-btn"
             onClick={handleSend}
             disabled={
-              !inputValue.trim() || !selectedThreadId || addMessage.isPending
+              !inputValue.trim() ||
+              !selectedThreadId ||
+              !masterKey ||
+              sendMessage.isPending
             }
             className="p-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title={t("send")}

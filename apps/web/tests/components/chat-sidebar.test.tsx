@@ -48,6 +48,12 @@ vi.mock("@/lib/trpc", () => ({
           isPending: false,
         })),
       },
+      sendMessage: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+        })),
+      },
     },
     llm: {
       listAvailableModels: {

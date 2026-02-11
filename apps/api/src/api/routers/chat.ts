@@ -11,8 +11,66 @@ import {
   deleteAgentMode,
   listCustomAgentModes,
 } from "../../services/agent-mode-service";
+import {
+  LLMService,
+  LocalLLMProvider,
+  OpenAIProvider,
+  AnthropicProvider,
+  type ChatMessage as LLMChatMessage,
+} from "../../services/llm-service";
+import { SettingsService } from "../../services/settings-service";
 
 const chatService = new ChatService();
+const settingsService = new SettingsService();
+
+/**
+ * Initialize LLM service with configured providers
+ * Uses API keys from settings if available, otherwise uses stub mode
+ */
+async function initializeLLMService(masterKey: string): Promise<LLMService> {
+  // Start with local provider (always available, can be stub mode)
+  const localProvider = new LocalLLMProvider(
+    "http://localhost:11434/v1",
+    "llama3.2",
+    true, // stub mode by default
+  );
+  const llmService = new LLMService(localProvider);
+
+  try {
+    // Try to get OpenAI API key
+    const openaiKey = await settingsService.getSetting(
+      "openai_api_key",
+      masterKey,
+    );
+    if (openaiKey && openaiKey.trim() !== "") {
+      const openaiProvider = new OpenAIProvider(openaiKey);
+      llmService.registerProvider(openaiProvider);
+      llmService.setActiveProvider("openai"); // Prefer OpenAI if available
+    }
+  } catch (err) {
+    console.warn("Failed to initialize OpenAI provider:", err);
+  }
+
+  try {
+    // Try to get Anthropic API key
+    const anthropicKey = await settingsService.getSetting(
+      "anthropic_api_key",
+      masterKey,
+    );
+    if (anthropicKey && anthropicKey.trim() !== "") {
+      const anthropicProvider = new AnthropicProvider(anthropicKey);
+      llmService.registerProvider(anthropicProvider);
+      // If OpenAI wasn't available, use Anthropic
+      if (llmService.getActiveProvider().name === "local") {
+        llmService.setActiveProvider("anthropic");
+      }
+    }
+  } catch (err) {
+    console.warn("Failed to initialize Anthropic provider:", err);
+  }
+
+  return llmService;
+}
 
 /**
  * Chat Router
@@ -143,6 +201,84 @@ export const chatRouter = router({
     .input(z.object({ threadId: z.string().uuid() }))
     .query(async ({ input }) => {
       return await chatService.countMessages(input.threadId);
+    }),
+
+  /**
+   * Send a message and get LLM response
+   * This is the main endpoint for chat interaction
+   */
+  sendMessage: publicProcedure
+    .input(
+      z.object({
+        threadId: z.string().uuid(),
+        content: z.string().min(1),
+        masterKey: z.string(), // Required for decrypting API keys
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { threadId, content, masterKey } = input;
+
+      // Get the thread to determine agent mode and model preference
+      const thread = await chatService.getThreadById(threadId);
+      if (!thread) {
+        throw new Error("Thread not found");
+      }
+
+      // Get conversation history
+      const history = await chatService.getMessages(threadId);
+
+      // Build system prompt based on agent mode
+      const systemPrompt = buildSystemPrompt(thread.agentMode);
+
+      // Convert database messages to LLM format
+      const llmMessages: LLMChatMessage[] = history.map((msg) => ({
+        role: msg.role as "user" | "assistant" | "system" | "tool",
+        content: msg.content,
+        toolCalls: msg.toolCalls as any,
+      }));
+
+      // Add the new user message
+      llmMessages.push({
+        role: "user",
+        content,
+      });
+
+      // Initialize LLM service with API keys
+      const llmService = await initializeLLMService(masterKey);
+
+      // Call the LLM
+      const response = await llmService.chat(llmMessages, {
+        model: thread.model ?? undefined,
+        systemPrompt,
+      });
+
+      // Store the user message
+      const userMessage = await chatService.addMessage({
+        threadId,
+        role: "user",
+        content,
+      });
+
+      // Store the assistant response
+      const assistantMessage = await chatService.addMessage({
+        threadId,
+        role: "assistant",
+        content: response.content,
+        model: response.model,
+        tokensUsed: response.tokensUsed,
+        toolCalls: response.toolCalls,
+        metadata: {
+          finishReason: response.finishReason,
+          reasoning: response.reasoning,
+          reasoningTokens: response.reasoningTokens,
+          outputTokens: response.outputTokens,
+        },
+      });
+
+      return {
+        userMessage,
+        assistantMessage,
+      };
     }),
 
   /**

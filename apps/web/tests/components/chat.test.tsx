@@ -28,6 +28,7 @@ vi.mock("@/contexts/toast-context", () => ({
 const mockCreateThreadMutate = vi.fn();
 const mockDeleteThreadMutate = vi.fn();
 const mockAddMessageMutate = vi.fn();
+const mockSendMessageMutate = vi.fn();
 
 // Mock data
 const mockThreads = [
@@ -134,6 +135,15 @@ vi.mock("@/lib/trpc", () => {
         useMutation: vi.fn((opts: any) => ({
           mutate: (...args: any[]) => {
             mockAddMessageMutate(...args);
+            opts?.onSuccess?.();
+          },
+          isPending: false,
+        })),
+      },
+      sendMessage: {
+        useMutation: vi.fn((opts: any) => ({
+          mutate: (...args: any[]) => {
+            mockSendMessageMutate(...args);
             opts?.onSuccess?.();
           },
           isPending: false,
@@ -495,11 +505,11 @@ describe("ChatPanel", () => {
     fireEvent.change(input, { target: { value: "Hello AI!" } });
     // Click send
     fireEvent.click(screen.getByTestId("send-btn"));
-    expect(mockAddMessageMutate).toHaveBeenCalledTimes(1);
-    expect(mockAddMessageMutate).toHaveBeenCalledWith({
+    expect(mockSendMessageMutate).toHaveBeenCalledTimes(1);
+    expect(mockSendMessageMutate).toHaveBeenCalledWith({
       threadId: "thread-1",
-      role: "user",
       content: "Hello AI!",
+      masterKey: "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=",
     });
   });
 
@@ -512,7 +522,7 @@ describe("ChatPanel", () => {
     const input = screen.getByTestId("chat-input");
     fireEvent.change(input, { target: { value: "Hello from Enter!" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(mockAddMessageMutate).toHaveBeenCalledTimes(1);
+    expect(mockSendMessageMutate).toHaveBeenCalledTimes(1);
   });
 
   it("should not send on Shift+Enter", () => {
@@ -522,7 +532,7 @@ describe("ChatPanel", () => {
     const input = screen.getByTestId("chat-input");
     fireEvent.change(input, { target: { value: "Hello!" } });
     fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
-    expect(mockAddMessageMutate).not.toHaveBeenCalled();
+    expect(mockSendMessageMutate).not.toHaveBeenCalled();
   });
 
   it("should not send empty messages", () => {
@@ -530,7 +540,7 @@ describe("ChatPanel", () => {
     const items = screen.getAllByTestId("thread-item");
     fireEvent.click(items[0]);
     fireEvent.click(screen.getByTestId("send-btn"));
-    expect(mockAddMessageMutate).not.toHaveBeenCalled();
+    expect(mockSendMessageMutate).not.toHaveBeenCalled();
   });
 
   it("should change agent mode via selector", () => {
