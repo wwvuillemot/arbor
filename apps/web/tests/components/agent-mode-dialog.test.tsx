@@ -93,12 +93,16 @@ describe("AgentModeDialog", () => {
     render(<AgentModeDialog open={true} mode={null} onClose={mockOnClose} />);
 
     expect(screen.getByText("createMode")).toBeInTheDocument();
+    // Overview tab is default
     expect(screen.getByLabelText(/form\.name/)).toBeInTheDocument();
     expect(screen.getByLabelText(/form\.displayName/)).toBeInTheDocument();
     expect(screen.getByLabelText(/form\.description/)).toBeInTheDocument();
     // Guidelines now uses TipTap editor (mocked as textarea with testid)
-    expect(screen.getByTestId("markdown-editor")).toBeInTheDocument();
     expect(screen.getByLabelText(/form\.temperature/)).toBeInTheDocument();
+
+    // Click Guidelines tab to see markdown editor
+    fireEvent.click(screen.getByRole("tab", { name: /Guidelines/i }));
+    expect(screen.getByTestId("markdown-editor")).toBeInTheDocument();
   });
 
   it("should render edit form when mode is provided", () => {
@@ -110,6 +114,9 @@ describe("AgentModeDialog", () => {
     expect(screen.queryByLabelText(/form\.name/)).not.toBeInTheDocument(); // Name field hidden in edit mode
     expect(screen.getByDisplayValue("Custom Mode")).toBeInTheDocument();
     expect(screen.getByDisplayValue("A custom mode")).toBeInTheDocument();
+
+    // Click Guidelines tab to see guidelines
+    fireEvent.click(screen.getByRole("tab", { name: /Guidelines/i }));
     expect(screen.getByDisplayValue("Custom guidelines")).toBeInTheDocument();
   });
 
@@ -120,8 +127,13 @@ describe("AgentModeDialog", () => {
 
     expect(screen.getByDisplayValue("Custom Mode")).toBeInTheDocument();
     expect(screen.getByDisplayValue("A custom mode")).toBeInTheDocument();
+
+    // Click Guidelines tab to see guidelines
+    fireEvent.click(screen.getByRole("tab", { name: /Guidelines/i }));
     expect(screen.getByDisplayValue("Custom guidelines")).toBeInTheDocument();
-    // Tools are now checkboxes, not a comma-separated text input
+
+    // Click Tools tab to see tool checkboxes
+    fireEvent.click(screen.getByRole("tab", { name: /Tools/i }));
     expect(screen.getByLabelText(/create_node/)).toBeChecked();
     expect(screen.getByLabelText(/update_node/)).toBeChecked();
   });
@@ -131,7 +143,7 @@ describe("AgentModeDialog", () => {
 
     render(<AgentModeDialog open={true} mode={null} onClose={mockOnClose} />);
 
-    // Fill in form
+    // Fill in Overview tab fields
     fireEvent.change(screen.getByLabelText(/form\.name/), {
       target: { value: "new-mode" },
     });
@@ -141,12 +153,15 @@ describe("AgentModeDialog", () => {
     fireEvent.change(screen.getByLabelText(/form\.description/), {
       target: { value: "New description" },
     });
+
+    // Click Guidelines tab and fill in guidelines
+    fireEvent.click(screen.getByRole("tab", { name: /Guidelines/i }));
     fireEvent.change(screen.getByTestId("markdown-editor"), {
       target: { value: "New guidelines" },
     });
 
-    // Submit form
-    const form = screen.getByLabelText(/form\.name/).closest("form");
+    // Submit form (find form element from the markdown editor)
+    const form = screen.getByTestId("markdown-editor").closest("form");
     fireEvent.submit(form!);
 
     await waitFor(() => {
@@ -206,7 +221,7 @@ describe("AgentModeDialog", () => {
 
     render(<AgentModeDialog open={true} mode={null} onClose={mockOnClose} />);
 
-    // Fill in required fields
+    // Fill in Overview tab fields
     fireEvent.change(screen.getByLabelText(/form\.name/), {
       target: { value: "new-mode" },
     });
@@ -216,12 +231,15 @@ describe("AgentModeDialog", () => {
     fireEvent.change(screen.getByLabelText(/form\.description/), {
       target: { value: "Description" },
     });
+
+    // Click Guidelines tab and fill in guidelines
+    fireEvent.click(screen.getByRole("tab", { name: /Guidelines/i }));
     fireEvent.change(screen.getByTestId("markdown-editor"), {
       target: { value: "Guidelines" },
     });
 
-    // Submit form
-    const form = screen.getByLabelText(/form\.name/).closest("form");
+    // Submit form (find form element from the markdown editor)
+    const form = screen.getByTestId("markdown-editor").closest("form");
     fireEvent.submit(form!);
 
     await waitFor(() => {
