@@ -28,13 +28,27 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const t = useTranslations("chat");
 
-  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
-    null,
-  );
+  // Persist selected thread ID in localStorage
+  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("arbor:selectedThreadId");
+    }
+    return null;
+  });
+
   const [inputValue, setInputValue] = React.useState("");
   const [agentMode, setAgentMode] = React.useState<string>("assistant");
   const [selectedModel, setSelectedModel] = React.useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = React.useState<string | null>(null);
+
+  // Save selected thread ID to localStorage whenever it changes
+  React.useEffect(() => {
+    if (selectedThreadId) {
+      localStorage.setItem("arbor:selectedThreadId", selectedThreadId);
+    } else {
+      localStorage.removeItem("arbor:selectedThreadId");
+    }
+  }, [selectedThreadId]);
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
@@ -77,6 +91,12 @@ export function ChatPanel({
     },
   });
 
+  const updateThread = trpc.chat.updateThread.useMutation({
+    onSuccess: () => {
+      threadsQuery.refetch();
+    },
+  });
+
   const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: (data) => {
       console.log("Message sent successfully:", data);
@@ -97,6 +117,33 @@ export function ChatPanel({
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messagesQuery.data]);
+
+  // ─── Sync model selector with current thread ────────────────────────
+  React.useEffect(() => {
+    if (selectedThreadId && threadsQuery.data) {
+      const currentThread = threadsQuery.data.find(
+        (t: { id: string; model?: string | null }) => t.id === selectedThreadId,
+      );
+      if (currentThread) {
+        setSelectedModel(currentThread.model ?? null);
+      }
+    }
+  }, [selectedThreadId, threadsQuery.data]);
+
+  // ─── Update thread model when changed ────────────────────────────────
+  const handleModelChange = React.useCallback(
+    (modelId: string | null) => {
+      setSelectedModel(modelId);
+      // If a thread is selected, update its model in the database
+      if (selectedThreadId) {
+        updateThread.mutate({
+          id: selectedThreadId,
+          model: modelId,
+        });
+      }
+    },
+    [selectedThreadId, updateThread],
+  );
 
   // ─── Auto-send after thread creation ─────────────────────────────────
   React.useEffect(() => {
@@ -316,7 +363,7 @@ export function ChatPanel({
             />
 
             {/* Model selector */}
-            <ModelSelector value={selectedModel} onChange={setSelectedModel} />
+            <ModelSelector value={selectedModel} onChange={handleModelChange} />
           </div>
         </div>
       </div>

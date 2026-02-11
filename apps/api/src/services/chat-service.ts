@@ -19,6 +19,7 @@ export interface CreateThreadParams {
 export interface UpdateThreadParams {
   name?: string;
   agentMode?: AgentMode;
+  model?: string | null;
 }
 
 export interface CreateMessageParams {
@@ -95,6 +96,7 @@ export class ChatService {
 
     if (params.name !== undefined) updates.name = params.name;
     if (params.agentMode !== undefined) updates.agentMode = params.agentMode;
+    if (params.model !== undefined) updates.model = params.model;
 
     const [thread] = await db
       .update(chatThreads)

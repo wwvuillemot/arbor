@@ -176,6 +176,7 @@ export const chatRouter = router({
         id: z.string().uuid(),
         name: z.string().min(1).max(255).optional(),
         agentMode: z.enum(agentModeEnum).optional(),
+        model: z.string().max(100).nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
