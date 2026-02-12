@@ -56,6 +56,7 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
   const t = useTranslations("chat");
   const [copied, setCopied] = React.useState(false);
   const [showReasoning, setShowReasoning] = React.useState(false);
+  const [expandedToolCalls, setExpandedToolCalls] = React.useState<Set<string>>(new Set());
 
   const RoleIcon = ROLE_ICONS[message.role] || User;
   const roleColor = ROLE_COLORS[message.role] || ROLE_COLORS.user;
@@ -93,6 +94,18 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
     if (Array.isArray(message.toolCalls)) return message.toolCalls;
     return [];
   }, [message.toolCalls]);
+
+  const toggleToolCall = React.useCallback((toolCallId: string) => {
+    setExpandedToolCalls((prev) => {
+      const next = new Set(prev);
+      if (next.has(toolCallId)) {
+        next.delete(toolCallId);
+      } else {
+        next.add(toolCallId);
+      }
+      return next;
+    });
+  }, []);
 
   return (
     <div
@@ -169,17 +182,77 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
 
         {/* Tool calls */}
         {toolCallsArray.length > 0 && (
-          <div data-testid="message-tool-calls" className="mt-2">
+          <div data-testid="message-tool-calls" className="mt-2 space-y-2">
             {toolCallsArray.map(
-              (tc: { name?: string; id?: string }, idx: number) => (
-                <div
-                  key={tc.id || idx}
-                  className="text-xs bg-muted rounded px-2 py-1 mt-1 font-mono"
-                >
-                  🔧 {tc.name || "tool_call"}
-                </div>
-              ),
+              (tc: {
+                id?: string;
+                type?: string;
+                function?: {
+                  name?: string;
+                  arguments?: string;
+                };
+              }, idx: number) => {
+                const toolCallId = tc.id || `tool-${idx}`;
+                const isExpanded = expandedToolCalls.has(toolCallId);
+                const toolName = tc.function?.name || "unknown_tool";
+                let parsedArgs: Record<string, unknown> = {};
+
+                try {
+                  if (tc.function?.arguments) {
+                    parsedArgs = JSON.parse(tc.function.arguments);
+                  }
+                } catch {
+                  // If parsing fails, show raw arguments
+                }
+
+                return (
+                  <div
+                    key={toolCallId}
+                    className="border border-purple-200 dark:border-purple-800 rounded-lg overflow-hidden bg-purple-50/50 dark:bg-purple-950/20"
+                  >
+                    <button
+                      onClick={() => toggleToolCall(toolCallId)}
+                      className="w-full px-3 py-2 flex items-center justify-between hover:bg-purple-100/50 dark:hover:bg-purple-900/20 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Wrench className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <span className="text-sm font-mono font-medium text-purple-900 dark:text-purple-100">
+                          {toolName}
+                        </span>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      )}
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-3 py-2 border-t border-purple-200 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-950/10">
+                        <div className="text-xs text-purple-900 dark:text-purple-100">
+                          <div className="font-semibold mb-1">Arguments:</div>
+                          <pre className="overflow-x-auto p-2 bg-purple-100/50 dark:bg-purple-900/20 rounded font-mono text-xs">
+                            {JSON.stringify(parsedArgs, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              },
             )}
+          </div>
+        )}
+
+        {/* Tool result (for role: "tool" messages) */}
+        {message.role === "tool" && message.content && (
+          <div className="mt-2">
+            <div className="text-xs font-semibold text-purple-900 dark:text-purple-100 mb-1">
+              Tool Result:
+            </div>
+            <pre className="text-xs overflow-x-auto p-2 bg-purple-100/50 dark:bg-purple-900/20 rounded font-mono max-h-60 overflow-y-auto">
+              {message.content}
+            </pre>
           </div>
         )}
 
