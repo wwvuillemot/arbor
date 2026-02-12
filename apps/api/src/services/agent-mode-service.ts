@@ -100,8 +100,8 @@ export async function createAgentMode(params: {
   }
 
   // Validate temperature range
-  if (params.temperature < 0 || params.temperature > 1) {
-    throw new Error("Temperature must be between 0.0 and 1.0");
+  if (params.temperature < 0 || params.temperature > 2) {
+    throw new Error("Temperature must be between 0.0 and 2.0");
   }
 
   const [mode] = await db
@@ -148,8 +148,8 @@ export async function updateAgentMode(
 
   // Validate temperature if provided
   if (params.temperature !== undefined) {
-    if (params.temperature < 0 || params.temperature > 1) {
-      throw new Error("Temperature must be between 0.0 and 1.0");
+    if (params.temperature < 0 || params.temperature > 2) {
+      throw new Error("Temperature must be between 0.0 and 2.0");
     }
   }
 

@@ -201,22 +201,71 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
                     id="temperature"
                     type="range"
                     min="0"
-                    max="1"
+                    max="2"
                     step="0.01"
                     value={temperature}
                     onChange={(e) => setTemperature(parseFloat(e.target.value))}
                     className="flex-1"
                   />
-                  <span className="text-sm font-mono w-12 text-right">
+                  <span className="text-sm font-mono w-16 text-right">
                     {temperature.toFixed(2)}
                   </span>
                 </div>
-                <div className="text-xs text-muted-foreground mt-1 space-y-1">
-                  <p>{t("form.temperatureHint")}</p>
-                  <p className="text-amber-600 dark:text-amber-500">
-                    ⚠️ Note: Reasoning models (o1, o3, o3-mini, DeepSeek R1) do not support temperature control and will ignore this setting.
-                  </p>
+
+                {/* Visual markers */}
+                <div className="relative mt-2 mb-3">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">0.0</span>
+                    <span className="text-muted-foreground">0.2</span>
+                    <span className="text-muted-foreground">0.6</span>
+                    <span className="text-muted-foreground">1.0</span>
+                    <span className="text-muted-foreground">2.0</span>
+                  </div>
                 </div>
+
+                {/* Temperature guide */}
+                <div className="space-y-2 text-xs">
+                  <div className={cn(
+                    "p-2 rounded-md border",
+                    temperature >= 0 && temperature <= 0.2
+                      ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
+                      : "bg-muted/50 border-border"
+                  )}>
+                    <div className="font-medium">0.0 - 0.2 (Very Low)</div>
+                    <div className="text-muted-foreground">Deterministic, exact, and highly factual. Ideal for technical documentation, code, and data extraction.</div>
+                  </div>
+                  <div className={cn(
+                    "p-2 rounded-md border",
+                    temperature > 0.2 && temperature <= 0.6
+                      ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                      : "bg-muted/50 border-border"
+                  )}>
+                    <div className="font-medium">0.3 - 0.6 (Medium)</div>
+                    <div className="text-muted-foreground">Balanced, professional, and coherent. Good for general-purpose chat, summarization, or structured creative tasks.</div>
+                  </div>
+                  <div className={cn(
+                    "p-2 rounded-md border",
+                    temperature > 0.6 && temperature <= 1.0
+                      ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+                      : "bg-muted/50 border-border"
+                  )}>
+                    <div className="font-medium">0.7 - 1.0 (Moderate to High)</div>
+                    <div className="text-muted-foreground">Creative, varied, and conversational. Suitable for brainstorming, storytelling, and marketing copy.</div>
+                  </div>
+                  <div className={cn(
+                    "p-2 rounded-md border",
+                    temperature > 1.0
+                      ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                      : "bg-muted/50 border-border"
+                  )}>
+                    <div className="font-medium">&gt; 1.0 (High)</div>
+                    <div className="text-muted-foreground">Very random, creative, and risky. Potential for high creativity but also for lower coherence or hallucinations.</div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-3">
+                  ⚠️ Note: Reasoning models (o1, o3, o3-mini, DeepSeek R1) do not support temperature control and will ignore this setting.
+                </p>
               </div>
             </TabsContent>
 

@@ -425,7 +425,7 @@ export const chatRouter = router({
         description: z.string().min(1),
         allowedTools: z.array(z.string()),
         guidelines: z.string().min(1),
-        temperature: z.number().min(0).max(1),
+        temperature: z.number().min(0).max(2),
       }),
     )
     .mutation(async ({ input }) => {
@@ -443,7 +443,7 @@ export const chatRouter = router({
         description: z.string().min(1).optional(),
         allowedTools: z.array(z.string()).optional(),
         guidelines: z.string().min(1).optional(),
-        temperature: z.number().min(0).max(1).optional(),
+        temperature: z.number().min(0).max(2).optional(),
       }),
     )
     .mutation(async ({ input }) => {
