@@ -212,14 +212,17 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
                   </span>
                 </div>
 
-                {/* Visual markers */}
-                <div className="relative mt-2 mb-3 px-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">0.0</span>
-                    <span className="text-muted-foreground">0.5</span>
-                    <span className="text-muted-foreground">1.0</span>
-                    <span className="text-muted-foreground">1.5</span>
-                    <span className="text-muted-foreground">2.0</span>
+                {/* Visual markers - aligned with slider track */}
+                <div className="relative mt-2 mb-3">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 flex justify-between text-xs px-2">
+                      <span className="text-muted-foreground">0.0</span>
+                      <span className="text-muted-foreground">0.5</span>
+                      <span className="text-muted-foreground">1.0</span>
+                      <span className="text-muted-foreground">1.5</span>
+                      <span className="text-muted-foreground">2.0</span>
+                    </div>
+                    <div className="w-16"></div>
                   </div>
                 </div>
 
