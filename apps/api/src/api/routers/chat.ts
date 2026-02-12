@@ -19,6 +19,7 @@ import {
   type ChatMessage as LLMChatMessage,
 } from "../../services/llm-service";
 import { SettingsService } from "../../services/settings-service";
+import { getMCPTools, executeMCPTool } from "../../services/mcp-integration-service";
 
 const chatService = new ChatService();
 const settingsService = new SettingsService();
@@ -331,6 +332,10 @@ export const chatRouter = router({
         ? await llmService.supportsTemperature(thread.model)
         : true;
 
+      // Get MCP tools for the agent to use
+      const tools = await getMCPTools();
+      console.log(`🔧 Loaded ${tools.length} MCP tools for agent`);
+
       // Call the LLM with error handling and fallback to stub mode
       let response;
       try {
@@ -341,16 +346,22 @@ export const chatRouter = router({
           thread.model ?? "default",
           "temperature:",
           supportsTemp ? agentModeConfig.temperature : "N/A (reasoning model)",
+          "tools:",
+          tools.length,
         );
         response = await llmService.chat(llmMessages, {
           model: thread.model ?? undefined,
           systemPrompt,
           // Only send temperature if the model supports it
           temperature: supportsTemp ? agentModeConfig.temperature : undefined,
+          // Pass MCP tools to the LLM
+          tools,
         });
         console.log(
           "✅ LLM response received:",
-          response.content.substring(0, 100) + "...",
+          response.content?.substring(0, 100) + "...",
+          "finishReason:",
+          response.finishReason,
         );
       } catch (error) {
         // If the API call fails (e.g., invalid API key), fall back to stub mode
@@ -368,6 +379,7 @@ export const chatRouter = router({
           model: thread.model ?? undefined,
           systemPrompt,
           temperature: agentModeConfig.temperature,
+          tools,
         });
         console.log("🔄 Using stub response");
       }
@@ -379,19 +391,123 @@ export const chatRouter = router({
         content,
       });
 
-      // Store the assistant response
+      // Tool call iteration loop
+      const MAX_ITERATIONS = 10;
+      let iteration = 0;
+      let continueLoop = true;
+      let finalResponse = response;
+
+      while (continueLoop && iteration < MAX_ITERATIONS) {
+        if (finalResponse.finishReason === "tool_calls" && finalResponse.toolCalls && finalResponse.toolCalls.length > 0) {
+          console.log(`🔄 Iteration ${iteration + 1}: LLM requested ${finalResponse.toolCalls.length} tool calls`);
+
+          // Store the assistant message with tool calls
+          await chatService.addMessage({
+            threadId,
+            role: "assistant",
+            content: finalResponse.content,
+            model: finalResponse.model,
+            tokensUsed: finalResponse.tokensUsed,
+            toolCalls: finalResponse.toolCalls,
+            metadata: {
+              finishReason: finalResponse.finishReason,
+              iteration,
+            },
+          });
+
+          // Execute each tool and collect results
+          for (const toolCall of finalResponse.toolCalls) {
+            console.log(`🔧 Executing tool: ${toolCall.function.name}`);
+
+            try {
+              const args = JSON.parse(toolCall.function.arguments);
+              const result = await executeMCPTool(toolCall.function.name, args);
+
+              console.log(`✅ Tool ${toolCall.function.name} executed successfully`);
+
+              // Store tool result as a message
+              await chatService.addMessage({
+                threadId,
+                role: "tool",
+                content: result,
+                metadata: {
+                  toolCallId: toolCall.id,
+                  toolName: toolCall.function.name,
+                },
+              });
+
+              // Add tool result to conversation for next LLM call
+              llmMessages.push({
+                role: "tool",
+                content: result,
+                toolCallId: toolCall.id,
+              });
+            } catch (error) {
+              console.error(`❌ Tool ${toolCall.function.name} failed:`, error);
+
+              // Store error as tool result
+              const errorResult = JSON.stringify({
+                error: error instanceof Error ? error.message : "Unknown error",
+                toolName: toolCall.function.name,
+              });
+
+              await chatService.addMessage({
+                threadId,
+                role: "tool",
+                content: errorResult,
+                metadata: {
+                  toolCallId: toolCall.id,
+                  toolName: toolCall.function.name,
+                  error: true,
+                },
+              });
+
+              llmMessages.push({
+                role: "tool",
+                content: errorResult,
+                toolCallId: toolCall.id,
+              });
+            }
+          }
+
+          // Call LLM again with tool results
+          iteration++;
+          try {
+            finalResponse = await llmService.chat(llmMessages, {
+              model: thread.model ?? undefined,
+              systemPrompt,
+              temperature: supportsTemp ? agentModeConfig.temperature : undefined,
+              tools,
+            });
+            console.log(`✅ Iteration ${iteration} response received, finishReason: ${finalResponse.finishReason}`);
+          } catch (error) {
+            console.error(`❌ LLM call failed in iteration ${iteration}:`, error);
+            continueLoop = false;
+          }
+        } else {
+          // No more tool calls, we're done
+          continueLoop = false;
+        }
+      }
+
+      if (iteration >= MAX_ITERATIONS) {
+        console.warn(`⚠️ Reached maximum iterations (${MAX_ITERATIONS}), stopping tool execution loop`);
+      }
+
+      // Store the final assistant response
       const assistantMessage = await chatService.addMessage({
         threadId,
         role: "assistant",
-        content: response.content,
-        model: response.model,
-        tokensUsed: response.tokensUsed,
-        toolCalls: response.toolCalls,
+        content: finalResponse.content,
+        model: finalResponse.model,
+        tokensUsed: finalResponse.tokensUsed,
+        toolCalls: finalResponse.toolCalls,
         metadata: {
-          finishReason: response.finishReason,
-          reasoning: response.reasoning,
-          reasoningTokens: response.reasoningTokens,
-          outputTokens: response.outputTokens,
+          finishReason: finalResponse.finishReason,
+          reasoning: finalResponse.reasoning,
+          reasoningTokens: finalResponse.reasoningTokens,
+          outputTokens: finalResponse.outputTokens,
+          totalIterations: iteration,
         },
       });
 
