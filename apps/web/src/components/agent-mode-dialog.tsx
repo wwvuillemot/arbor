@@ -101,8 +101,8 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
         className="flex-1 overflow-hidden flex flex-col"
       >
         <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
-          <div className="px-6 pt-4 border-b border-border">
-            <TabsList className="w-full justify-center">
+          <div className="px-6 pt-4 flex justify-center">
+            <TabsList className="justify-center">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="guidelines">Guidelines</TabsTrigger>
               <TabsTrigger value="tools">Tools</TabsTrigger>

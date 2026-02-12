@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 export interface DialogProps {
   open: boolean;
   onClose: () => void;
-  title: string;
+  title: React.ReactNode;
   children: React.ReactNode;
   showFullscreenToggle?: boolean;
   className?: string;
@@ -87,8 +87,8 @@ export function Dialog({
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-semibold">{title}</h2>
+        <div className="flex items-center justify-between p-6">
+          <div className="text-xl font-semibold">{title}</div>
           <div className="flex items-center gap-2">
             {showFullscreenToggle && (
               <button
