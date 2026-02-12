@@ -82,11 +82,7 @@ export function TabsList({ children, className }: TabsListProps) {
   );
 }
 
-export function TabsTrigger({
-  value,
-  children,
-  className,
-}: TabsTriggerProps) {
+export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
   const { value: selectedValue, onValueChange } = useTabsContext();
   const isSelected = selectedValue === value;
 
@@ -111,11 +107,7 @@ export function TabsTrigger({
   );
 }
 
-export function TabsContent({
-  value,
-  children,
-  className,
-}: TabsContentProps) {
+export function TabsContent({ value, children, className }: TabsContentProps) {
   const { value: selectedValue } = useTabsContext();
 
   if (selectedValue !== value) {
@@ -131,4 +123,3 @@ export function TabsContent({
     </div>
   );
 }
-

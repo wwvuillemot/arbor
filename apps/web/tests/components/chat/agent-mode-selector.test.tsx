@@ -47,10 +47,14 @@ describe("AgentModeSelector", () => {
     const button = screen.getByTestId("agent-mode-selector");
     fireEvent.click(button);
 
-    expect(screen.getByTestId("agent-mode-option-assistant")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("agent-mode-option-assistant"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("agent-mode-option-planner")).toBeInTheDocument();
     expect(screen.getByTestId("agent-mode-option-editor")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-mode-option-researcher")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("agent-mode-option-researcher"),
+    ).toBeInTheDocument();
   });
 
   it("should call onChange when mode is selected", () => {
@@ -94,4 +98,3 @@ describe("AgentModeSelector", () => {
     expect(screen.queryByTestId("agent-mode-dropdown")).not.toBeInTheDocument();
   });
 });
-

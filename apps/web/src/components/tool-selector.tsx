@@ -88,7 +88,11 @@ export interface ToolSelectorProps {
   className?: string;
 }
 
-export function ToolSelector({ value, onChange, className }: ToolSelectorProps) {
+export function ToolSelector({
+  value,
+  onChange,
+  className,
+}: ToolSelectorProps) {
   const toggleTool = (toolName: string) => {
     if (value.includes(toolName)) {
       onChange(value.filter((t) => t !== toolName));
@@ -122,7 +126,9 @@ export function ToolSelector({ value, onChange, className }: ToolSelectorProps) 
           onClick={toggleAll}
           className="text-sm text-primary hover:underline"
         >
-          {value.length === AVAILABLE_TOOLS.length ? "Deselect All" : "Select All"}
+          {value.length === AVAILABLE_TOOLS.length
+            ? "Deselect All"
+            : "Select All"}
         </button>
       </div>
 
@@ -133,49 +139,54 @@ export function ToolSelector({ value, onChange, className }: ToolSelectorProps) 
             {category}
           </h4>
           <div className="space-y-1">
-            {AVAILABLE_TOOLS.filter((t) => t.category === category).map((tool) => {
-              const isSelected = value.includes(tool.name);
-              return (
-                <label
-                  key={tool.name}
-                  className={cn(
-                    "flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors",
-                    isSelected
-                      ? "bg-primary/5 border-primary/50"
-                      : "bg-background border-border hover:bg-muted",
-                  )}
-                >
-                  <div className="flex items-center h-5">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleTool(tool.name)}
-                      className="sr-only"
-                    />
-                    <div
-                      className={cn(
-                        "w-4 h-4 rounded border flex items-center justify-center",
-                        isSelected
-                          ? "bg-primary border-primary"
-                          : "border-input bg-background",
-                      )}
-                    >
-                      {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+            {AVAILABLE_TOOLS.filter((t) => t.category === category).map(
+              (tool) => {
+                const isSelected = value.includes(tool.name);
+                return (
+                  <label
+                    key={tool.name}
+                    className={cn(
+                      "flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors",
+                      isSelected
+                        ? "bg-primary/5 border-primary/50"
+                        : "bg-background border-border hover:bg-muted",
+                    )}
+                  >
+                    <div className="flex items-center h-5">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleTool(tool.name)}
+                        className="sr-only"
+                      />
+                      <div
+                        className={cn(
+                          "w-4 h-4 rounded border flex items-center justify-center",
+                          isSelected
+                            ? "bg-primary border-primary"
+                            : "border-input bg-background",
+                        )}
+                      >
+                        {isSelected && (
+                          <Check className="w-3 h-3 text-primary-foreground" />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium">{tool.displayName}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {tool.description}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium">
+                        {tool.displayName}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {tool.description}
+                      </div>
                     </div>
-                  </div>
-                </label>
-              );
-            })}
+                  </label>
+                );
+              },
+            )}
           </div>
         </div>
       ))}
     </div>
   );
 }
-

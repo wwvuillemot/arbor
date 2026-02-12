@@ -85,7 +85,11 @@ async function initializeLLMService(
 
   // Auto-select provider based on model
   if (modelId) {
-    if (modelId.startsWith("gpt-") || modelId.startsWith("o1") || modelId.startsWith("o3")) {
+    if (
+      modelId.startsWith("gpt-") ||
+      modelId.startsWith("o1") ||
+      modelId.startsWith("o3")
+    ) {
       if (hasOpenAI) {
         llmService.setActiveProvider("openai");
         console.log("🎯 Selected OpenAI provider for model:", modelId);
@@ -281,7 +285,18 @@ export const chatRouter = router({
       const systemPrompt = await buildSystemPrompt(thread.agentMode);
 
       // Convert database messages to LLM format
-      console.log("📝 Raw history from database:", JSON.stringify(history.map(m => ({ role: m.role, content: m.content, contentType: typeof m.content })), null, 2));
+      console.log(
+        "📝 Raw history from database:",
+        JSON.stringify(
+          history.map((m) => ({
+            role: m.role,
+            content: m.content,
+            contentType: typeof m.content,
+          })),
+          null,
+          2,
+        ),
+      );
 
       const llmMessages: LLMChatMessage[] = history.map((msg) => ({
         role: msg.role as "user" | "assistant" | "system" | "tool",
@@ -295,7 +310,18 @@ export const chatRouter = router({
         content,
       });
 
-      console.log("📤 Messages being sent to LLM:", JSON.stringify(llmMessages.map(m => ({ role: m.role, content: m.content, contentType: typeof m.content })), null, 2));
+      console.log(
+        "📤 Messages being sent to LLM:",
+        JSON.stringify(
+          llmMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+            contentType: typeof m.content,
+          })),
+          null,
+          2,
+        ),
+      );
 
       // Initialize LLM service with API keys and auto-select provider based on model
       const llmService = await initializeLLMService(masterKey, thread.model);
@@ -308,17 +334,30 @@ export const chatRouter = router({
       // Call the LLM with error handling and fallback to stub mode
       let response;
       try {
-        console.log("🤖 Calling LLM with provider:", llmService.getActiveProvider().name, "model:", thread.model ?? "default", "temperature:", supportsTemp ? agentModeConfig.temperature : "N/A (reasoning model)");
+        console.log(
+          "🤖 Calling LLM with provider:",
+          llmService.getActiveProvider().name,
+          "model:",
+          thread.model ?? "default",
+          "temperature:",
+          supportsTemp ? agentModeConfig.temperature : "N/A (reasoning model)",
+        );
         response = await llmService.chat(llmMessages, {
           model: thread.model ?? undefined,
           systemPrompt,
           // Only send temperature if the model supports it
           temperature: supportsTemp ? agentModeConfig.temperature : undefined,
         });
-        console.log("✅ LLM response received:", response.content.substring(0, 100) + "...");
+        console.log(
+          "✅ LLM response received:",
+          response.content.substring(0, 100) + "...",
+        );
       } catch (error) {
         // If the API call fails (e.g., invalid API key), fall back to stub mode
-        console.warn("❌ LLM API call failed, falling back to stub mode:", error);
+        console.warn(
+          "❌ LLM API call failed, falling back to stub mode:",
+          error,
+        );
         const stubProvider = new LocalLLMProvider(
           "http://localhost:11434/v1",
           "llama3.2",

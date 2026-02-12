@@ -42,6 +42,12 @@ vi.mock("@/lib/trpc", () => ({
           isPending: false,
         })),
       },
+      updateThread: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+        })),
+      },
       addMessage: {
         useMutation: vi.fn(() => ({
           mutate: vi.fn(),
@@ -71,6 +77,16 @@ vi.mock("@/lib/trpc", () => ({
           ],
           isLoading: false,
           error: null,
+        })),
+      },
+    },
+    preferences: {
+      getMasterKey: {
+        useQuery: vi.fn(() => ({
+          data: { masterKey: "mock-master-key-for-testing" },
+          isLoading: false,
+          error: null,
+          refetch: vi.fn(),
         })),
       },
     },

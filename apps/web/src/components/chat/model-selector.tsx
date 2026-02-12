@@ -169,12 +169,12 @@ export function ModelSelector({
                     {(model.supportsReasoning ||
                       model.supportsVision ||
                       model.supportsTools) && (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          {model.supportsReasoning && <span>🧠 Reasoning</span>}
-                          {model.supportsVision && <span>👁️ Vision</span>}
-                          {model.supportsTools && <span>🔧 Tools</span>}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {model.supportsReasoning && <span>🧠 Reasoning</span>}
+                        {model.supportsVision && <span>👁️ Vision</span>}
+                        {model.supportsTools && <span>🔧 Tools</span>}
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>

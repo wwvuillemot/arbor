@@ -134,7 +134,10 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
         onSubmit={handleSubmit}
         className="flex-1 overflow-hidden flex flex-col"
       >
-        <Tabs defaultValue="overview" className="flex-1 flex flex-col overflow-hidden">
+        <Tabs
+          defaultValue="overview"
+          className="flex-1 flex flex-col overflow-hidden"
+        >
           <div className="px-6 pt-4 flex justify-center">
             <TabsList className="justify-center">
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -149,7 +152,10 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
               {/* Name (only for create) */}
               {!isEditing && (
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium mb-2">
+                  <label
+                    htmlFor="name"
+                    className="block text-sm font-medium mb-2"
+                  >
                     {t("form.name")} <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -262,46 +268,70 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
                 {/* Temperature guide */}
                 <div className="space-y-2 text-xs">
-                  <div className={cn(
-                    "p-2 rounded-md border",
-                    temperature >= 0 && temperature <= 0.2
-                      ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
-                      : "bg-muted/50 border-border"
-                  )}>
+                  <div
+                    className={cn(
+                      "p-2 rounded-md border",
+                      temperature >= 0 && temperature <= 0.2
+                        ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
+                        : "bg-muted/50 border-border",
+                    )}
+                  >
                     <div className="font-medium">0.0 - 0.2 (Very Low)</div>
-                    <div className="text-muted-foreground">Deterministic, exact, and highly factual. Ideal for technical documentation, code, and data extraction.</div>
+                    <div className="text-muted-foreground">
+                      Deterministic, exact, and highly factual. Ideal for
+                      technical documentation, code, and data extraction.
+                    </div>
                   </div>
-                  <div className={cn(
-                    "p-2 rounded-md border",
-                    temperature > 0.2 && temperature <= 0.6
-                      ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
-                      : "bg-muted/50 border-border"
-                  )}>
+                  <div
+                    className={cn(
+                      "p-2 rounded-md border",
+                      temperature > 0.2 && temperature <= 0.6
+                        ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800"
+                        : "bg-muted/50 border-border",
+                    )}
+                  >
                     <div className="font-medium">0.3 - 0.6 (Medium)</div>
-                    <div className="text-muted-foreground">Balanced, professional, and coherent. Good for general-purpose chat, summarization, or structured creative tasks.</div>
+                    <div className="text-muted-foreground">
+                      Balanced, professional, and coherent. Good for
+                      general-purpose chat, summarization, or structured
+                      creative tasks.
+                    </div>
                   </div>
-                  <div className={cn(
-                    "p-2 rounded-md border",
-                    temperature > 0.6 && temperature <= 1.0
-                      ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
-                      : "bg-muted/50 border-border"
-                  )}>
-                    <div className="font-medium">0.7 - 1.0 (Moderate to High)</div>
-                    <div className="text-muted-foreground">Creative, varied, and conversational. Suitable for brainstorming, storytelling, and marketing copy.</div>
+                  <div
+                    className={cn(
+                      "p-2 rounded-md border",
+                      temperature > 0.6 && temperature <= 1.0
+                        ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+                        : "bg-muted/50 border-border",
+                    )}
+                  >
+                    <div className="font-medium">
+                      0.7 - 1.0 (Moderate to High)
+                    </div>
+                    <div className="text-muted-foreground">
+                      Creative, varied, and conversational. Suitable for
+                      brainstorming, storytelling, and marketing copy.
+                    </div>
                   </div>
-                  <div className={cn(
-                    "p-2 rounded-md border",
-                    temperature > 1.0
-                      ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
-                      : "bg-muted/50 border-border"
-                  )}>
+                  <div
+                    className={cn(
+                      "p-2 rounded-md border",
+                      temperature > 1.0
+                        ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+                        : "bg-muted/50 border-border",
+                    )}
+                  >
                     <div className="font-medium">&gt; 1.0 (High)</div>
-                    <div className="text-muted-foreground">Very random, creative, and risky. Potential for high creativity but also for lower coherence or hallucinations.</div>
+                    <div className="text-muted-foreground">
+                      Very random, creative, and risky. Potential for high
+                      creativity but also for lower coherence or hallucinations.
+                    </div>
                   </div>
                 </div>
 
                 <p className="text-xs text-amber-600 dark:text-amber-500 mt-3">
-                  ⚠️ Note: Reasoning models (o1, o3, o3-mini, DeepSeek R1) do not support temperature control and will ignore this setting.
+                  ⚠️ Note: Reasoning models (o1, o3, o3-mini, DeepSeek R1) do
+                  not support temperature control and will ignore this setting.
                 </p>
               </div>
             </TabsContent>
@@ -310,7 +340,8 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
             <TabsContent value="guidelines" className="space-y-4 mt-0">
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  {t("form.guidelines")} <span className="text-destructive">*</span>
+                  {t("form.guidelines")}{" "}
+                  <span className="text-destructive">*</span>
                 </label>
                 <MarkdownEditor
                   value={guidelines}
@@ -346,7 +377,6 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
             )}
           </div>
         </Tabs>
-
       </form>
     </Dialog>
   );

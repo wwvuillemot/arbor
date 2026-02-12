@@ -53,17 +53,13 @@ export function AboutDialog({ open, onOpenChange }: AboutDialogProps) {
       {/* Content */}
       <div className="p-6 space-y-4">
         <div>
-          <p className="text-sm text-muted-foreground">
-            {t("description")}
-          </p>
+          <p className="text-sm text-muted-foreground">{t("description")}</p>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">{t("version")}</span>
-            <span className="font-mono">
-              {systemInfo?.version || "0.1.0"}
-            </span>
+            <span className="font-mono">{systemInfo?.version || "0.1.0"}</span>
           </div>
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground flex items-center gap-1">

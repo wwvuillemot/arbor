@@ -228,10 +228,16 @@ export class OpenAIProvider implements LLMProvider {
     options?: ChatOptions,
   ): Promise<ChatResponse> {
     const model = options?.model || this.defaultModel;
-    const formattedMessages = this.formatMessages(messages, options?.systemPrompt);
+    const formattedMessages = this.formatMessages(
+      messages,
+      options?.systemPrompt,
+    );
 
     // Debug logging
-    console.log("🔍 Formatted messages for OpenAI:", JSON.stringify(formattedMessages, null, 2));
+    console.log(
+      "🔍 Formatted messages for OpenAI:",
+      JSON.stringify(formattedMessages, null, 2),
+    );
 
     const body: Record<string, unknown> = {
       model,
@@ -375,9 +381,9 @@ export class OpenAIProvider implements LLMProvider {
                     type: "function",
                     function: tc.function
                       ? {
-                        name: tc.function.name || "",
-                        arguments: tc.function.arguments || "",
-                      }
+                          name: tc.function.name || "",
+                          arguments: tc.function.arguments || "",
+                        }
                       : undefined,
                   },
                 };
@@ -814,14 +820,14 @@ type AnthropicContentBlock =
   | { type: "text"; text: string; id?: never; name?: never; input?: never }
   | { type: "tool_use"; id: string; name: string; input: unknown; text?: never }
   | {
-    type: "tool_result";
-    tool_use_id: string;
-    content: string;
-    text?: never;
-    id?: never;
-    name?: never;
-    input?: never;
-  };
+      type: "tool_result";
+      tool_use_id: string;
+      content: string;
+      text?: never;
+      id?: never;
+      name?: never;
+      input?: never;
+    };
 
 interface AnthropicMessage {
   role: "user" | "assistant";

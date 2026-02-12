@@ -42,7 +42,7 @@ export function Dialog({
   // Load fullscreen preference
   const { data: preference } = trpc.preferences.getAppPreference.useQuery(
     { key: "dialog_fullscreen" },
-    { enabled: open }
+    { enabled: open },
   );
 
   // Save fullscreen preference mutation
@@ -70,11 +70,7 @@ export function Dialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
 
       {/* Dialog */}
       <div
@@ -85,7 +81,7 @@ export function Dialog({
           isFullscreen
             ? "w-full h-full max-w-none max-h-none"
             : `w-full ${maxWidthClasses[maxWidth]} max-h-[90vh]`,
-          className
+          className,
         )}
       >
         {/* Header - Fixed at top */}
@@ -97,7 +93,9 @@ export function Dialog({
                 type="button"
                 onClick={toggleFullscreen}
                 className="rounded-md p-1 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                aria-label={
+                  isFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+                }
               >
                 {isFullscreen ? (
                   <Minimize2 className="h-5 w-5" />
@@ -118,18 +116,13 @@ export function Dialog({
         </div>
 
         {/* Body - Scrollable */}
-        <div className="flex-1 overflow-auto min-h-0">
-          {children}
-        </div>
+        <div className="flex-1 overflow-auto min-h-0">{children}</div>
 
         {/* Footer - Fixed at bottom */}
         {footer && (
-          <div className="flex-shrink-0 border-t border-border">
-            {footer}
-          </div>
+          <div className="flex-shrink-0 border-t border-border">{footer}</div>
         )}
       </div>
     </div>
   );
 }
-

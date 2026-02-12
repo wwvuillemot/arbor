@@ -5,4 +5,7 @@ export {
 } from "./chat-message";
 export { ChatPanel, type ChatPanelProps } from "./chat-panel";
 export { ChatSidebar, type ChatSidebarProps } from "./chat-sidebar";
-export { AgentModeSelector, type AgentModeSelectorProps } from "./agent-mode-selector";
+export {
+  AgentModeSelector,
+  type AgentModeSelectorProps,
+} from "./agent-mode-selector";

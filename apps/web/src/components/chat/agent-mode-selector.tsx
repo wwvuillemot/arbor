@@ -8,7 +8,10 @@ import { cn } from "@/lib/utils";
 const AGENT_MODES = ["assistant", "planner", "editor", "researcher"] as const;
 type AgentMode = (typeof AGENT_MODES)[number];
 
-const MODE_ICONS: Record<AgentMode, React.ComponentType<{ className?: string }>> = {
+const MODE_ICONS: Record<
+  AgentMode,
+  React.ComponentType<{ className?: string }>
+> = {
   assistant: Bot,
   planner: Lightbulb,
   editor: Pencil,
@@ -100,4 +103,3 @@ export function AgentModeSelector({
     </div>
   );
 }
-

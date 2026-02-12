@@ -131,6 +131,14 @@ vi.mock("@/lib/trpc", () => {
           isPending: false,
         })),
       },
+      updateThread: {
+        useMutation: vi.fn((opts: any) => ({
+          mutate: (...args: any[]) => {
+            opts?.onSuccess?.();
+          },
+          isPending: false,
+        })),
+      },
       addMessage: {
         useMutation: vi.fn((opts: any) => ({
           mutate: (...args: any[]) => {
@@ -166,6 +174,16 @@ vi.mock("@/lib/trpc", () => {
           ],
           isLoading: false,
           error: null,
+        })),
+      },
+    },
+    preferences: {
+      getMasterKey: {
+        useQuery: vi.fn(() => ({
+          data: { masterKey: "mock-master-key-for-testing" },
+          isLoading: false,
+          error: null,
+          refetch: vi.fn(),
         })),
       },
     },
@@ -445,10 +463,14 @@ describe("ChatPanel", () => {
     // Click to open dropdown
     fireEvent.click(selector);
     // Check all 4 modes are present
-    expect(screen.getByTestId("agent-mode-option-assistant")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("agent-mode-option-assistant"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("agent-mode-option-planner")).toBeInTheDocument();
     expect(screen.getByTestId("agent-mode-option-editor")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-mode-option-researcher")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("agent-mode-option-researcher"),
+    ).toBeInTheDocument();
   });
 
   it("should render chat input", () => {
@@ -516,7 +538,7 @@ describe("ChatPanel", () => {
     expect(mockSendMessageMutate).toHaveBeenCalledWith({
       threadId: "thread-1",
       content: "Hello AI!",
-      masterKey: "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=",
+      masterKey: "mock-master-key-for-testing",
     });
   });
 

@@ -56,10 +56,7 @@ export function MarkdownEditor({
     content: value,
     editorProps: {
       attributes: {
-        class: cn(
-          "prose prose-sm max-w-none focus:outline-none",
-          "px-3 py-2",
-        ),
+        class: cn("prose prose-sm max-w-none focus:outline-none", "px-3 py-2"),
         style: `min-height: ${minHeight}`,
       },
     },
@@ -110,25 +107,36 @@ export function MarkdownEditor({
   const iconSize = 16;
 
   return (
-    <div className={cn("border border-input rounded-md overflow-hidden bg-background", className)}>
+    <div
+      className={cn(
+        "border border-input rounded-md overflow-hidden bg-background",
+        className,
+      )}
+    >
       {/* Toolbar */}
       <div className="flex items-center gap-1 p-2 border-b bg-muted/30 flex-wrap">
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 1 }).run()
+          }
           isActive={editor.isActive("heading", { level: 1 })}
           title="Heading 1"
         >
           <Heading1 size={iconSize} />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 2 }).run()
+          }
           isActive={editor.isActive("heading", { level: 2 })}
           title="Heading 2"
         >
           <Heading2 size={iconSize} />
         </ToolbarButton>
         <ToolbarButton
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          onClick={() =>
+            editor.chain().focus().toggleHeading({ level: 3 }).run()
+          }
           isActive={editor.isActive("heading", { level: 3 })}
           title="Heading 3"
         >
@@ -191,15 +199,26 @@ export function MarkdownEditor({
       <div className="text-xs text-muted-foreground px-3 py-2 border-t bg-muted/10">
         <div className="font-medium mb-1">Markdown shortcuts:</div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-          <div><code className="bg-muted px-1 rounded"># Space</code> - Heading 1</div>
-          <div><code className="bg-muted px-1 rounded">**text**</code> - Bold</div>
-          <div><code className="bg-muted px-1 rounded">## Space</code> - Heading 2</div>
-          <div><code className="bg-muted px-1 rounded">*text*</code> - Italic</div>
-          <div><code className="bg-muted px-1 rounded">- Space</code> - Bullet list</div>
-          <div><code className="bg-muted px-1 rounded">`code`</code> - Inline code</div>
+          <div>
+            <code className="bg-muted px-1 rounded"># Space</code> - Heading 1
+          </div>
+          <div>
+            <code className="bg-muted px-1 rounded">**text**</code> - Bold
+          </div>
+          <div>
+            <code className="bg-muted px-1 rounded">## Space</code> - Heading 2
+          </div>
+          <div>
+            <code className="bg-muted px-1 rounded">*text*</code> - Italic
+          </div>
+          <div>
+            <code className="bg-muted px-1 rounded">- Space</code> - Bullet list
+          </div>
+          <div>
+            <code className="bg-muted px-1 rounded">`code`</code> - Inline code
+          </div>
         </div>
       </div>
     </div>
   );
 }
-

@@ -29,17 +29,21 @@ export function ChatPanel({
   const t = useTranslations("chat");
 
   // Persist selected thread ID in localStorage
-  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("arbor:selectedThreadId");
-    }
-    return null;
-  });
+  const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
+    () => {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem("arbor:selectedThreadId");
+      }
+      return null;
+    },
+  );
 
   const [inputValue, setInputValue] = React.useState("");
   const [agentMode, setAgentMode] = React.useState<string>("assistant");
   const [selectedModel, setSelectedModel] = React.useState<string | null>(null);
-  const [pendingMessage, setPendingMessage] = React.useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = React.useState<string | null>(
+    null,
+  );
 
   // Save selected thread ID to localStorage whenever it changes
   React.useEffect(() => {
@@ -183,7 +187,11 @@ export function ChatPanel({
       setInputValue(""); // Clear input immediately
       createThread.mutate({
         name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
-        agentMode: agentMode as "assistant" | "planner" | "editor" | "researcher",
+        agentMode: agentMode as
+          | "assistant"
+          | "planner"
+          | "editor"
+          | "researcher",
         model: selectedModel,
       });
       // The message will be sent after the thread is created (see useEffect above)
@@ -195,7 +203,16 @@ export function ChatPanel({
       content: inputValue.trim(),
       masterKey,
     });
-  }, [inputValue, selectedThreadId, masterKey, sendMessage, createThread, agentMode, selectedModel, t]);
+  }, [
+    inputValue,
+    selectedThreadId,
+    masterKey,
+    sendMessage,
+    createThread,
+    agentMode,
+    selectedModel,
+    t,
+  ]);
 
   const handleKeyDown = React.useCallback(
     (e: React.KeyboardEvent) => {
@@ -357,10 +374,7 @@ export function ChatPanel({
           {/* Selectors row */}
           <div className="flex items-center gap-2">
             {/* Agent mode selector */}
-            <AgentModeSelector
-              value={agentMode}
-              onChange={setAgentMode}
-            />
+            <AgentModeSelector value={agentMode} onChange={setAgentMode} />
 
             {/* Model selector */}
             <ModelSelector value={selectedModel} onChange={handleModelChange} />
