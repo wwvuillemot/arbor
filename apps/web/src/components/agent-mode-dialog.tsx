@@ -89,14 +89,48 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
+  // Footer with action buttons
+  const footer = (
+    <div className="flex items-center justify-end gap-3 p-6">
+      <button
+        type="button"
+        onClick={handleCancel}
+        disabled={isSaving}
+        className={cn(
+          "rounded-md px-4 py-2 text-sm font-medium",
+          "border border-input bg-background hover:bg-muted hover:text-foreground",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "disabled:opacity-50 disabled:cursor-not-allowed",
+        )}
+      >
+        {t("form.cancel")}
+      </button>
+      <button
+        type="submit"
+        form="agent-mode-form"
+        disabled={isSaving}
+        className={cn(
+          "rounded-md px-4 py-2 text-sm font-medium",
+          "bg-primary text-primary-foreground hover:bg-primary/90",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "disabled:opacity-50 disabled:cursor-not-allowed",
+        )}
+      >
+        {isSaving ? t("form.saving") : t("form.save")}
+      </button>
+    </div>
+  );
+
   return (
     <Dialog
       open={open}
       onClose={handleCancel}
       title={isEditing ? t("editMode") : t("createMode")}
       maxWidth="2xl"
+      footer={footer}
     >
       <form
+        id="agent-mode-form"
         onSubmit={handleSubmit}
         className="flex-1 overflow-hidden flex flex-col"
       >
@@ -313,35 +347,6 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
           </div>
         </Tabs>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-border">
-          <button
-            type="button"
-            onClick={handleCancel}
-            disabled={isSaving}
-            className={cn(
-              "rounded-md px-4 py-2 text-sm font-medium",
-              "border border-input bg-background hover:bg-muted hover:text-foreground",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-            )}
-          >
-            {t("form.cancel")}
-          </button>
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            disabled={isSaving}
-            className={cn(
-              "rounded-md px-4 py-2 text-sm font-medium",
-              "bg-primary text-primary-foreground hover:bg-primary/90",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              "disabled:opacity-50 disabled:cursor-not-allowed",
-            )}
-          >
-            {isSaving ? t("form.saving") : t("form.save")}
-          </button>
-        </div>
       </form>
     </Dialog>
   );

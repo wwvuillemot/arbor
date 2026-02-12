@@ -10,6 +10,7 @@ export interface DialogProps {
   onClose: () => void;
   title: React.ReactNode;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   showFullscreenToggle?: boolean;
   className?: string;
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "4xl" | "6xl";
@@ -30,6 +31,7 @@ export function Dialog({
   onClose,
   title,
   children,
+  footer,
   showFullscreenToggle = true,
   className,
   maxWidth = "2xl",
@@ -119,6 +121,13 @@ export function Dialog({
         <div className="flex-1 overflow-auto">
           {children}
         </div>
+
+        {/* Footer */}
+        {footer && (
+          <div className="border-t border-border">
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
