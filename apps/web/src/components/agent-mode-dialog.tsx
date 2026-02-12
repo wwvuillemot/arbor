@@ -202,23 +202,23 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
                     type="range"
                     min="0"
                     max="2"
-                    step="0.01"
+                    step="0.1"
                     value={temperature}
                     onChange={(e) => setTemperature(parseFloat(e.target.value))}
                     className="flex-1"
                   />
                   <span className="text-sm font-mono w-16 text-right">
-                    {temperature.toFixed(2)}
+                    {temperature.toFixed(1)}
                   </span>
                 </div>
 
                 {/* Visual markers */}
-                <div className="relative mt-2 mb-3">
+                <div className="relative mt-2 mb-3 px-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-muted-foreground">0.0</span>
-                    <span className="text-muted-foreground">0.2</span>
-                    <span className="text-muted-foreground">0.6</span>
+                    <span className="text-muted-foreground">0.5</span>
                     <span className="text-muted-foreground">1.0</span>
+                    <span className="text-muted-foreground">1.5</span>
                     <span className="text-muted-foreground">2.0</span>
                   </div>
                 </div>
