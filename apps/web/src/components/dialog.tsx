@@ -88,8 +88,8 @@ export function Dialog({
           className
         )}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-6">
+        {/* Header - Fixed at top */}
+        <div className="flex-shrink-0 flex items-center justify-between p-6">
           <div className="text-xl font-semibold">{title}</div>
           <div className="flex items-center gap-2">
             {showFullscreenToggle && (
@@ -117,14 +117,14 @@ export function Dialog({
           </div>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-auto">
+        {/* Body - Scrollable */}
+        <div className="flex-1 overflow-auto min-h-0">
           {children}
         </div>
 
-        {/* Footer */}
+        {/* Footer - Fixed at bottom */}
         {footer && (
-          <div className="border-t border-border">
+          <div className="flex-shrink-0 border-t border-border">
             {footer}
           </div>
         )}
