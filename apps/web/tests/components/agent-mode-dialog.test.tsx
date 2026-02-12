@@ -81,6 +81,31 @@ describe("AgentModeDialog", () => {
           })),
         },
       },
+      preferences: {
+        getAppPreference: {
+          useQuery: vi.fn(() => ({
+            data: null,
+            isLoading: false,
+            error: null,
+          })),
+        },
+        setAppPreference: {
+          useMutation: vi.fn(() => ({
+            mutate: vi.fn(),
+            isPending: false,
+          })),
+        },
+        getAllAppPreferences: {
+          invalidate: vi.fn(),
+        },
+      },
+      useUtils: vi.fn(() => ({
+        preferences: {
+          getAllAppPreferences: {
+            invalidate: vi.fn(),
+          },
+        },
+      })),
     } as any);
   });
 
