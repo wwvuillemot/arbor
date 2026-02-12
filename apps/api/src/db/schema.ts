@@ -562,6 +562,56 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type NewChatMessage = typeof chatMessages.$inferInsert;
 
 /**
+ * Agent Tasks Table
+ *
+ * Stores tasks created and managed by AI agents for planning and tracking their work.
+ * Supports hierarchical task structures (parent-child relationships).
+ */
+export const agentTasks = pgTable(
+  "agent_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Thread this task belongs to
+    threadId: uuid("thread_id")
+      .references(() => chatThreads.id, { onDelete: "cascade" })
+      .notNull(),
+
+    // Task title
+    title: varchar("title", { length: 255 }).notNull(),
+
+    // Optional detailed description
+    description: text("description"),
+
+    // Task status: pending, in_progress, completed, cancelled
+    status: varchar("status", { length: 20 }).notNull().default("pending"),
+
+    // Parent task for hierarchical structure (null for root tasks)
+    parentTaskId: uuid("parent_task_id").references((): any => agentTasks.id, {
+      onDelete: "cascade",
+    }),
+
+    // Position/order within siblings
+    position: integer("position").default(0).notNull(),
+
+    // Timestamps
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => ({
+    // Index for querying tasks by thread
+    threadIdx: index("idx_agent_tasks_thread").on(table.threadId),
+    // Index for hierarchical queries
+    parentIdx: index("idx_agent_tasks_parent").on(table.parentTaskId),
+  }),
+);
+
+// Type inference for TypeScript
+export type AgentTask = typeof agentTasks.$inferSelect;
+export type NewAgentTask = typeof agentTasks.$inferInsert;
+
+/**
  * Actor Types for Provenance Tracking
  *
  * Identifies who made a change:
