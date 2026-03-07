@@ -3,6 +3,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ChatSidebar } from "@/components/chat/chat-sidebar";
 
+// Mock toast context
+vi.mock("@/contexts/toast-context", () => ({
+  useToast: () => ({
+    addToast: vi.fn(),
+    removeToast: vi.fn(),
+    toasts: [],
+  }),
+}));
+
 // Mock tRPC
 vi.mock("@/lib/trpc", () => ({
   trpc: {
@@ -89,6 +98,19 @@ vi.mock("@/lib/trpc", () => ({
           refetch: vi.fn(),
         })),
       },
+      getAppPreference: {
+        useQuery: vi.fn(() => ({
+          data: null,
+          isLoading: false,
+          error: null,
+        })),
+      },
+      setAppPreference: {
+        useMutation: vi.fn(() => ({
+          mutate: vi.fn(),
+          isPending: false,
+        })),
+      },
     },
     useUtils: vi.fn(() => ({})),
   },
@@ -167,12 +189,12 @@ describe("ChatSidebar", () => {
   it("should have full width when open", () => {
     render(<ChatSidebar isOpen={true} onToggle={mockOnToggle} />);
     const sidebar = screen.getByTestId("chat-sidebar");
-    expect(sidebar).toHaveClass("w-96"); // 384px = 96 * 4px
+    expect(sidebar).toHaveStyle({ width: "384px" });
   });
 
   it("should have tab width when closed", () => {
     render(<ChatSidebar isOpen={false} onToggle={mockOnToggle} />);
     const sidebar = screen.getByTestId("chat-sidebar");
-    expect(sidebar).toHaveClass("w-10"); // 40px tab width
+    expect(sidebar).toHaveStyle({ width: "32px" });
   });
 });

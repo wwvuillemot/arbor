@@ -65,6 +65,15 @@ export const mediaRouter = router({
     }),
 
   /**
+   * Get all image attachments for a project (by projectId prefix on objectKey).
+   */
+  getByProject: publicProcedure
+    .input(z.object({ projectId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      return await mediaService.getImageAttachmentsByProjectId(input.projectId);
+    }),
+
+  /**
    * Delete an attachment (removes from DB and MinIO).
    */
   delete: publicProcedure

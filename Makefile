@@ -1,4 +1,4 @@
-.PHONY: help setup build clean up down logs restart health db-migrate db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage coverage lint format typecheck audit preflight api-generate api-watch desktop desktop-build backup restore export-md
+.PHONY: help setup build clean up down logs restart nuke health db-migrate db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage coverage lint format typecheck audit preflight api-generate api-watch desktop desktop-build backup restore export-md
 
 # Default target
 .DEFAULT_GOAL := help
@@ -14,6 +14,7 @@ help:
 	@echo "  make up              - Start all services (Web, API, PostgreSQL, Redis, pgAdmin)"
 	@echo "  make down            - Stop all services"
 	@echo "  make restart         - Restart all services"
+	@echo "  make nuke            - Hard reset: kill + wipe Next.js cache, restart (fixes stuck hot-reload)"
 	@echo "  make desktop         - Start Tauri desktop app (manages services automatically)"
 	@echo "  make build           - Build for production"
 	@echo "  make desktop-build   - Build Tauri desktop app"
@@ -90,9 +91,7 @@ up:
 	@echo "Stopping any existing containers..."
 	@docker compose -f apps/api/docker-compose.yml -f apps/key-value-store/docker-compose.yml down --remove-orphans 2>/dev/null || true
 	@echo "Starting Docker services (postgres, redis, minio, pgadmin, proxies)..."
-	@docker compose -f apps/api/docker-compose.yml -f apps/key-value-store/docker-compose.yml -f tmp/traefik/local/arbor-docker-compose.traefik.yml up -d
-	@echo "Waiting for services to be ready..."
-	@sleep 5
+	@docker compose -f apps/api/docker-compose.yml -f apps/key-value-store/docker-compose.yml -f tmp/traefik/local/arbor-docker-compose.traefik.yml up -d --wait
 	@echo ""
 	@echo "Running database migrations..."
 	@pnpm run db:migrate 2>/dev/null || echo "⚠️  Migrations failed (may already be applied)"
@@ -100,21 +99,8 @@ up:
 	@echo "Seeding database (idempotent)..."
 	@pnpm run db:seed 2>/dev/null || echo "⚠️  Seeding skipped (data may already exist)"
 	@echo ""
-	@echo "Starting API server on host..."
-	@$(MAKE) -C apps/api up
-	@echo ""
-	@echo "Starting web app on host..."
-	@$(MAKE) -C apps/web up
-	@echo ""
-	@echo "Verifying HTTP endpoints..."
-	@for i in 1 2 3 4 5; do \
-		curl -s -o /dev/null -w "" http://api.arbor.local/health 2>/dev/null && echo "  ✅ API Server: http://api.arbor.local/health (HTTP 200)" && break || \
-		([ $$i -eq 5 ] && echo "  ❌ API Server: http://api.arbor.local/health (not responding)" || sleep 2); \
-	done
-	@for i in 1 2 3 4 5; do \
-		curl -s -o /dev/null -w "" http://app.arbor.local 2>/dev/null && echo "  ✅ Web App: http://app.arbor.local (HTTP 200)" && break || \
-		([ $$i -eq 5 ] && echo "  ❌ Web App: http://app.arbor.local (not responding)" || sleep 2); \
-	done
+	@echo "Starting API and web servers..."
+	@$(MAKE) -C apps/api up & $(MAKE) -C apps/web up & wait
 	@echo ""
 	@echo "========================================="
 	@echo "   ✅ Arbor is ready!"
@@ -152,6 +138,13 @@ logs:
 restart:
 	make down
 	make up
+
+# Hard reset for when hot-reload is stuck: kills all processes, wipes
+# Next.js / Turbopack cache, then starts fresh. Use instead of restart.
+nuke:
+	@$(MAKE) -C apps/api down
+	@$(MAKE) -C apps/web nuke
+	@$(MAKE) -C apps/api up
 
 health:
 	@echo "========================================="

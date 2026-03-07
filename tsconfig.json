@@ -24,6 +24,8 @@
       "@/*": ["./apps/api/src/*"],
       "@server": ["./apps/api/src"],
       "@server/*": ["./apps/api/src/*"],
+      "@mcp": ["./apps/mcp-server/src"],
+      "@mcp/*": ["./apps/mcp-server/src/*"],
       "@tests": ["./tests"],
       "@tests/*": ["./tests/*"]
     }

@@ -78,7 +78,7 @@ describe("OpenAIProvider", () => {
   it("should have correct name and default model", () => {
     const provider = new OpenAIProvider("sk-test-key");
     expect(provider.name).toBe("openai");
-    expect(provider.defaultModel).toBe("gpt-4o");
+    expect(provider.defaultModel).toBe("gpt-4.1");
   });
 
   it("should throw if API key is empty", () => {
@@ -91,16 +91,16 @@ describe("OpenAIProvider", () => {
     );
   });
 
-  it("should return model list with GPT-4o", async () => {
+  it("should return model list with GPT-4.1", async () => {
     const provider = new OpenAIProvider("sk-test");
     const models = await provider.models();
     expect(models.length).toBe(5);
     expect(models.every((m) => m.provider === "openai")).toBe(true);
-    const gpt4o = models.find((m) => m.id === "gpt-4o");
-    expect(gpt4o).toBeDefined();
-    expect(gpt4o!.supportsTools).toBe(true);
-    expect(gpt4o!.supportsVision).toBe(true);
-    expect(gpt4o!.contextWindow).toBe(128000);
+    const gpt41 = models.find((m) => m.id === "gpt-4.1");
+    expect(gpt41).toBeDefined();
+    expect(gpt41!.supportsTools).toBe(true);
+    expect(gpt41!.supportsVision).toBe(true);
+    expect(gpt41!.contextWindow).toBe(1047576);
   });
 
   it("should count tokens using estimation", () => {
@@ -257,7 +257,7 @@ describe("AnthropicProvider", () => {
   it("should have correct name and default model", () => {
     const provider = new AnthropicProvider("sk-ant-test");
     expect(provider.name).toBe("anthropic");
-    expect(provider.defaultModel).toBe("claude-sonnet-4-20250514");
+    expect(provider.defaultModel).toBe("claude-sonnet-4-6");
   });
 
   it("should throw if API key is empty", () => {
@@ -277,7 +277,7 @@ describe("AnthropicProvider", () => {
     const models = await provider.models();
     expect(models.length).toBe(3);
     expect(models.every((m) => m.provider === "anthropic")).toBe(true);
-    const sonnet = models.find((m) => m.id === "claude-sonnet-4-20250514");
+    const sonnet = models.find((m) => m.id === "claude-sonnet-4-6");
     expect(sonnet).toBeDefined();
     expect(sonnet!.supportsTools).toBe(true);
     expect(sonnet!.contextWindow).toBe(200000);
@@ -295,7 +295,7 @@ describe("AnthropicProvider", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           content: [{ type: "text", text: "Hello! I can help with that." }],
           stop_reason: "end_turn",
           usage: { input_tokens: 12, output_tokens: 8 },
@@ -308,7 +308,7 @@ describe("AnthropicProvider", () => {
     const result = await provider.chat([{ role: "user", content: "Hello" }]);
 
     expect(result.content).toBe("Hello! I can help with that.");
-    expect(result.model).toBe("claude-sonnet-4-20250514");
+    expect(result.model).toBe("claude-sonnet-4-6");
     expect(result.tokensUsed).toBe(20);
     expect(result.finishReason).toBe("stop");
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -322,7 +322,7 @@ describe("AnthropicProvider", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           content: [{ type: "text", text: "ok" }],
           stop_reason: "end_turn",
           usage: { input_tokens: 5, output_tokens: 1 },
@@ -347,7 +347,7 @@ describe("AnthropicProvider", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          model: "claude-sonnet-4-20250514",
+          model: "claude-sonnet-4-6",
           content: [
             {
               type: "tool_use",
@@ -392,7 +392,7 @@ describe("AnthropicProvider", () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(
         JSON.stringify({
-          model: "claude-3-5-haiku-20241022",
+          model: "claude-haiku-4-5-20251001",
           content: [{ type: "text", text: "ok" }],
           stop_reason: "end_turn",
           usage: { input_tokens: 5, output_tokens: 1 },
@@ -403,13 +403,13 @@ describe("AnthropicProvider", () => {
 
     const provider = new AnthropicProvider("sk-ant-test");
     await provider.chat([{ role: "user", content: "Hi" }], {
-      model: "claude-3-5-haiku-20241022",
+      model: "claude-haiku-4-5-20251001",
       temperature: 0.7,
       systemPrompt: "Be concise",
     });
 
     const callBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
-    expect(callBody.model).toBe("claude-3-5-haiku-20241022");
+    expect(callBody.model).toBe("claude-haiku-4-5-20251001");
     expect(callBody.temperature).toBe(0.7);
     expect(callBody.system).toBe("Be concise");
     fetchSpy.mockRestore();
@@ -639,7 +639,7 @@ describe("LLMService", () => {
     service.registerProvider(anthropic);
 
     const allModels = await service.getAllModels();
-    // 2 local (stub + deepseek-r1) + 5 openai (gpt-4o, gpt-4o-mini, o1, o3, o3-mini) + 3 anthropic = 10
+    // 2 local (stub + deepseek-r1) + 5 openai (gpt-4.1, gpt-4.1-mini, gpt-4.1-nano, o3, o4-mini) + 3 anthropic = 10
     expect(allModels.length).toBe(10);
     expect(allModels.some((m) => m.provider === "local")).toBe(true);
     expect(allModels.some((m) => m.provider === "openai")).toBe(true);
@@ -666,14 +666,6 @@ describe("LLMService", () => {
 
 describe("Reasoning Model Support", () => {
   describe("OpenAI reasoning models", () => {
-    it("should mark o1 as supporting reasoning", async () => {
-      const provider = new OpenAIProvider("sk-test");
-      const models = await provider.models();
-      const o1Model = models.find((m) => m.id === "o1");
-      expect(o1Model).toBeDefined();
-      expect(o1Model!.supportsReasoning).toBe(true);
-    });
-
     it("should mark o3 as supporting reasoning", async () => {
       const provider = new OpenAIProvider("sk-test");
       const models = await provider.models();
@@ -682,20 +674,20 @@ describe("Reasoning Model Support", () => {
       expect(o3Model!.supportsReasoning).toBe(true);
     });
 
-    it("should mark o3-mini as supporting reasoning", async () => {
+    it("should mark o4-mini as supporting reasoning", async () => {
       const provider = new OpenAIProvider("sk-test");
       const models = await provider.models();
-      const o3MiniModel = models.find((m) => m.id === "o3-mini");
-      expect(o3MiniModel).toBeDefined();
-      expect(o3MiniModel!.supportsReasoning).toBe(true);
+      const o4MiniModel = models.find((m) => m.id === "o4-mini");
+      expect(o4MiniModel).toBeDefined();
+      expect(o4MiniModel!.supportsReasoning).toBe(true);
     });
 
-    it("should NOT mark gpt-4o as supporting reasoning", async () => {
+    it("should NOT mark gpt-4.1 as supporting reasoning", async () => {
       const provider = new OpenAIProvider("sk-test");
       const models = await provider.models();
-      const gpt4oModel = models.find((m) => m.id === "gpt-4o");
-      expect(gpt4oModel).toBeDefined();
-      expect(gpt4oModel!.supportsReasoning).toBeUndefined();
+      const gpt41Model = models.find((m) => m.id === "gpt-4.1");
+      expect(gpt41Model).toBeDefined();
+      expect(gpt41Model!.supportsReasoning).toBeUndefined();
     });
 
     it("should extract reasoning from o1 chat response", async () => {

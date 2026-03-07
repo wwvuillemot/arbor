@@ -10,6 +10,8 @@ import {
   Link,
   Sparkles,
   Mic,
+  MessageSquarePlus,
+  Image,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +59,8 @@ export interface FileTreeNodeProps {
   onSelect: (nodeId: string) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
   onRename?: (nodeId: string, newName: string) => void;
+  onAddToContext?: (node: TreeNode) => void;
+  isInContext?: boolean;
   onDrop?: (
     draggedNodeId: string,
     targetNodeId: string,
@@ -77,7 +81,17 @@ const nodeTypeIcons: Record<
   audio_note: { collapsed: Mic, expanded: Mic },
 };
 
-function getNodeIcon(type: string, isExpanded: boolean) {
+function isImageOnlyContent(content: unknown): boolean {
+  if (!content || typeof content !== "object") return false;
+  const doc = content as { type?: string; content?: unknown[] };
+  if (doc.type !== "doc" || !doc.content || doc.content.length !== 1)
+    return false;
+  const first = doc.content[0] as { type?: string };
+  return first.type === "image";
+}
+
+function getNodeIcon(type: string, isExpanded: boolean, content?: unknown) {
+  if (type === "note" && isImageOnlyContent(content)) return Image;
   const icons = nodeTypeIcons[type] || nodeTypeIcons.note;
   return isExpanded ? icons.expanded : icons.collapsed;
 }
@@ -94,11 +108,13 @@ export function FileTreeNode({
   onSelect,
   onContextMenu,
   onRename,
+  onAddToContext,
+  isInContext,
   onDrop,
   renderChildren,
 }: FileTreeNodeProps) {
   const isExpandable = expandableTypes.has(node.type);
-  const Icon = getNodeIcon(node.type, isExpanded);
+  const Icon = getNodeIcon(node.type, isExpanded, node.content);
 
   // Inline editing state
   const [isEditing, setIsEditing] = React.useState(false);
@@ -277,7 +293,7 @@ export function FileTreeNode({
         onDragLeave={handleDragLeave}
         onDrop={handleDropEvent}
         className={cn(
-          "flex items-center gap-1 px-2 py-1 cursor-pointer rounded-sm text-sm",
+          "group/node flex items-center gap-1 px-2 py-1 cursor-pointer rounded-sm text-sm",
           "hover:bg-accent hover:text-accent-foreground",
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           "transition-colors",
@@ -327,6 +343,27 @@ export function FileTreeNode({
           <span className="truncate flex-1" onDoubleClick={handleDoubleClick}>
             {node.name}
           </span>
+        )}
+
+        {/* Add to chat context button — shown on hover when handler is provided */}
+        {onAddToContext && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToContext(node);
+            }}
+            className={cn(
+              "flex-shrink-0 p-0.5 rounded transition-colors",
+              isInContext
+                ? "text-primary opacity-100"
+                : "opacity-0 group-hover/node:opacity-100 text-muted-foreground hover:text-primary",
+            )}
+            title={
+              isInContext ? "Remove from chat context" : "Add to chat context"
+            }
+          >
+            <MessageSquarePlus className="w-3 h-3" />
+          </button>
         )}
 
         {/* LLM Attribution badge */}

@@ -9,7 +9,11 @@ const nodeService = new NodeService();
 const provenanceService = new ProvenanceService();
 
 const createCaller = () => {
-  const ctx = createContext({ req: {} as any, res: {} as any });
+  const ctx = createContext({
+    req: {} as any,
+    res: {} as any,
+    info: {} as any,
+  });
   return appRouter.createCaller(ctx);
 };
 

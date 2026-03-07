@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { TRPCProvider } from "@/components/providers/trpc-provider";
+import "../styles/globals.css";
 
 export async function generateMetadata({
   params,
@@ -33,10 +34,20 @@ export async function generateMetadata({
  * This prevents the QueryClient from being recreated when the user changes languages,
  * which would otherwise clear all cached data (current project, preferences, API keys).
  */
-export default function RootLayout({
+export default async function RootLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ locale?: string }>;
 }) {
-  return <TRPCProvider>{children}</TRPCProvider>;
+  const { locale } = await params;
+
+  return (
+    <html lang={locale ?? "en"} suppressHydrationWarning>
+      <body>
+        <TRPCProvider>{children}</TRPCProvider>
+      </body>
+    </html>
+  );
 }

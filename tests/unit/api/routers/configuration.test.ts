@@ -6,7 +6,7 @@ import { like } from "drizzle-orm";
 import { DEFAULT_CONFIG } from "@/config/defaults";
 
 describe("Configuration Router", () => {
-  const caller = appRouter.createCaller({});
+  const caller = appRouter.createCaller({} as any);
 
   beforeEach(async () => {
     // Clean up test data

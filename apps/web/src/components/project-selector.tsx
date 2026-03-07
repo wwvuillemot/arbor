@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { useRouter, usePathname } from "next/navigation";
 import { FolderTree, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -15,6 +16,8 @@ export function ProjectSelector({ isCollapsed }: ProjectSelectorProps) {
   const t = useTranslations("projects");
   const [isOpen, setIsOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const pathname = usePathname();
 
   const { currentProjectId, setCurrentProject } = useCurrentProject();
   const projectsQuery = trpc.nodes.getAllProjects.useQuery(undefined, {
@@ -64,6 +67,10 @@ export function ProjectSelector({ isCollapsed }: ProjectSelectorProps) {
   const handleSelectProject = async (projectId: string) => {
     await setCurrentProject(projectId);
     setIsOpen(false);
+    // Navigate to /projects if not already there
+    if (!pathname.includes("/projects")) {
+      router.push("/projects");
+    }
   };
 
   if (isCollapsed) {

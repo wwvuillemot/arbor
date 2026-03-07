@@ -1,7 +1,7 @@
 import { db } from "../db/index";
 import { mediaAttachments } from "../db/schema";
 import type { MediaAttachment } from "../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
 import { MinioService, createMinioService } from "./minio";
 
 const DEFAULT_BUCKET = "arbor-media";
@@ -88,6 +88,19 @@ export class MediaAttachmentService {
       .select()
       .from(mediaAttachments)
       .where(eq(mediaAttachments.nodeId, nodeId));
+  }
+
+  /**
+   * Get all image attachments for a project.
+   * Uses objectKey prefix ({projectId}/...) since attachments don't have a direct projectId column.
+   */
+  async getImageAttachmentsByProjectId(
+    projectId: string,
+  ): Promise<MediaAttachment[]> {
+    return await db
+      .select()
+      .from(mediaAttachments)
+      .where(like(mediaAttachments.objectKey, `${projectId}/%`));
   }
 
   /**

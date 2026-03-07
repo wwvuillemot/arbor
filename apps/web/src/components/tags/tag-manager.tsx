@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Globe, FolderTree } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/contexts/toast-context";
@@ -29,16 +29,19 @@ const DEFAULT_COLORS = [
 ];
 
 export interface TagManagerProps {
+  /** Current project context. When set, shows global + project tags and allows scoping. */
+  projectId?: string;
   className?: string;
 }
 
 /**
  * TagManager - Full tag management panel
  *
- * Displays all tags with create/edit/delete functionality,
- * color picker, and type filter.
+ * Displays all tags with create/edit/delete functionality.
+ * When `projectId` is provided, shows global tags + project-scoped tags,
+ * and allows creating new tags as either global or project-scoped.
  */
-export function TagManager({ className }: TagManagerProps) {
+export function TagManager({ projectId, className }: TagManagerProps) {
   const t = useTranslations("tags");
   const tCommon = useTranslations("common");
   const { addToast } = useToast();
@@ -54,11 +57,20 @@ export function TagManager({ className }: TagManagerProps) {
   const [formName, setFormName] = React.useState("");
   const [formColor, setFormColor] = React.useState(DEFAULT_COLORS[0]);
   const [formType, setFormType] = React.useState<string>("general");
+  // Scope: "project" = scoped to current project, "global" = visible everywhere
+  const [formScope, setFormScope] = React.useState<"project" | "global">(
+    projectId ? "project" : "global",
+  );
 
   const utils = trpc.useUtils();
 
+  // Fetch tags: global + project-scoped (if projectId provided)
   const tagsQuery = trpc.tags.getAll.useQuery(
-    filterType ? { type: filterType } : {},
+    filterType
+      ? { type: filterType as TagType, ...(projectId ? { projectId } : {}) }
+      : projectId
+        ? { projectId }
+        : {},
   );
 
   const createMutation = trpc.tags.create.useMutation({
@@ -100,13 +112,15 @@ export function TagManager({ className }: TagManagerProps) {
     setFormName("");
     setFormColor(DEFAULT_COLORS[0]);
     setFormType("general");
+    setFormScope(projectId ? "project" : "global");
   }
 
-  function openEditForm(tag: TagBadgeTag) {
+  function openEditForm(tag: TagBadgeTag & { projectId?: string | null }) {
     setEditingTag(tag);
     setFormName(tag.name);
     setFormColor(tag.color || DEFAULT_COLORS[0]);
     setFormType(tag.type);
+    setFormScope(tag.projectId ? "project" : "global");
     setShowCreateForm(false);
   }
 
@@ -116,6 +130,7 @@ export function TagManager({ className }: TagManagerProps) {
       name: formName.trim(),
       color: formColor,
       type: formType as TagType,
+      projectId: formScope === "project" && projectId ? projectId : null,
     });
   }
 
@@ -126,6 +141,7 @@ export function TagManager({ className }: TagManagerProps) {
       name: formName.trim(),
       color: formColor,
       type: formType as TagType,
+      projectId: formScope === "project" && projectId ? projectId : null,
     });
   }
 
@@ -134,16 +150,57 @@ export function TagManager({ className }: TagManagerProps) {
     deleteMutation.mutate({ id: deleteConfirm.id });
   }
 
-  const tags = (tagsQuery.data ?? []) as TagBadgeTag[];
+  const allTags = (tagsQuery.data ?? []) as (TagBadgeTag & {
+    projectId?: string | null;
+  })[];
+
+  // Split into project-scoped and global
+  const projectTags = projectId
+    ? allTags.filter((tag) => tag.projectId === projectId)
+    : [];
+  const globalTags = allTags.filter((tag) => !tag.projectId);
 
   const isFormOpen = showCreateForm || editingTag !== null;
+
+  function renderTagGroup(
+    groupTags: (TagBadgeTag & { projectId?: string | null })[],
+    label: string,
+    icon: React.ReactNode,
+  ) {
+    if (groupTags.length === 0) return null;
+    return (
+      <div>
+        <div className="flex items-center gap-1 mb-1.5">
+          {icon}
+          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+            {label}
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {groupTags.map((tag) => (
+            <div key={tag.id} className="group relative">
+              <TagBadge tag={tag} onClick={() => openEditForm(tag)} />
+              <button
+                onClick={() => setDeleteConfirm(tag)}
+                className="absolute -top-1 -right-1 hidden group-hover:flex w-4 h-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs leading-none"
+                data-testid={`tag-delete-${tag.id}`}
+                aria-label={`${t("delete")} ${tag.name}`}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       className={cn("flex flex-col gap-3", className)}
       data-testid="tag-manager"
     >
-      {/* Header with create button */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">{t("title")}</h3>
         <button
@@ -197,6 +254,7 @@ export function TagManager({ className }: TagManagerProps) {
               <X className="w-3 h-3" />
             </button>
           </div>
+
           <input
             type="text"
             value={formName}
@@ -206,14 +264,12 @@ export function TagManager({ className }: TagManagerProps) {
             data-testid="tag-form-name"
             onKeyDown={(e) => {
               if (e.key === "Enter") {
-                if (editingTag) {
-                  handleUpdate();
-                } else {
-                  handleCreate();
-                }
+                if (editingTag) handleUpdate();
+                else handleCreate();
               }
             }}
           />
+
           <div className="flex items-center gap-2">
             <label className="text-xs text-muted-foreground">
               {t("color")}:
@@ -236,6 +292,7 @@ export function TagManager({ className }: TagManagerProps) {
               ))}
             </div>
           </div>
+
           <select
             value={formType}
             onChange={(e) => setFormType(e.target.value)}
@@ -248,6 +305,37 @@ export function TagManager({ className }: TagManagerProps) {
               </option>
             ))}
           </select>
+
+          {/* Scope toggle — shown when in a project context (create or edit) */}
+          {projectId && (
+            <div className="flex rounded border overflow-hidden text-xs">
+              <button
+                onClick={() => setFormScope("project")}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1 py-1 transition-colors",
+                  formScope === "project"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background hover:bg-accent",
+                )}
+              >
+                <FolderTree className="w-3 h-3" />
+                {t("scopeProject")}
+              </button>
+              <button
+                onClick={() => setFormScope("global")}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1 py-1 transition-colors",
+                  formScope === "global"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background hover:bg-accent",
+                )}
+              >
+                <Globe className="w-3 h-3" />
+                {t("scopeGlobal")}
+              </button>
+            </div>
+          )}
+
           <button
             onClick={editingTag ? handleUpdate : handleCreate}
             disabled={
@@ -269,14 +357,27 @@ export function TagManager({ className }: TagManagerProps) {
         </div>
       )}
 
-      {/* Tag list */}
-      {tags.length === 0 ? (
+      {/* Tag list — grouped when in project context */}
+      {allTags.length === 0 ? (
         <p className="text-xs text-muted-foreground" data-testid="tag-empty">
           {t("noTags")}
         </p>
+      ) : projectId ? (
+        <div className="flex flex-col gap-3" data-testid="tag-list">
+          {renderTagGroup(
+            projectTags,
+            t("scopeProject"),
+            <FolderTree className="w-3 h-3 text-muted-foreground" />,
+          )}
+          {renderTagGroup(
+            globalTags,
+            t("scopeGlobal"),
+            <Globe className="w-3 h-3 text-muted-foreground" />,
+          )}
+        </div>
       ) : (
         <div className="flex flex-wrap gap-1.5" data-testid="tag-list">
-          {tags.map((tag) => (
+          {allTags.map((tag) => (
             <div key={tag.id} className="group relative">
               <TagBadge tag={tag} onClick={() => openEditForm(tag)} />
               <button

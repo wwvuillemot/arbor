@@ -199,6 +199,7 @@
       "title": "Welcome to Arbor",
       "description": "Let's get everything set up for you.",
       "steps": {
+        "checkingServices": "Checking services...",
         "checkingDocker": "Checking Docker installation...",
         "startingServices": "Starting services...",
         "initializingDatabase": "Initializing database...",
@@ -276,13 +277,15 @@
     "error": "Failed to send message",
     "loadingModels": "Loading models...",
     "defaultModel": "Default",
-    "useProviderDefault": "Use provider default"
+    "useProviderDefault": "Use provider default",
+    "selectThread": "Select a thread..."
   },
   "search": {
     "title": "Search",
     "description": "Search across all your notes, projects, and content.",
     "placeholder": "Search your content...",
     "clear": "Clear search",
+    "close": "Close search",
     "mode": {
       "hybrid": "Hybrid",
       "vector": "Semantic",
@@ -295,6 +298,10 @@
     },
     "filters": "Filters",
     "filterNodeType": "Node Type",
+    "filterProject": "Project",
+    "allProjects": "All projects",
+    "filterTags": "Tags",
+    "clearFilters": "Clear all filters",
     "searching": "Searching...",
     "noResults": "No results found",
     "prompt": "Enter a search query to find content",
@@ -316,7 +323,10 @@
       "name": "Project Name",
       "namePlaceholder": "My Novel",
       "creating": "Creating...",
-      "create": "Create Project"
+      "create": "Create Project",
+      "createBlank": "Create blank",
+      "importFromFolder": "Import from folder",
+      "importing": "Importing..."
     },
     "editDialog": {
       "title": "Edit Project",
@@ -361,6 +371,8 @@
     "saving": "Saving...",
     "saved": "Saved",
     "saveFailed": "Save failed",
+    "insertLink": "Insert link",
+    "removeLink": "Remove link",
     "insertImage": "Insert image",
     "imageUpload": {
       "uploading": "Uploading image...",
@@ -489,6 +501,8 @@
     "entityUnlinkError": "Failed to unlink entity page",
     "unlinkEntity": "Unlink entity page",
     "entityTag": "Entity tag",
+    "scopeProject": "This Project",
+    "scopeGlobal": "Global",
     "browser": {
       "browse": "Browse",
       "cloudView": "Cloud view",

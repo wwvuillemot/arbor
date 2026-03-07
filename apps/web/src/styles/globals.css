@@ -58,3 +58,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* TipTap / ProseMirror heading styles — Tailwind Preflight resets h1-h6 to
+   unstyled text, so we re-apply size/weight directly on the ProseMirror root. */
+.ProseMirror h1 {
+  font-size: 2em;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-top: 0.75em;
+  margin-bottom: 0.4em;
+}
+
+.ProseMirror h2 {
+  font-size: 1.5em;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 0.75em;
+  margin-bottom: 0.4em;
+}
+
+.ProseMirror h3 {
+  font-size: 1.25em;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 0.75em;
+  margin-bottom: 0.4em;
+}

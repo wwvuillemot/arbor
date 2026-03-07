@@ -1,5 +1,10 @@
 import { beforeAll, afterAll, beforeEach } from "vitest";
-import { getTestDb, cleanupTestDb, resetTestDb } from "./helpers/db";
+import {
+  acquireTestDbSuiteLock,
+  getTestDb,
+  cleanupTestDb,
+  resetTestDb,
+} from "./helpers/db";
 
 // Skip database setup for tests that don't need it
 const SKIP_DB_SETUP = process.env.SKIP_DB_SETUP === "true";
@@ -11,6 +16,7 @@ beforeAll(async () => {
   }
   // Ensure test database connection is ready
   await getTestDb();
+  await acquireTestDbSuiteLock();
 });
 
 // Clean up after all tests

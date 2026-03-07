@@ -19,11 +19,14 @@ import {
   Redo,
   RemoveFormatting,
   ImagePlus,
+  Link2,
+  Unlink,
 } from "lucide-react";
 
 interface EditorToolbarProps {
   editor: Editor | null;
   onInsertImage?: () => void;
+  onInsertLink?: () => void;
 }
 
 interface ToolbarButtonProps {
@@ -44,6 +47,10 @@ function ToolbarButton({
   return (
     <button
       type="button"
+      // Prevent the editor from losing focus (and losing selection) when a
+      // toolbar button is clicked. Cursor positioning uses mousedown; we must
+      // not steal focus from the contenteditable. The click event still fires.
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -62,7 +69,11 @@ function ToolbarDivider() {
   return <div className="w-px h-6 bg-border mx-1" />;
 }
 
-export function EditorToolbar({ editor, onInsertImage }: EditorToolbarProps) {
+export function EditorToolbar({
+  editor,
+  onInsertImage,
+  onInsertLink,
+}: EditorToolbarProps) {
   const t = useTranslations("editor");
 
   if (!editor) return null;
@@ -147,6 +158,24 @@ export function EditorToolbar({ editor, onInsertImage }: EditorToolbarProps) {
       >
         <Code size={iconSize} />
       </ToolbarButton>
+      {/* Insert/change link — always visible so the user can edit an existing link */}
+      <ToolbarButton
+        onClick={() => onInsertLink?.()}
+        disabled={!onInsertLink}
+        isActive={editor.isActive("link")}
+        title={t("insertLink")}
+      >
+        <Link2 size={iconSize} />
+      </ToolbarButton>
+      {/* Remove link — only shown when cursor is inside a link mark */}
+      {editor.isActive("link") && (
+        <ToolbarButton
+          onClick={() => editor.chain().focus().unsetLink().run()}
+          title={t("removeLink")}
+        >
+          <Unlink size={iconSize} />
+        </ToolbarButton>
+      )}
 
       <ToolbarDivider />
 

@@ -12,6 +12,178 @@ import { SearchService } from "./search-service";
 import { LocalEmbeddingProvider } from "./embedding-service";
 import type { ToolDefinition } from "./llm-service";
 
+/**
+ * Minimal markdown → TipTap JSON converter for LLM-generated content.
+ * Handles: headings, paragraphs, bold, italic, inline code, code blocks,
+ * bullet/ordered lists, blockquotes, horizontal rules.
+ */
+function markdownToTipTap(markdown: string): {
+  type: "doc";
+  content: unknown[];
+} {
+  const lines = markdown.split("\n");
+  const content: unknown[] = [];
+  let i = 0;
+
+  const parseInline = (text: string): unknown[] => {
+    const nodes: unknown[] = [];
+    const pattern =
+      /(\*\*\*(.+?)\*\*\*|\*\*(.+?)\*\*|__(.+?)__|_(.+?)_|\*(.+?)\*|`(.+?)`|\[([^\]]+)\]\(([^)]+)\))/gs;
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(text)) !== null) {
+      if (m.index > last)
+        nodes.push({ type: "text", text: text.slice(last, m.index) });
+      const [, , bi, b, b2, it, it2, code, linkText, linkHref] = m;
+      if (bi)
+        nodes.push({
+          type: "text",
+          marks: [{ type: "bold" }, { type: "italic" }],
+          text: bi,
+        });
+      else if (b || b2)
+        nodes.push({ type: "text", marks: [{ type: "bold" }], text: b || b2 });
+      else if (it || it2)
+        nodes.push({
+          type: "text",
+          marks: [{ type: "italic" }],
+          text: it || it2,
+        });
+      else if (code)
+        nodes.push({ type: "text", marks: [{ type: "code" }], text: code });
+      else if (linkHref !== undefined && linkText !== undefined) {
+        nodes.push({
+          type: "text",
+          marks: [{ type: "link", attrs: { href: linkHref } }],
+          text: linkText,
+        });
+      }
+      last = m.index + m[0].length;
+    }
+    if (last < text.length)
+      nodes.push({ type: "text", text: text.slice(last) });
+    return nodes.filter((n: any) => n.type !== "text" || n.text);
+  };
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.match(/^```/)) {
+      const lang = line.slice(3).trim() || null;
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].match(/^```/)) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++;
+      content.push({
+        type: "codeBlock",
+        attrs: { language: lang },
+        content: [{ type: "text", text: codeLines.join("\n") }],
+      });
+      continue;
+    }
+    const h = line.match(/^(#{1,6})\s+(.*)/);
+    if (h) {
+      content.push({
+        type: "heading",
+        attrs: { level: h[1].length },
+        content: parseInline(h[2]),
+      });
+      i++;
+      continue;
+    }
+    if (
+      line.match(/^(\s*[-*_]){3,}\s*$/) &&
+      line.replace(/[\s\-*_]/g, "").length === 0
+    ) {
+      content.push({ type: "horizontalRule" });
+      i++;
+      continue;
+    }
+    if (line.startsWith(">")) {
+      const qLines: string[] = [];
+      while (i < lines.length && lines[i].startsWith(">")) {
+        qLines.push(lines[i].replace(/^>\s?/, ""));
+        i++;
+      }
+      const inner = markdownToTipTap(qLines.join("\n"));
+      content.push({ type: "blockquote", content: inner.content });
+      continue;
+    }
+    if (line.match(/^[\s]*[-*+]\s/)) {
+      const items: unknown[] = [];
+      while (i < lines.length && lines[i].match(/^[\s]*[-*+]\s/)) {
+        items.push({
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: parseInline(lines[i].replace(/^[\s]*[-*+]\s/, "")),
+            },
+          ],
+        });
+        i++;
+      }
+      content.push({ type: "bulletList", content: items });
+      continue;
+    }
+    if (line.match(/^\s*\d+[.)]\s/)) {
+      const items: unknown[] = [];
+      while (i < lines.length && lines[i].match(/^\s*\d+[.)]\s/)) {
+        items.push({
+          type: "listItem",
+          content: [
+            {
+              type: "paragraph",
+              content: parseInline(lines[i].replace(/^\s*\d+[.)]\s/, "")),
+            },
+          ],
+        });
+        i++;
+      }
+      content.push({ type: "orderedList", content: items });
+      continue;
+    }
+    if (line.trim() === "") {
+      i++;
+      continue;
+    }
+    const paraLines: string[] = [];
+    while (
+      i < lines.length &&
+      lines[i].trim() !== "" &&
+      !lines[i].match(/^#{1,6}\s/) &&
+      !lines[i].match(/^```/) &&
+      !lines[i].startsWith(">") &&
+      !lines[i].match(/^[\s]*[-*+]\s/) &&
+      !lines[i].match(/^\s*\d+[.)]\s/)
+    ) {
+      paraLines.push(lines[i]);
+      i++;
+    }
+    if (paraLines.length > 0)
+      content.push({
+        type: "paragraph",
+        content: parseInline(paraLines.join("\n")),
+      });
+  }
+
+  return {
+    type: "doc",
+    content:
+      content.length > 0 ? content : [{ type: "paragraph", content: [] }],
+  };
+}
+
+/** Recursively collect all image nodes from a TipTap document tree. */
+function collectImageNodes(node: any): unknown[] {
+  if (!node || typeof node !== "object") return [];
+  if (node.type === "image") return [node];
+  if (!Array.isArray(node.content)) return [];
+  return node.content.flatMap((child: any) => collectImageNodes(child));
+}
+
 // Initialize services for tool execution
 const nodeService = new NodeService();
 const tagService = new TagService();
@@ -34,7 +206,14 @@ export async function getMCPTools(): Promise<ToolDefinition[]> {
         properties: {
           type: {
             type: "string",
-            enum: ["project", "folder", "note", "link", "ai_suggestion", "audio_note"],
+            enum: [
+              "project",
+              "folder",
+              "note",
+              "link",
+              "ai_suggestion",
+              "audio_note",
+            ],
             description: "Type of node to create",
           },
           name: {
@@ -72,8 +251,9 @@ export async function getMCPTools(): Promise<ToolDefinition[]> {
             description: "New name for the node (optional)",
           },
           content: {
-            type: "object",
-            description: "New content for the node (optional)",
+            type: "string",
+            description:
+              "New content for the node as Markdown text (optional). Will be converted to the editor format automatically.",
           },
           metadata: {
             type: "object",
@@ -125,21 +305,30 @@ export async function getMCPTools(): Promise<ToolDefinition[]> {
     },
     {
       name: "list_nodes",
-      description: "List child nodes of a parent, optionally filtered by type",
+      description:
+        "List child nodes of a parent, optionally filtered by type. Omit parentId (or pass null) to list all top-level nodes (projects).",
       parameters: {
         type: "object",
         properties: {
           parentId: {
             type: "string",
-            description: "UUID of the parent node",
+            description:
+              "UUID of the parent node. Omit to list top-level nodes.",
           },
           type: {
             type: "string",
-            enum: ["project", "folder", "note", "link", "ai_suggestion", "audio_note"],
+            enum: [
+              "project",
+              "folder",
+              "note",
+              "link",
+              "ai_suggestion",
+              "audio_note",
+            ],
             description: "Filter by node type (optional)",
           },
         },
-        required: ["parentId"],
+        required: [],
       },
     },
     {
@@ -154,7 +343,14 @@ export async function getMCPTools(): Promise<ToolDefinition[]> {
           },
           type: {
             type: "string",
-            enum: ["project", "folder", "note", "link", "ai_suggestion", "audio_note"],
+            enum: [
+              "project",
+              "folder",
+              "note",
+              "link",
+              "ai_suggestion",
+              "audio_note",
+            ],
             description: "Filter by node type (optional)",
           },
         },
@@ -163,7 +359,8 @@ export async function getMCPTools(): Promise<ToolDefinition[]> {
     },
     {
       name: "search_semantic",
-      description: "Search nodes using keyword matching across names and content",
+      description:
+        "Search nodes using keyword matching across names and content",
       parameters: {
         type: "object",
         properties: {
@@ -260,7 +457,8 @@ export async function getMCPTools(): Promise<ToolDefinition[]> {
     },
     {
       name: "export_project",
-      description: "Export a project and all its contents in markdown or HTML format",
+      description:
+        "Export a project and all its contents in markdown or HTML format",
       parameters: {
         type: "object",
         properties: {
@@ -280,6 +478,7 @@ export async function getMCPTools(): Promise<ToolDefinition[]> {
   ];
 
   // Convert to LLM ToolDefinition format
+  const tools: ToolDefinition[] = [];
   for (const tool of mcpTools) {
     tools.push({
       type: "function",
@@ -310,7 +509,10 @@ export async function executeMCPTool(
           type: args.type as any,
           name: args.name as string,
           parentId: (args.parentId as string | undefined) || null,
-          content: args.content,
+          content:
+            typeof args.content === "string"
+              ? markdownToTipTap(args.content)
+              : args.content,
           metadata: args.metadata as Record<string, unknown> | undefined,
           createdBy: "llm:chat-agent",
           updatedBy: "llm:chat-agent",
@@ -322,7 +524,23 @@ export async function executeMCPTool(
       case "update_node": {
         const updates: Record<string, unknown> = {};
         if (args.name !== undefined) updates.name = args.name;
-        if (args.content !== undefined) updates.content = args.content;
+        if (args.content !== undefined) {
+          if (typeof args.content === "string") {
+            const newDoc = markdownToTipTap(args.content);
+            // Preserve image nodes from existing content so LLM edits don't wipe them
+            const existing = await nodeService.getNodeById(args.id as string);
+            if (existing?.content && typeof existing.content === "object") {
+              const existingDoc = existing.content as any;
+              const imageNodes = collectImageNodes(existingDoc);
+              if (imageNodes.length > 0) {
+                (newDoc.content as unknown[]).push(...imageNodes);
+              }
+            }
+            updates.content = newDoc;
+          } else {
+            updates.content = args.content;
+          }
+        }
         if (args.metadata !== undefined) updates.metadata = args.metadata;
         if (args.position !== undefined) updates.position = args.position;
         updates.updatedBy = "llm:chat-agent";
@@ -349,7 +567,28 @@ export async function executeMCPTool(
       }
 
       case "list_nodes": {
-        let children = await nodeService.getNodesByParentId(args.parentId as string);
+        const parentId =
+          args.parentId && args.parentId !== "root"
+            ? (args.parentId as string)
+            : null;
+        let children;
+        if (parentId) {
+          children = await nodeService.getNodesByParentId(parentId);
+        } else {
+          // Top-level nodes: query where parentId IS NULL
+          const { db } = await import("../db/index");
+          const { nodes } = await import("../db/schema");
+          const { isNull, eq, and, asc } = await import("drizzle-orm");
+          const conditions = [isNull(nodes.parentId)];
+          if (args.type) conditions.push(eq(nodes.type, args.type as any));
+          children = await db
+            .select()
+            .from(nodes)
+            .where(and(...conditions))
+            .orderBy(asc(nodes.position));
+          result = children;
+          break;
+        }
         if (args.type) {
           children = children.filter((c) => c.type === args.type);
         }
@@ -374,10 +613,10 @@ export async function executeMCPTool(
         const results =
           conditions.length > 0
             ? await db
-              .select()
-              .from(nodes)
-              .where(and(...conditions))
-              .limit(50)
+                .select()
+                .from(nodes)
+                .where(and(...conditions))
+                .limit(50)
             : await db.select().from(nodes).limit(50);
 
         result = results;
@@ -413,7 +652,9 @@ export async function executeMCPTool(
       }
 
       case "remove_tag": {
-        const nodeTagsList = await tagService.getNodeTags(args.nodeId as string);
+        const nodeTagsList = await tagService.getNodeTags(
+          args.nodeId as string,
+        );
         const tag = nodeTagsList.find((t) => t.name === args.tagName);
         if (!tag) {
           result = {
@@ -422,7 +663,11 @@ export async function executeMCPTool(
           };
         } else {
           await tagService.removeTagFromNode(args.nodeId as string, tag.id);
-          result = { removed: true, nodeId: args.nodeId, tagName: args.tagName };
+          result = {
+            removed: true,
+            nodeId: args.nodeId,
+            tagName: args.tagName,
+          };
         }
         break;
       }
@@ -450,7 +695,9 @@ export async function executeMCPTool(
         const content =
           format === "html"
             ? await exportService.exportProjectAsHtml(args.projectId as string)
-            : await exportService.exportProjectAsMarkdown(args.projectId as string);
+            : await exportService.exportProjectAsMarkdown(
+                args.projectId as string,
+              );
         result = { content, format };
         break;
       }
@@ -468,4 +715,3 @@ export async function executeMCPTool(
     });
   }
 }
-

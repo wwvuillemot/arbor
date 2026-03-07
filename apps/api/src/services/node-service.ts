@@ -1,7 +1,7 @@
 import { db } from "../db/index";
 import { nodes } from "../db/schema";
 import type { NodeType, AuthorType, ActorType } from "../db/schema";
-import { eq, isNull, and, asc } from "drizzle-orm";
+import { eq, isNull, and, sql } from "drizzle-orm";
 import { ProvenanceService } from "./provenance-service";
 
 const provenanceService = new ProvenanceService();
@@ -111,7 +111,7 @@ export class NodeService {
       .select()
       .from(nodes)
       .where(eq(nodes.parentId, parentId))
-      .orderBy(asc(nodes.position));
+      .orderBy(nodes.position, sql`lower(${nodes.name}) asc`);
   }
 
   /**
@@ -121,7 +121,35 @@ export class NodeService {
     return await db
       .select()
       .from(nodes)
-      .where(and(eq(nodes.type, "project"), isNull(nodes.parentId)));
+      .where(and(eq(nodes.type, "project"), isNull(nodes.parentId)))
+      .orderBy(nodes.position, sql`lower(${nodes.name}) asc`);
+  }
+
+  /**
+   * Resolve the top-level project ID for any node in a project tree.
+   */
+  async getProjectIdForNode(nodeId: string) {
+    let currentNode = await this.getNodeById(nodeId);
+
+    if (!currentNode) {
+      throw new Error("Node not found");
+    }
+
+    while (currentNode.parentId) {
+      const parentNode = await this.getNodeById(currentNode.parentId);
+
+      if (!parentNode) {
+        throw new Error("Parent node not found");
+      }
+
+      currentNode = parentNode;
+    }
+
+    if (currentNode.type !== "project") {
+      throw new Error("Top-level node is not a project");
+    }
+
+    return currentNode.id;
   }
 
   /**

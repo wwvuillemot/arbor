@@ -54,6 +54,10 @@ export interface FileTreeProps {
   filterNodeIds?: Set<string> | null;
   /** When set to a value other than "all", filter leaf nodes by attribution */
   attributionFilter?: AttributionFilter;
+  /** When provided, show "add to chat context" button on each node */
+  onAddToContext?: (node: TreeNode) => void;
+  /** IDs of nodes currently in chat context (to show them as active) */
+  contextNodeIds?: Set<string>;
   className?: string;
 }
 
@@ -76,6 +80,8 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
       onMoveNode,
       filterNodeIds,
       attributionFilter,
+      onAddToContext,
+      contextNodeIds,
       className,
     },
     ref,
@@ -113,7 +119,7 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
     }, [selectedNodeId, selectedNodeQuery.data, projectId]);
 
     // Cache for loaded children per parent node
-    const childrenQueries = new Map<
+    const _childrenQueries = new Map<
       string,
       ReturnType<typeof trpc.nodes.getChildren.useQuery>
     >();
@@ -180,6 +186,8 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
             onDrop={onMoveNode}
             filterNodeIds={filterNodeIds}
             attributionFilter={attributionFilter}
+            onAddToContext={onAddToContext}
+            contextNodeIds={contextNodeIds}
             emptyMessage={t("emptyProject")}
           />
         </div>
@@ -249,6 +257,8 @@ function ChildrenList({
   onDrop,
   filterNodeIds,
   attributionFilter,
+  onAddToContext,
+  contextNodeIds,
   emptyMessage,
 }: {
   parentId: string;
@@ -266,6 +276,8 @@ function ChildrenList({
   ) => void;
   filterNodeIds?: Set<string> | null;
   attributionFilter?: AttributionFilter;
+  onAddToContext?: (node: TreeNode) => void;
+  contextNodeIds?: Set<string>;
   emptyMessage?: string;
 }) {
   const childrenQuery = trpc.nodes.getChildren.useQuery(
@@ -375,9 +387,20 @@ function ChildrenList({
     return null;
   }
 
+  // Sort: folders before files, then by position, then alphabetically
+  const sortedChildren = [...filteredChildren].sort((a, b) => {
+    const aIsContainer = containerTypes.has(a.type);
+    const bIsContainer = containerTypes.has(b.type);
+    if (aIsContainer !== bIsContainer) return aIsContainer ? -1 : 1;
+    const posA = (a as { position?: number | null }).position ?? 0;
+    const posB = (b as { position?: number | null }).position ?? 0;
+    if (posA !== posB) return posA - posB;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  });
+
   return (
     <>
-      {filteredChildren.map((child) => (
+      {sortedChildren.map((child) => (
         <FileTreeNode
           key={child.id}
           node={child as TreeNode}
@@ -390,6 +413,8 @@ function ChildrenList({
           onContextMenu={onContextMenu}
           onRename={onRename}
           onDrop={onDrop}
+          onAddToContext={onAddToContext}
+          isInContext={contextNodeIds?.has(child.id)}
           renderChildren={(childParentId, childDepth) => (
             <ChildrenList
               parentId={childParentId}
@@ -403,6 +428,8 @@ function ChildrenList({
               onDrop={onDrop}
               filterNodeIds={filterNodeIds}
               attributionFilter={attributionFilter}
+              onAddToContext={onAddToContext}
+              contextNodeIds={contextNodeIds}
             />
           )}
         />

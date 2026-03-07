@@ -28,6 +28,7 @@ describe("Settings Router", () => {
     const ctx = createContext({
       req: {} as any,
       res: {} as any,
+      info: {} as any,
     });
     return appRouter.createCaller(ctx);
   };

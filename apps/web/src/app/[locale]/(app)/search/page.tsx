@@ -1,16 +1,13 @@
 "use client";
 
-import { SearchPanel } from "@/components/search";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SearchPage() {
-  return (
-    <div className="h-full">
-      <SearchPanel
-        onSelectNode={(nodeId) => {
-          // TODO: Navigate to node in projects page
-          console.log("Navigate to node:", nodeId);
-        }}
-      />
-    </div>
-  );
+  const router = useRouter();
+  // Search is now a modal (Cmd+K). Redirect to projects.
+  useEffect(() => {
+    router.replace("/projects");
+  }, [router]);
+  return null;
 }

@@ -204,7 +204,7 @@ describe("MCP Server", () => {
       });
 
       expect(result.contents.length).toBe(1);
-      const node = JSON.parse(result.contents[0].text as string);
+      const node = JSON.parse((result.contents[0] as { text: string }).text);
 
       expect(node.name).toBe("Resource Test Project");
       expect(node.type).toBe("project");
@@ -225,7 +225,9 @@ describe("MCP Server", () => {
       const result = await client.readResource({ uri: "project://list" });
 
       expect(result.contents.length).toBe(1);
-      const projects = JSON.parse(result.contents[0].text as string);
+      const projects = JSON.parse(
+        (result.contents[0] as { text: string }).text,
+      );
 
       expect(projects.length).toBeGreaterThanOrEqual(2);
       expect(projects.every((p: any) => p.type === "project")).toBe(true);

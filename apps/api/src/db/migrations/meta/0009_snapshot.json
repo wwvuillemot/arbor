@@ -96,9 +96,7 @@
         "agent_modes_name_unique": {
           "name": "agent_modes_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
+          "columns": ["name"]
         }
       },
       "policies": {},
@@ -212,12 +210,8 @@
           "name": "agent_tasks_thread_id_chat_threads_id_fk",
           "tableFrom": "agent_tasks",
           "tableTo": "chat_threads",
-          "columnsFrom": [
-            "thread_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["thread_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -225,12 +219,8 @@
           "name": "agent_tasks_parent_task_id_agent_tasks_id_fk",
           "tableFrom": "agent_tasks",
           "tableTo": "agent_tasks",
-          "columnsFrom": [
-            "parent_task_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_task_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -308,9 +298,7 @@
         "app_settings_key_unique": {
           "name": "app_settings_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
+          "columns": ["key"]
         }
       },
       "policies": {},
@@ -407,12 +395,8 @@
           "name": "chat_messages_thread_id_chat_threads_id_fk",
           "tableFrom": "chat_messages",
           "tableTo": "chat_threads",
-          "columnsFrom": [
-            "thread_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["thread_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -511,12 +495,8 @@
           "name": "chat_threads_project_id_nodes_id_fk",
           "tableFrom": "chat_threads",
           "tableTo": "nodes",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["project_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -639,12 +619,8 @@
           "name": "media_attachments_node_id_nodes_id_fk",
           "tableFrom": "media_attachments",
           "tableTo": "nodes",
-          "columnsFrom": [
-            "node_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["node_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -802,12 +778,8 @@
           "name": "node_history_node_id_nodes_id_fk",
           "tableFrom": "node_history",
           "tableTo": "nodes",
-          "columnsFrom": [
-            "node_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["node_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -879,12 +851,8 @@
           "name": "node_tags_node_id_nodes_id_fk",
           "tableFrom": "node_tags",
           "tableTo": "nodes",
-          "columnsFrom": [
-            "node_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["node_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -892,12 +860,8 @@
           "name": "node_tags_tag_id_tags_id_fk",
           "tableFrom": "node_tags",
           "tableTo": "tags",
-          "columnsFrom": [
-            "tag_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["tag_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -905,10 +869,7 @@
       "compositePrimaryKeys": {
         "node_tags_node_id_tag_id_pk": {
           "name": "node_tags_node_id_tag_id_pk",
-          "columns": [
-            "node_id",
-            "tag_id"
-          ]
+          "columns": ["node_id", "tag_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1102,12 +1063,8 @@
           "name": "nodes_parent_id_nodes_id_fk",
           "tableFrom": "nodes",
           "tableTo": "nodes",
-          "columnsFrom": [
-            "parent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1227,12 +1184,8 @@
           "name": "tags_entity_node_id_nodes_id_fk",
           "tableFrom": "tags",
           "tableTo": "nodes",
-          "columnsFrom": [
-            "entity_node_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["entity_node_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -1304,9 +1257,7 @@
         "user_preferences_key_unique": {
           "name": "user_preferences_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "key"
-          ]
+          "columns": ["key"]
         }
       },
       "policies": {},

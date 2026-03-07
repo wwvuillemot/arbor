@@ -128,6 +128,9 @@ describe("FilterPanel", () => {
     );
 
     expect(screen.getByTestId("filter-panel-tag-selector")).toBeInTheDocument();
+    expect(screen.getByTestId("filter-panel-tag-selector")).toHaveClass(
+      "w-full",
+    );
   });
 
   it("should call onTagsChange when tags selected", () => {
@@ -174,6 +177,30 @@ describe("FilterPanel", () => {
     fireEvent.click(operatorToggle);
 
     expect(mockOnTagsChange).toHaveBeenCalledWith(["tag-1", "tag-2"], "AND");
+  });
+
+  it("should render selected tags below the selector", () => {
+    render(
+      <FilterPanel
+        onSearchChange={mockOnSearchChange}
+        onTagsChange={mockOnTagsChange}
+        onAttributionChange={mockOnAttributionChange}
+      />,
+    );
+
+    const tagSelectorButton = screen.getByTestId("filter-panel-tag-selector");
+    fireEvent.click(tagSelectorButton);
+    fireEvent.click(screen.getByTestId("tag-option-tag-1"));
+
+    const selectedTagsContainer = screen.getByTestId(
+      "filter-panel-selected-tags",
+    );
+
+    expect(selectedTagsContainer).toHaveTextContent("Fantasy");
+    expect(
+      tagSelectorButton.compareDocumentPosition(selectedTagsContainer) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
   });
 
   it("should render attribution filter buttons", () => {

@@ -49,7 +49,7 @@ describe("Search Router", () => {
 
   describe("keywordSearch", () => {
     it("should find nodes by name", async () => {
-      const caller = appRouter.createCaller({});
+      const caller = appRouter.createCaller({} as any);
       const results = await caller.search.keywordSearch({
         query: "dragon",
         filters: {},
@@ -63,7 +63,7 @@ describe("Search Router", () => {
     });
 
     it("should find nodes by content", async () => {
-      const caller = appRouter.createCaller({});
+      const caller = appRouter.createCaller({} as any);
       const results = await caller.search.keywordSearch({
         query: "magic",
         filters: {},
@@ -76,7 +76,7 @@ describe("Search Router", () => {
     });
 
     it("should filter by projectId", async () => {
-      const caller = appRouter.createCaller({});
+      const caller = appRouter.createCaller({} as any);
       const results = await caller.search.keywordSearch({
         query: "dragon",
         filters: { projectId: testProjectId },
@@ -92,7 +92,7 @@ describe("Search Router", () => {
     });
 
     it("should return empty array for no matches", async () => {
-      const caller = appRouter.createCaller({});
+      const caller = appRouter.createCaller({} as any);
       const results = await caller.search.keywordSearch({
         query: "nonexistentquery12345",
         filters: {},
@@ -103,7 +103,7 @@ describe("Search Router", () => {
     });
 
     it("should respect limit option", async () => {
-      const caller = appRouter.createCaller({});
+      const caller = appRouter.createCaller({} as any);
       const results = await caller.search.keywordSearch({
         query: "dragon",
         filters: {},
@@ -114,7 +114,7 @@ describe("Search Router", () => {
     });
 
     it("should be case-insensitive", async () => {
-      const caller = appRouter.createCaller({});
+      const caller = appRouter.createCaller({} as any);
       const results = await caller.search.keywordSearch({
         query: "DRAGON",
         filters: {},
@@ -122,6 +122,229 @@ describe("Search Router", () => {
       });
 
       expect(results.length).toBeGreaterThan(0);
+    });
+
+    it("should include tags and project info in results", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.keywordSearch({
+        query: "dragon",
+        filters: {},
+        options: { limit: 10 },
+      });
+
+      expect(results.length).toBeGreaterThan(0);
+      // Each result should have augmented fields
+      results.forEach((r) => {
+        expect(Array.isArray(r.tags)).toBe(true);
+        expect("projectId" in r).toBe(true);
+        expect("projectName" in r).toBe(true);
+      });
+    });
+
+    it("should filter by nodeTypes", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.keywordSearch({
+        query: "dragon",
+        filters: { nodeTypes: ["note"] },
+        options: { limit: 10 },
+      });
+
+      results.forEach((r) => {
+        expect(r.node.type).toBe("note");
+      });
+    });
+  });
+
+  describe("vectorSearch", () => {
+    it("should return results for a semantic query", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.vectorSearch({
+        query: "fantasy creatures",
+        filters: {},
+        options: { limit: 10 },
+      });
+
+      // Vector search may return results or empty depending on embeddings
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    it("should return empty array for a very specific non-matching query", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.vectorSearch({
+        query: "quantum cryptography blockchain",
+        filters: {},
+        options: { limit: 10, minScore: 0.99 },
+      });
+
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    it("should respect limit option", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.vectorSearch({
+        query: "dragon magic",
+        filters: {},
+        options: { limit: 1 },
+      });
+
+      expect(results.length).toBeLessThanOrEqual(1);
+    });
+
+    it("should filter by projectId", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.vectorSearch({
+        query: "dragon",
+        filters: { projectId: testProjectId },
+        options: { limit: 10 },
+      });
+
+      expect(Array.isArray(results)).toBe(true);
+      results.forEach((r) => {
+        expect(
+          r.node.id === testProjectId || r.node.parentId === testProjectId,
+        ).toBe(true);
+      });
+    });
+
+    it("should include augmented tags and project fields", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.vectorSearch({
+        query: "dragon lore magic",
+        filters: {},
+        options: { limit: 10 },
+      });
+
+      expect(Array.isArray(results)).toBe(true);
+      results.forEach((r) => {
+        expect(Array.isArray(r.tags)).toBe(true);
+        expect("projectId" in r).toBe(true);
+        expect("projectName" in r).toBe(true);
+      });
+    });
+
+    it("should filter by nodeTypes", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.vectorSearch({
+        query: "dragon",
+        filters: { nodeTypes: ["project"] },
+        options: { limit: 10 },
+      });
+
+      results.forEach((r) => {
+        expect(r.node.type).toBe("project");
+      });
+    });
+  });
+
+  describe("hybridSearch", () => {
+    it("should return results combining vector and keyword", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.hybridSearch({
+        query: "dragon",
+        filters: {},
+        options: { limit: 10 },
+      });
+
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    it("should find nodes by name", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.hybridSearch({
+        query: "dragon",
+        filters: {},
+        options: { limit: 10 },
+      });
+
+      expect(results.length).toBeGreaterThan(0);
+      const nodeNames = results.map((r) => r.node.name);
+      expect(nodeNames.some((n) => n.toLowerCase().includes("dragon"))).toBe(
+        true,
+      );
+    });
+
+    it("should return empty array for no matches", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.hybridSearch({
+        query: "nonexistentquery12345",
+        filters: {},
+        options: { limit: 10, minScore: 0.99 },
+      });
+
+      expect(Array.isArray(results)).toBe(true);
+    });
+
+    it("should respect limit option", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.hybridSearch({
+        query: "dragon",
+        filters: {},
+        options: { limit: 1 },
+      });
+
+      expect(results.length).toBeLessThanOrEqual(1);
+    });
+
+    it("should accept vectorWeight option", async () => {
+      const caller = appRouter.createCaller({} as any);
+      // vectorWeight=1.0 means full vector, 0.0 means full keyword
+      const vectorOnly = await caller.search.hybridSearch({
+        query: "dragon",
+        filters: {},
+        options: { limit: 10, vectorWeight: 1.0 },
+      });
+      const keywordOnly = await caller.search.hybridSearch({
+        query: "dragon",
+        filters: {},
+        options: { limit: 10, vectorWeight: 0.0 },
+      });
+
+      expect(Array.isArray(vectorOnly)).toBe(true);
+      expect(Array.isArray(keywordOnly)).toBe(true);
+    });
+
+    it("should filter by projectId", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.hybridSearch({
+        query: "dragon",
+        filters: { projectId: testProjectId },
+        options: { limit: 10 },
+      });
+
+      expect(Array.isArray(results)).toBe(true);
+      results.forEach((r) => {
+        expect(
+          r.node.id === testProjectId || r.node.parentId === testProjectId,
+        ).toBe(true);
+      });
+    });
+
+    it("should include augmented tags and project fields", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.hybridSearch({
+        query: "dragon",
+        filters: {},
+        options: { limit: 10 },
+      });
+
+      results.forEach((r) => {
+        expect(Array.isArray(r.tags)).toBe(true);
+        expect("projectId" in r).toBe(true);
+        expect("projectName" in r).toBe(true);
+      });
+    });
+
+    it("should filter by nodeTypes", async () => {
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.hybridSearch({
+        query: "dragon",
+        filters: { nodeTypes: ["note"] },
+        options: { limit: 10 },
+      });
+
+      results.forEach((r) => {
+        expect(r.node.type).toBe("note");
+      });
     });
   });
 });

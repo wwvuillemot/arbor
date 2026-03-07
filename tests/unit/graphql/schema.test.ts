@@ -35,9 +35,9 @@ describe("GraphQL Schema", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.node).toBeDefined();
-      expect(result.data?.node.id).toBe(project.id);
-      expect(result.data?.node.name).toBe("Test Project");
-      expect(result.data?.node.nodeType).toBe("project");
+      expect((result.data as any)?.node.id).toBe(project.id);
+      expect((result.data as any)?.node.name).toBe("Test Project");
+      expect((result.data as any)?.node.nodeType).toBe("project");
     });
 
     it("should return null for non-existent node", async () => {
@@ -91,10 +91,10 @@ describe("GraphQL Schema", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.node).toBeDefined();
-      expect(result.data?.node.id).toBe(project.id);
-      expect(result.data?.node.position).toBe(0);
-      expect(result.data?.node.createdBy).toBe("user:system");
-      expect(result.data?.node.updatedBy).toBe("user:system");
+      expect((result.data as any)?.node.id).toBe(project.id);
+      expect((result.data as any)?.node.position).toBe(0);
+      expect((result.data as any)?.node.createdBy).toBe("user:system");
+      expect((result.data as any)?.node.updatedBy).toBe("user:system");
     });
   });
 
@@ -120,7 +120,7 @@ describe("GraphQL Schema", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.nodes).toBeDefined();
-      expect(result.data?.nodes.length).toBeGreaterThanOrEqual(2);
+      expect((result.data as any)?.nodes.length).toBeGreaterThanOrEqual(2);
     });
 
     it("should filter nodes by projectId", async () => {
@@ -148,7 +148,7 @@ describe("GraphQL Schema", () => {
       expect(result.errors).toBeUndefined();
       expect(result.data?.nodes).toBeDefined();
       // All nodes should belong to project1
-      result.data?.nodes.forEach((node: any) => {
+      (result.data as any)?.nodes.forEach((node: any) => {
         if (node.projectId) {
           expect(node.projectId).toBe(project1.id);
         }
@@ -179,8 +179,8 @@ describe("GraphQL Schema", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.nodes).toBeDefined();
-      expect(result.data?.nodes.length).toBe(2);
-      result.data?.nodes.forEach((node: any) => {
+      expect((result.data as any)?.nodes.length).toBe(2);
+      (result.data as any)?.nodes.forEach((node: any) => {
         expect(node.parentId).toBe(folder.id);
       });
     });
@@ -209,7 +209,7 @@ describe("GraphQL Schema", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.nodes).toBeDefined();
-      result.data?.nodes.forEach((node: any) => {
+      (result.data as any)?.nodes.forEach((node: any) => {
         expect(node.nodeType).toBe("folder");
       });
     });
@@ -237,7 +237,7 @@ describe("GraphQL Schema", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.nodes).toBeDefined();
-      expect(result.data?.nodes.length).toBeLessThanOrEqual(2);
+      expect((result.data as any)?.nodes.length).toBeLessThanOrEqual(2);
     });
   });
 
@@ -272,9 +272,9 @@ describe("GraphQL Schema", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.nodeTree).toBeDefined();
-      expect(result.data?.nodeTree.root.id).toBe(hierarchy.project.id);
-      expect(result.data?.nodeTree.nodes.length).toBeGreaterThan(0);
-      expect(result.data?.nodeTree.totalCount).toBeGreaterThan(0);
+      expect((result.data as any)?.nodeTree.root.id).toBe(hierarchy.project.id);
+      expect((result.data as any)?.nodeTree.nodes.length).toBeGreaterThan(0);
+      expect((result.data as any)?.nodeTree.totalCount).toBeGreaterThan(0);
     });
 
     it("should respect maxDepth parameter", async () => {

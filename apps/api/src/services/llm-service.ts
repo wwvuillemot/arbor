@@ -146,42 +146,48 @@ export function estimateMessagesTokenCount(messages: ChatMessage[]): number {
 // ─── OpenAI Provider ───────────────────────────────────────────────────────────
 
 /** Model IDs that support reasoning/thinking */
-const OPENAI_REASONING_MODELS = new Set(["o1", "o3", "o3-mini"]);
+const OPENAI_REASONING_MODELS = new Set([
+  "o1",
+  "o1-mini",
+  "o1-preview",
+  "o3",
+  "o3-mini",
+  "o4-mini",
+]);
 
 const OPENAI_MODELS: ModelInfo[] = [
   {
-    id: "gpt-4o",
-    name: "GPT-4o",
+    id: "gpt-4.1",
+    name: "GPT-4.1",
     provider: "openai",
-    contextWindow: 128000,
+    contextWindow: 1047576,
     supportsTools: true,
     supportsVision: true,
     supportsStreaming: true,
-    costPer1kInput: 0.0025,
-    costPer1kOutput: 0.01,
+    costPer1kInput: 0.002,
+    costPer1kOutput: 0.008,
   },
   {
-    id: "gpt-4o-mini",
-    name: "GPT-4o Mini",
+    id: "gpt-4.1-mini",
+    name: "GPT-4.1 Mini",
     provider: "openai",
-    contextWindow: 128000,
+    contextWindow: 1047576,
     supportsTools: true,
     supportsVision: true,
     supportsStreaming: true,
-    costPer1kInput: 0.00015,
-    costPer1kOutput: 0.0006,
+    costPer1kInput: 0.0004,
+    costPer1kOutput: 0.0016,
   },
   {
-    id: "o1",
-    name: "o1",
+    id: "gpt-4.1-nano",
+    name: "GPT-4.1 Nano",
     provider: "openai",
-    contextWindow: 200000,
-    supportsTools: false,
+    contextWindow: 1047576,
+    supportsTools: true,
     supportsVision: true,
     supportsStreaming: true,
-    supportsReasoning: true,
-    costPer1kInput: 0.015,
-    costPer1kOutput: 0.06,
+    costPer1kInput: 0.0001,
+    costPer1kOutput: 0.0004,
   },
   {
     id: "o3",
@@ -196,12 +202,12 @@ const OPENAI_MODELS: ModelInfo[] = [
     costPer1kOutput: 0.04,
   },
   {
-    id: "o3-mini",
-    name: "o3-mini",
+    id: "o4-mini",
+    name: "o4-mini",
     provider: "openai",
     contextWindow: 200000,
-    supportsTools: false,
-    supportsVision: false,
+    supportsTools: true,
+    supportsVision: true,
     supportsStreaming: true,
     supportsReasoning: true,
     costPer1kInput: 0.0011,
@@ -211,7 +217,7 @@ const OPENAI_MODELS: ModelInfo[] = [
 
 export class OpenAIProvider implements LLMProvider {
   readonly name = "openai";
-  readonly defaultModel = "gpt-4o";
+  readonly defaultModel = "gpt-4.1";
   private apiKey: string;
   private baseUrl: string;
 
@@ -381,9 +387,9 @@ export class OpenAIProvider implements LLMProvider {
                     type: "function",
                     function: tc.function
                       ? {
-                        name: tc.function.name || "",
-                        arguments: tc.function.arguments || "",
-                      }
+                          name: tc.function.name || "",
+                          arguments: tc.function.arguments || "",
+                        }
                       : undefined,
                   },
                 };
@@ -524,8 +530,19 @@ interface OpenAIStreamChunk {
 
 const ANTHROPIC_MODELS: ModelInfo[] = [
   {
-    id: "claude-sonnet-4-20250514",
-    name: "Claude Sonnet 4",
+    id: "claude-opus-4-6",
+    name: "Claude Opus 4.6",
+    provider: "anthropic",
+    contextWindow: 200000,
+    supportsTools: true,
+    supportsVision: true,
+    supportsStreaming: true,
+    costPer1kInput: 0.015,
+    costPer1kOutput: 0.075,
+  },
+  {
+    id: "claude-sonnet-4-6",
+    name: "Claude Sonnet 4.6",
     provider: "anthropic",
     contextWindow: 200000,
     supportsTools: true,
@@ -535,8 +552,8 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
     costPer1kOutput: 0.015,
   },
   {
-    id: "claude-3-5-haiku-20241022",
-    name: "Claude 3.5 Haiku",
+    id: "claude-haiku-4-5-20251001",
+    name: "Claude Haiku 4.5",
     provider: "anthropic",
     contextWindow: 200000,
     supportsTools: true,
@@ -545,22 +562,11 @@ const ANTHROPIC_MODELS: ModelInfo[] = [
     costPer1kInput: 0.0008,
     costPer1kOutput: 0.004,
   },
-  {
-    id: "claude-opus-4-20250514",
-    name: "Claude Opus 4",
-    provider: "anthropic",
-    contextWindow: 200000,
-    supportsTools: true,
-    supportsVision: true,
-    supportsStreaming: true,
-    costPer1kInput: 0.015,
-    costPer1kOutput: 0.075,
-  },
 ];
 
 export class AnthropicProvider implements LLMProvider {
   readonly name = "anthropic";
-  readonly defaultModel = "claude-sonnet-4-20250514";
+  readonly defaultModel = "claude-sonnet-4-6";
   private apiKey: string;
   private baseUrl: string;
 
@@ -820,14 +826,14 @@ type AnthropicContentBlock =
   | { type: "text"; text: string; id?: never; name?: never; input?: never }
   | { type: "tool_use"; id: string; name: string; input: unknown; text?: never }
   | {
-    type: "tool_result";
-    tool_use_id: string;
-    content: string;
-    text?: never;
-    id?: never;
-    name?: never;
-    input?: never;
-  };
+      type: "tool_result";
+      tool_use_id: string;
+      content: string;
+      text?: never;
+      id?: never;
+      name?: never;
+      input?: never;
+    };
 
 interface AnthropicMessage {
   role: "user" | "assistant";

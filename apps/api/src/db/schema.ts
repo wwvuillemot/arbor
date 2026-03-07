@@ -322,6 +322,12 @@ export const tags = pgTable(
       onDelete: "set null",
     }),
 
+    // Optional project scope: NULL = global tag (visible across all projects),
+    // set = tag is scoped to a specific project only.
+    projectId: uuid("project_id").references(() => nodes.id, {
+      onDelete: "cascade",
+    }),
+
     // Timestamps
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -333,6 +339,8 @@ export const tags = pgTable(
     typeIdx: index("idx_tags_type").on(table.type),
     // Index for looking up entity node links
     entityNodeIdx: index("idx_tags_entity_node").on(table.entityNodeId),
+    // Index for project-scoped tags
+    projectIdx: index("idx_tags_project").on(table.projectId),
   }),
 );
 

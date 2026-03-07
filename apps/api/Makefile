@@ -34,14 +34,15 @@ install:
 up:
 	@echo "Starting API server on host..."
 	@bash -c "cd ../.. && nohup pnpm run dev:api > /tmp/arbor-api.log 2>&1 & echo \$$! > /tmp/arbor-api.pid"
-	@sleep 3
-	@echo "✅ API server started at http://localhost:3848"
-	@echo "   Logs: tail -f /tmp/arbor-api.log"
+	@timeout 30 bash -c 'until nc -z localhost 3848 2>/dev/null; do sleep 0.3; done' && echo "✅ API server ready at http://localhost:3848" || echo "⚠️  API server slow to start — tail -f /tmp/arbor-api.log"
 
 down:
 	@echo "Stopping API server..."
 	@if [ -f /tmp/arbor-api.pid ]; then kill $$(cat /tmp/arbor-api.pid) 2>/dev/null || true; rm /tmp/arbor-api.pid; fi
 	@pkill -f "pnpm run dev:api" 2>/dev/null || true
+	@pkill -f "tsx.*watch.*api" 2>/dev/null || true
+	@pkill -f "tsx.*api/src/api/index" 2>/dev/null || true
+	@sleep 1
 	@echo "✅ API server stopped"
 
 restart: down up

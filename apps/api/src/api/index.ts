@@ -6,6 +6,9 @@ import { parse } from "url";
 import { appRouter } from "./router";
 import { createContext } from "./trpc";
 import { schema } from "../graphql/schema";
+import { MediaAttachmentService } from "../services/media-attachment-service";
+
+const mediaService = new MediaAttachmentService();
 
 const PORT = parseInt(process.env.API_PORT || "3001", 10);
 const HOST = process.env.API_HOST || "0.0.0.0";
@@ -30,6 +33,7 @@ export async function createServer(): Promise<{
       },
     },
     maxParamLength: 5000,
+    bodyLimit: 52428800, // 50MB — needed for large directory imports
   });
 
   // Register CORS
@@ -112,6 +116,20 @@ export async function createServer(): Promise<{
       }
     },
   });
+
+  // Permanent media URL — generates a fresh presigned URL and redirects.
+  // Storing /media/:id as image src means URLs never expire in content.
+  server.get<{ Params: { id: string } }>(
+    "/media/:id",
+    async (request, reply) => {
+      try {
+        const url = await mediaService.getDownloadUrl(request.params.id, 3600);
+        return reply.redirect(url, 302);
+      } catch {
+        return reply.status(404).send({ error: "Media not found" });
+      }
+    },
+  );
 
   // Health check endpoint (non-tRPC)
   server.get("/health", async () => {

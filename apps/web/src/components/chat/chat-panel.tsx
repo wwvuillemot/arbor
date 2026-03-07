@@ -2,8 +2,19 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Plus, Trash2, Send, MessageSquare, Bot } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Send,
+  MessageSquare,
+  Bot,
+  Loader2,
+  X,
+  FileText,
+  Folder,
+} from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useToast } from "@/contexts/toast-context";
 import { cn } from "@/lib/utils";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import { ModelSelector } from "./model-selector";
@@ -12,6 +23,10 @@ import { AgentModeSelector } from "./agent-mode-selector";
 export interface ChatPanelProps {
   className?: string;
   showThreadSidebar?: boolean;
+  projectId?: string | null;
+  projectName?: string | null;
+  contextNodes?: { id: string; name: string; type: string }[];
+  onRemoveContext?: (id: string) => void;
 }
 
 /**
@@ -25,8 +40,14 @@ export interface ChatPanelProps {
 export function ChatPanel({
   className,
   showThreadSidebar = true,
+  projectId,
+  projectName,
+  contextNodes = [],
+  onRemoveContext,
 }: ChatPanelProps) {
   const t = useTranslations("chat");
+  const { addToast } = useToast();
+  const utils = trpc.useUtils();
 
   // Persist selected thread ID in localStorage
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
@@ -54,6 +75,15 @@ export function ChatPanel({
     }
   }, [selectedThreadId]);
 
+  // Clear selected thread when project changes (threads are project-scoped)
+  const prevProjectIdRef = React.useRef(projectId);
+  React.useEffect(() => {
+    if (prevProjectIdRef.current !== projectId) {
+      prevProjectIdRef.current = projectId;
+      setSelectedThreadId(null);
+    }
+  }, [projectId]);
+
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   // Get master key for API key decryption
@@ -71,9 +101,10 @@ export function ChatPanel({
   }, [masterKeyQuery.data]);
 
   // ─── Queries ─────────────────────────────────────────────────────────
-  const threadsQuery = trpc.chat.listThreads.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-  });
+  const threadsQuery = trpc.chat.listThreads.useQuery(
+    projectId ? { projectId } : undefined,
+    { refetchOnWindowFocus: false },
+  );
 
   const messagesQuery = trpc.chat.getMessages.useQuery(
     { threadId: selectedThreadId! },
@@ -102,13 +133,15 @@ export function ChatPanel({
   });
 
   const sendMessage = trpc.chat.sendMessage.useMutation({
-    onSuccess: (data) => {
-      console.log("Message sent successfully:", data);
+    onSuccess: () => {
       messagesQuery.refetch();
       setInputValue("");
+      // Invalidate node cache so UI reflects any node changes made by LLM tools
+      utils.nodes.getById.invalidate();
+      utils.nodes.getChildren.invalidate();
     },
     onError: (error) => {
-      console.error("Failed to send message:", error);
+      addToast(error.message || t("error"), "error");
     },
   });
 
@@ -120,7 +153,7 @@ export function ChatPanel({
     ) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messagesQuery.data]);
+  }, [messagesQuery.data, sendMessage.isPending]);
 
   // ─── Sync model selector with current thread ────────────────────────
   React.useEffect(() => {
@@ -157,10 +190,19 @@ export function ChatPanel({
         threadId: selectedThreadId,
         content: pendingMessage,
         masterKey,
+        projectId: projectId ?? null,
+        contextNodeIds: contextNodes.map((n) => n.id),
       });
       setPendingMessage(null); // Clear pending message
     }
-  }, [pendingMessage, selectedThreadId, masterKey, sendMessage]);
+  }, [
+    pendingMessage,
+    selectedThreadId,
+    masterKey,
+    sendMessage,
+    projectId,
+    contextNodes,
+  ]);
 
   // ─── Handlers ────────────────────────────────────────────────────────
   const handleNewThread = React.useCallback(() => {
@@ -168,8 +210,9 @@ export function ChatPanel({
       name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
       agentMode: agentMode as "assistant" | "planner" | "editor" | "researcher",
       model: selectedModel,
+      projectId: projectId ?? null,
     });
-  }, [createThread, agentMode, selectedModel, t]);
+  }, [createThread, agentMode, selectedModel, projectId, t]);
 
   const handleDeleteThread = React.useCallback(
     (threadId: string) => {
@@ -193,6 +236,7 @@ export function ChatPanel({
           | "editor"
           | "researcher",
         model: selectedModel,
+        projectId: projectId ?? null,
       });
       // The message will be sent after the thread is created (see useEffect above)
       return;
@@ -202,6 +246,8 @@ export function ChatPanel({
       threadId: selectedThreadId,
       content: inputValue.trim(),
       masterKey,
+      projectId: projectId ?? null,
+      contextNodeIds: contextNodes.map((n) => n.id),
     });
   }, [
     inputValue,
@@ -212,6 +258,8 @@ export function ChatPanel({
     agentMode,
     selectedModel,
     t,
+    projectId,
+    contextNodes,
   ]);
 
   const handleKeyDown = React.useCallback(
@@ -233,6 +281,9 @@ export function ChatPanel({
       model: (msg.model as string) ?? null,
       tokensUsed: (msg.tokensUsed as number) ?? null,
       toolCalls: msg.toolCalls,
+      toolName: (msg.metadata as Record<string, unknown> | null)?.toolName as
+        | string
+        | undefined,
       createdAt: (msg.createdAt as string) ?? new Date().toISOString(),
     }),
   );
@@ -311,7 +362,43 @@ export function ChatPanel({
       )}
 
       {/* ─── Main Chat Area ──────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Compact thread bar (when thread sidebar is hidden) */}
+        {!showThreadSidebar && (
+          <div className="flex items-center gap-1 px-2 py-1.5 border-b bg-muted/20 shrink-0">
+            <select
+              value={selectedThreadId ?? ""}
+              onChange={(e) => setSelectedThreadId(e.target.value || null)}
+              className="flex-1 min-w-0 text-xs bg-transparent border rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-ring truncate"
+            >
+              <option value="">
+                {threads.length === 0 ? t("noThreads") : t("selectThread")}
+              </option>
+              {threads.map((thread: { id: string; name: string }) => (
+                <option key={thread.id} value={thread.id}>
+                  {thread.name}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleNewThread}
+              className="p-1 rounded hover:bg-muted transition-colors flex-shrink-0"
+              title={t("newThread")}
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+            {selectedThreadId && (
+              <button
+                onClick={() => handleDeleteThread(selectedThreadId)}
+                className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors flex-shrink-0"
+                title="Delete thread"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Message history */}
         <div
           data-testid="message-area"
@@ -333,6 +420,17 @@ export function ChatPanel({
           ) : (
             messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
           )}
+          {sendMessage.isPending && (
+            <div className="flex gap-3 p-3 rounded-lg bg-green-50/50 dark:bg-green-950/20 border border-green-100 dark:border-green-900">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Thinking…</span>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -341,6 +439,48 @@ export function ChatPanel({
           data-testid="input-area"
           className="border-t p-3 flex flex-col gap-2"
         >
+          {/* Context chips */}
+          {(projectId || contextNodes.length > 0) && (
+            <div className="flex flex-wrap gap-1">
+              {projectId && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                  <Folder className="w-3 h-3" />
+                  {projectName ?? "Project"}
+                </span>
+              )}
+              {contextNodes.map((node) => (
+                <span
+                  key={node.id}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground border border-border"
+                >
+                  {node.type === "folder" ? (
+                    <Folder className="w-3 h-3" />
+                  ) : (
+                    <FileText className="w-3 h-3" />
+                  )}
+                  {node.name}
+                  {onRemoveContext && (
+                    <button
+                      onClick={() => onRemoveContext(node.id)}
+                      className="ml-0.5 hover:text-destructive transition-colors"
+                      title="Remove from context"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Processing status bar */}
+          {sendMessage.isPending && (
+            <div className="flex items-center gap-1.5 text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 px-2 py-1 rounded border border-green-200 dark:border-green-800">
+              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+              <span>Processing your message…</span>
+            </div>
+          )}
+
           {/* Text input and send button */}
           <div className="flex items-end gap-2">
             {/* Text input */}
@@ -354,7 +494,7 @@ export function ChatPanel({
               className="flex-1 text-sm border rounded px-3 py-2 resize-none bg-background focus:outline-none focus:ring-1 focus:ring-ring font-mono"
             />
 
-            {/* Send button */}
+            {/* Send button — shows spinner while pending */}
             <button
               data-testid="send-btn"
               onClick={handleSend}
@@ -367,7 +507,11 @@ export function ChatPanel({
               className="p-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title={t("send")}
             >
-              <Send className="w-4 h-4" />
+              {sendMessage.isPending || createThread.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
             </button>
           </div>
 

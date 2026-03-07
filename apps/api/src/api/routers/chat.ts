@@ -19,10 +19,89 @@ import {
   type ChatMessage as LLMChatMessage,
 } from "../../services/llm-service";
 import { SettingsService } from "../../services/settings-service";
-import { getMCPTools, executeMCPTool } from "../../services/mcp-integration-service";
+import {
+  getMCPTools,
+  executeMCPTool,
+} from "../../services/mcp-integration-service";
+import { NodeService } from "../../services/node-service";
 
 const chatService = new ChatService();
+
+/** Recursively extract plain text from a TipTap JSON document */
+function extractTextFromTipTap(node: Record<string, unknown>): string {
+  if (node.type === "text" && typeof node.text === "string") {
+    return node.text;
+  }
+  const children = (node.content ?? node.children) as
+    | Record<string, unknown>[]
+    | undefined;
+  if (!children) return "";
+  const childText = children.map((c) => extractTextFromTipTap(c)).join("");
+  // Add newlines after block-level nodes
+  const blockTypes = new Set([
+    "paragraph",
+    "heading",
+    "blockquote",
+    "listItem",
+    "codeBlock",
+    "bulletList",
+    "orderedList",
+  ]);
+  if (typeof node.type === "string" && blockTypes.has(node.type)) {
+    return childText + "\n";
+  }
+  return childText;
+}
 const settingsService = new SettingsService();
+const nodeService = new NodeService();
+
+/**
+ * Remove incomplete tool call sequences from message history.
+ * An assistant message with tool_calls must be immediately followed by
+ * tool result messages covering ALL of its tool_call IDs.
+ * If not, that assistant message and any partial results are removed.
+ */
+function sanitizeMessageHistory(messages: LLMChatMessage[]): LLMChatMessage[] {
+  const result: LLMChatMessage[] = [];
+  let i = 0;
+  while (i < messages.length) {
+    const msg = messages[i];
+    if (msg.role === "assistant" && msg.toolCalls && msg.toolCalls.length > 0) {
+      const expectedIds = new Set(
+        msg.toolCalls.map((tc: { id: string }) => tc.id),
+      );
+      // Collect consecutive tool result messages that follow
+      const toolResults: LLMChatMessage[] = [];
+      let j = i + 1;
+      while (j < messages.length && messages[j].role === "tool") {
+        toolResults.push(messages[j]);
+        j++;
+      }
+      const returnedIds = new Set(
+        toolResults.map((m) => m.toolCallId).filter(Boolean),
+      );
+      // Only include this block if ALL tool calls have matching results
+      if (
+        expectedIds.size > 0 &&
+        [...expectedIds].every((id) => returnedIds.has(id))
+      ) {
+        result.push(msg);
+        result.push(...toolResults);
+        i = j;
+      } else {
+        // Incomplete sequence — drop this assistant message and its partial results
+        console.warn(
+          `⚠️ Dropping incomplete tool call sequence (${expectedIds.size} calls, ${returnedIds.size} results)`,
+        );
+        i = j; // skip the assistant + any partial tool results
+      }
+    } else {
+      result.push(msg);
+      i++;
+    }
+  }
+  return result;
+}
 
 /**
  * Initialize LLM service with configured providers
@@ -89,7 +168,9 @@ async function initializeLLMService(
     if (
       modelId.startsWith("gpt-") ||
       modelId.startsWith("o1") ||
-      modelId.startsWith("o3")
+      modelId.startsWith("o2") ||
+      modelId.startsWith("o3") ||
+      modelId.startsWith("o4")
     ) {
       if (hasOpenAI) {
         llmService.setActiveProvider("openai");
@@ -262,10 +343,12 @@ export const chatRouter = router({
         threadId: z.string().uuid(),
         content: z.string().min(1),
         masterKey: z.string(), // Required for decrypting API keys
+        projectId: z.string().uuid().nullable().optional(),
+        contextNodeIds: z.array(z.string().uuid()).optional(),
       }),
     )
     .mutation(async ({ input }) => {
-      const { threadId, content, masterKey } = input;
+      const { threadId, content, masterKey, projectId, contextNodeIds } = input;
 
       // Get the thread to determine agent mode and model preference
       const thread = await chatService.getThreadById(threadId);
@@ -282,8 +365,72 @@ export const chatRouter = router({
         throw new Error(`Unknown agent mode: ${thread.agentMode}`);
       }
 
-      // Build system prompt based on agent mode
-      const systemPrompt = await buildSystemPrompt(thread.agentMode);
+      // Build system prompt based on agent mode, optionally injecting project context
+      let systemPrompt = await buildSystemPrompt(thread.agentMode);
+
+      if (projectId) {
+        try {
+          const projectNode = await nodeService.getNodeById(projectId);
+          if (projectNode) {
+            const descendants = await nodeService.getDescendants(projectId);
+            // Build depth map from parent IDs so we can indent properly
+            const depthMap = new Map<string, number>();
+            depthMap.set(projectId, 0);
+            // Descendants are returned breadth-first (parents before children)
+            for (const n of descendants) {
+              const parentDepth = depthMap.get(n.parentId ?? projectId) ?? 0;
+              depthMap.set(n.id, parentDepth + 1);
+            }
+            const outline = descendants
+              .map((n) => {
+                const depth = depthMap.get(n.id) ?? 1;
+                const indent = "  ".repeat(depth - 1);
+                return `${indent}- [${n.type}] ${n.name} (id: ${n.id})`;
+              })
+              .join("\n");
+            systemPrompt =
+              systemPrompt +
+              `\n\n---\n## Current Project Context\n\nThe user is currently working in the project: **${projectNode.name}** (id: ${projectNode.id})\n\nProject structure:\n${outline || "(empty project)"}\n\nWhen the user refers to "the project", "here", or "this context", they mean this project. Use the node IDs above when calling tools that require a projectId or parentId.`;
+          }
+        } catch (err) {
+          // Non-fatal — proceed without project context
+          console.warn("⚠️ Failed to load project context:", err);
+        }
+      }
+
+      // Inject additional context nodes into system prompt
+      if (contextNodeIds && contextNodeIds.length > 0) {
+        try {
+          const contextSections: string[] = [];
+          for (const nodeId of contextNodeIds) {
+            const node = await nodeService.getNodeById(nodeId);
+            if (!node) continue;
+            let contentText = "";
+            if (node.content) {
+              // Extract plain text from TipTap JSON if possible
+              const raw = node.content as unknown;
+              if (typeof raw === "string") {
+                contentText = raw;
+              } else if (typeof raw === "object" && raw !== null) {
+                contentText = extractTextFromTipTap(
+                  raw as Record<string, unknown>,
+                );
+              }
+            }
+            const section = contentText
+              ? `### ${node.name} (${node.type})\n${contentText}`
+              : `### ${node.name} (${node.type})\n(no content)`;
+            contextSections.push(section);
+          }
+          if (contextSections.length > 0) {
+            systemPrompt =
+              systemPrompt +
+              `\n\n---\n## Additional Context\n\nThe user has pinned the following nodes as context for this conversation:\n\n${contextSections.join("\n\n")}`;
+          }
+        } catch (err) {
+          console.warn("⚠️ Failed to load context nodes:", err);
+        }
+      }
 
       // Convert database messages to LLM format
       console.log(
@@ -299,11 +446,14 @@ export const chatRouter = router({
         ),
       );
 
-      const llmMessages: LLMChatMessage[] = history.map((msg) => ({
+      const rawMessages: LLMChatMessage[] = history.map((msg) => ({
         role: msg.role as "user" | "assistant" | "system" | "tool",
         content: msg.content,
         toolCalls: msg.toolCalls as any,
+        toolCallId: (msg.metadata as Record<string, unknown> | null)
+          ?.toolCallId as string | undefined,
       }));
+      let llmMessages = sanitizeMessageHistory(rawMessages);
 
       // Add the new user message
       llmMessages.push({
@@ -311,21 +461,82 @@ export const chatRouter = router({
         content,
       });
 
-      console.log(
-        "📤 Messages being sent to LLM:",
-        JSON.stringify(
-          llmMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-            contentType: typeof m.content,
-          })),
-          null,
-          2,
-        ),
-      );
-
       // Initialize LLM service with API keys and auto-select provider based on model
       const llmService = await initializeLLMService(masterKey, thread.model);
+
+      // ── Context window compaction ──────────────────────────────────────
+      // Estimate token count (~4 chars per token). If we're approaching the
+      // limit, summarize the oldest messages so the context stays manageable.
+      const COMPACTION_CHAR_THRESHOLD = 24_000; // ~6k tokens
+      const KEEP_RECENT = 12; // always keep the most recent N non-system messages
+
+      const estimateChars = (msgs: LLMChatMessage[]) =>
+        msgs.reduce(
+          (sum, m) =>
+            sum + (typeof m.content === "string" ? m.content.length : 0),
+          0,
+        );
+
+      const systemMsgs = llmMessages.filter((m) => m.role === "system");
+      const nonSystemMsgs = llmMessages.filter((m) => m.role !== "system");
+
+      if (
+        estimateChars(llmMessages) > COMPACTION_CHAR_THRESHOLD &&
+        nonSystemMsgs.length > KEEP_RECENT + 2
+      ) {
+        const toSummarize = nonSystemMsgs.slice(
+          0,
+          nonSystemMsgs.length - KEEP_RECENT,
+        );
+        const toKeep = nonSystemMsgs.slice(nonSystemMsgs.length - KEEP_RECENT);
+
+        console.log(
+          `📦 Compacting context: summarizing ${toSummarize.length} messages, keeping ${toKeep.length}`,
+        );
+
+        try {
+          const summaryText = toSummarize
+            .filter((m) => m.role === "user" || m.role === "assistant")
+            .map((m) => `${m.role}: ${m.content}`)
+            .join("\n\n");
+
+          const summaryResp = await llmService.chat(
+            [
+              {
+                role: "user",
+                content: `Summarize this conversation concisely, preserving key facts, decisions, and context:\n\n${summaryText}`,
+              },
+            ],
+            { model: thread.model ?? undefined },
+          );
+
+          const summaryMsg: LLMChatMessage = {
+            role: "assistant",
+            content: `[Context summary of earlier conversation: ${summaryResp.content}]`,
+          };
+
+          llmMessages = [...systemMsgs, summaryMsg, ...toKeep];
+          console.log(
+            `✅ Context compacted. New message count: ${llmMessages.length}`,
+          );
+
+          // Persist the summary as a synthetic message in the thread so it
+          // shows up in future history loads
+          await chatService.addMessage({
+            threadId,
+            role: "assistant",
+            content: summaryMsg.content,
+            metadata: { isSummary: true },
+          });
+        } catch (err) {
+          // Compaction is best-effort; don't fail the whole request
+          console.warn(
+            "⚠️ Context compaction failed, proceeding with full history:",
+            err,
+          );
+        }
+      }
+      // ────────────────────────────────────────────────────────────────────
 
       // Check if the model supports temperature
       const supportsTemp = thread.model
@@ -364,24 +575,8 @@ export const chatRouter = router({
           response.finishReason,
         );
       } catch (error) {
-        // If the API call fails (e.g., invalid API key), fall back to stub mode
-        console.warn(
-          "❌ LLM API call failed, falling back to stub mode:",
-          error,
-        );
-        const stubProvider = new LocalLLMProvider(
-          "http://localhost:11434/v1",
-          "llama3.2",
-          true, // stub mode
-        );
-        const stubService = new LLMService(stubProvider);
-        response = await stubService.chat(llmMessages, {
-          model: thread.model ?? undefined,
-          systemPrompt,
-          temperature: agentModeConfig.temperature,
-          tools,
-        });
-        console.log("🔄 Using stub response");
+        console.error("❌ LLM API call failed:", error);
+        throw error;
       }
 
       // Store the user message
@@ -398,8 +593,14 @@ export const chatRouter = router({
       let finalResponse = response;
 
       while (continueLoop && iteration < MAX_ITERATIONS) {
-        if (finalResponse.finishReason === "tool_calls" && finalResponse.toolCalls && finalResponse.toolCalls.length > 0) {
-          console.log(`🔄 Iteration ${iteration + 1}: LLM requested ${finalResponse.toolCalls.length} tool calls`);
+        if (
+          finalResponse.finishReason === "tool_calls" &&
+          finalResponse.toolCalls &&
+          finalResponse.toolCalls.length > 0
+        ) {
+          console.log(
+            `🔄 Iteration ${iteration + 1}: LLM requested ${finalResponse.toolCalls.length} tool calls`,
+          );
 
           // Store the assistant message with tool calls
           await chatService.addMessage({
@@ -415,6 +616,14 @@ export const chatRouter = router({
             },
           });
 
+          // Add assistant's tool call message to in-memory history so the next
+          // LLM call sees it before the tool results (required by all providers)
+          llmMessages.push({
+            role: "assistant",
+            content: finalResponse.content,
+            toolCalls: finalResponse.toolCalls,
+          });
+
           // Execute each tool and collect results
           for (const toolCall of finalResponse.toolCalls) {
             console.log(`🔧 Executing tool: ${toolCall.function.name}`);
@@ -423,7 +632,9 @@ export const chatRouter = router({
               const args = JSON.parse(toolCall.function.arguments);
               const result = await executeMCPTool(toolCall.function.name, args);
 
-              console.log(`✅ Tool ${toolCall.function.name} executed successfully`);
+              console.log(
+                `✅ Tool ${toolCall.function.name} executed successfully`,
+              );
 
               // Store tool result as a message
               await chatService.addMessage({
@@ -476,12 +687,19 @@ export const chatRouter = router({
             finalResponse = await llmService.chat(llmMessages, {
               model: thread.model ?? undefined,
               systemPrompt,
-              temperature: supportsTemp ? agentModeConfig.temperature : undefined,
+              temperature: supportsTemp
+                ? agentModeConfig.temperature
+                : undefined,
               tools,
             });
-            console.log(`✅ Iteration ${iteration} response received, finishReason: ${finalResponse.finishReason}`);
+            console.log(
+              `✅ Iteration ${iteration} response received, finishReason: ${finalResponse.finishReason}`,
+            );
           } catch (error) {
-            console.error(`❌ LLM call failed in iteration ${iteration}:`, error);
+            console.error(
+              `❌ LLM call failed in iteration ${iteration}:`,
+              error,
+            );
             continueLoop = false;
           }
         } else {
@@ -491,7 +709,9 @@ export const chatRouter = router({
       }
 
       if (iteration >= MAX_ITERATIONS) {
-        console.warn(`⚠️ Reached maximum iterations (${MAX_ITERATIONS}), stopping tool execution loop`);
+        console.warn(
+          `⚠️ Reached maximum iterations (${MAX_ITERATIONS}), stopping tool execution loop`,
+        );
       }
 
       // Store the final assistant response

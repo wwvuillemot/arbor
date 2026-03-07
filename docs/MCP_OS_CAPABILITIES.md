@@ -197,11 +197,11 @@ npx @modelcontextprotocol/inspector node dist/index.js
 
 ```typescript
 // apps/mcp-server/src/server.ts
-const TEST_MODE = process.env.MCP_TEST_MODE === 'true';
+const TEST_MODE = process.env.MCP_TEST_MODE === "true";
 
 // In approval checks:
 if (TEST_MODE) {
-  console.log('[TEST MODE] Auto-approving:', operation);
+  console.log("[TEST MODE] Auto-approving:", operation);
   return true;
 }
 ```
@@ -213,18 +213,18 @@ if (TEST_MODE) {
 ```typescript
 interface ApprovalRequest {
   id: string;
-  type: 'filesystem' | 'shell' | 'git';
+  type: "filesystem" | "shell" | "git";
   operation: string;
   details: Record<string, any>;
   timestamp: Date;
-  status: 'pending' | 'approved' | 'rejected' | 'expired';
+  status: "pending" | "approved" | "rejected" | "expired";
 }
 
 class ApprovalService {
-  async requestApproval(request: ApprovalRequest): Promise<boolean>
-  async approveRequest(id: string): Promise<void>
-  async rejectRequest(id: string): Promise<void>
-  async getPendingRequests(): Promise<ApprovalRequest[]>
+  async requestApproval(request: ApprovalRequest): Promise<boolean>;
+  async approveRequest(id: string): Promise<void>;
+  async rejectRequest(id: string): Promise<void>;
+  async getPendingRequests(): Promise<ApprovalRequest[]>;
 }
 ```
 
@@ -240,33 +240,41 @@ class ApprovalService {
 **Add to MCP Server:**
 
 ```typescript
-server.registerTool('read_file', {
-  title: 'Read File',
-  description: 'Read contents of a file',
-  inputSchema: {
-    path: z.string(),
-    encoding: z.enum(['utf-8', 'base64']).optional()
-  }
-}, async ({ path, encoding }) => {
-  // Validate path is in allowed directories
-  // Read file
-  // Return contents
-});
+server.registerTool(
+  "read_file",
+  {
+    title: "Read File",
+    description: "Read contents of a file",
+    inputSchema: {
+      path: z.string(),
+      encoding: z.enum(["utf-8", "base64"]).optional(),
+    },
+  },
+  async ({ path, encoding }) => {
+    // Validate path is in allowed directories
+    // Read file
+    // Return contents
+  },
+);
 
-server.registerTool('write_file', {
-  title: 'Write File',
-  description: 'Write contents to a file (requires approval)',
-  inputSchema: {
-    path: z.string(),
-    content: z.string(),
-    encoding: z.enum(['utf-8', 'base64']).optional()
-  }
-}, async ({ path, content, encoding }) => {
-  // Request user approval
-  // Validate path
-  // Write file
-  // Return success
-});
+server.registerTool(
+  "write_file",
+  {
+    title: "Write File",
+    description: "Write contents to a file (requires approval)",
+    inputSchema: {
+      path: z.string(),
+      content: z.string(),
+      encoding: z.enum(["utf-8", "base64"]).optional(),
+    },
+  },
+  async ({ path, content, encoding }) => {
+    // Request user approval
+    // Validate path
+    // Write file
+    // Return success
+  },
+);
 ```
 
 ### Phase 3: Shell Command Tools
@@ -274,19 +282,23 @@ server.registerTool('write_file', {
 **Add to MCP Server:**
 
 ```typescript
-server.registerTool('execute_command', {
-  title: 'Execute Shell Command',
-  description: 'Execute a shell command (ALWAYS requires user approval)',
-  inputSchema: {
-    command: z.string(),
-    args: z.array(z.string()).optional(),
-    cwd: z.string().optional(),
-    timeout: z.number().optional()
-  }
-}, async ({ command, args, cwd, timeout }) => {
-  // ALWAYS request user approval with full command details
-  // Show command, args, working directory
-  // Execute if approved
-  // Return stdout, stderr, exit code
-});
+server.registerTool(
+  "execute_command",
+  {
+    title: "Execute Shell Command",
+    description: "Execute a shell command (ALWAYS requires user approval)",
+    inputSchema: {
+      command: z.string(),
+      args: z.array(z.string()).optional(),
+      cwd: z.string().optional(),
+      timeout: z.number().optional(),
+    },
+  },
+  async ({ command, args, cwd, timeout }) => {
+    // ALWAYS request user approval with full command details
+    // Show command, args, working directory
+    // Execute if approved
+    // Return stdout, stderr, exit code
+  },
+);
 ```

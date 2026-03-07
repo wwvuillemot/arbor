@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { SettingsService } from "@server/services/settings-service";
 import { getTestDb, resetTestDb } from "@tests/helpers/db";
 import { appSettings } from "@server/db/schema";
@@ -29,7 +30,7 @@ describe("SettingsService", () => {
       const [stored] = await db
         .select()
         .from(appSettings)
-        .where((t) => t.key === "openai_api_key");
+        .where(eq(appSettings.key, "openai_api_key"));
 
       expect(stored).toBeDefined();
       expect(stored.key).toBe("openai_api_key");

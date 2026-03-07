@@ -35,9 +35,9 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.parent).toBeDefined();
-      expect(result.data?.node.parent.id).toBe(project.id);
-      expect(result.data?.node.parent.name).toBe("Project");
+      expect((result.data as any)?.node.parent).toBeDefined();
+      expect((result.data as any)?.node.parent.id).toBe(project.id);
+      expect((result.data as any)?.node.parent.name).toBe("Project");
     });
 
     it("should return null for node without parent", async () => {
@@ -62,7 +62,7 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.parent).toBeNull();
+      expect((result.data as any)?.node.parent).toBeNull();
     });
   });
 
@@ -94,8 +94,8 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.children).toBeDefined();
-      expect(result.data?.node.children.length).toBe(3);
+      expect((result.data as any)?.node.children).toBeDefined();
+      expect((result.data as any)?.node.children.length).toBe(3);
     });
 
     it("should return empty array for node without children", async () => {
@@ -121,7 +121,7 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.children).toEqual([]);
+      expect((result.data as any)?.node.children).toEqual([]);
     });
   });
 
@@ -152,10 +152,10 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.project).toBeDefined();
-      expect(result.data?.node.project.id).toBe(project.id);
-      expect(result.data?.node.project.name).toBe("My Project");
-      expect(result.data?.node.project.nodeType).toBe("project");
+      expect((result.data as any)?.node.project).toBeDefined();
+      expect((result.data as any)?.node.project.id).toBe(project.id);
+      expect((result.data as any)?.node.project.name).toBe("My Project");
+      expect((result.data as any)?.node.project.nodeType).toBe("project");
     });
 
     it("should return self for project node", async () => {
@@ -179,7 +179,7 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.project.id).toBe(project.id);
+      expect((result.data as any)?.node.project.id).toBe(project.id);
     });
   });
 
@@ -211,12 +211,12 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.ancestors).toBeDefined();
-      expect(result.data?.node.ancestors.length).toBe(3);
+      expect((result.data as any)?.node.ancestors).toBeDefined();
+      expect((result.data as any)?.node.ancestors.length).toBe(3);
       // Should be ordered from closest to root: subfolder -> folder -> project
-      expect(result.data?.node.ancestors[0].id).toBe(subfolder.id);
-      expect(result.data?.node.ancestors[1].id).toBe(folder.id);
-      expect(result.data?.node.ancestors[2].id).toBe(project.id);
+      expect((result.data as any)?.node.ancestors[0].id).toBe(subfolder.id);
+      expect((result.data as any)?.node.ancestors[1].id).toBe(folder.id);
+      expect((result.data as any)?.node.ancestors[2].id).toBe(project.id);
     });
 
     it("should return empty array for project node", async () => {
@@ -240,7 +240,7 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.ancestors).toEqual([]);
+      expect((result.data as any)?.node.ancestors).toEqual([]);
     });
   });
 
@@ -269,8 +269,8 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.descendants).toBeDefined();
-      expect(result.data?.node.descendants.length).toBeGreaterThan(0);
+      expect((result.data as any)?.node.descendants).toBeDefined();
+      expect((result.data as any)?.node.descendants.length).toBeGreaterThan(0);
     });
 
     it("should respect maxDepth parameter", async () => {
@@ -298,10 +298,10 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.descendants).toBeDefined();
+      expect((result.data as any)?.node.descendants).toBeDefined();
       // With maxDepth=1, should only get immediate children (folder)
-      expect(result.data?.node.descendants.length).toBe(1);
-      expect(result.data?.node.descendants[0].id).toBe(folder.id);
+      expect((result.data as any)?.node.descendants.length).toBe(1);
+      expect((result.data as any)?.node.descendants[0].id).toBe(folder.id);
     });
 
     it("should return empty array for leaf node", async () => {
@@ -326,7 +326,7 @@ describe("GraphQL Relationship Resolvers", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.descendants).toEqual([]);
+      expect((result.data as any)?.node.descendants).toEqual([]);
     });
   });
 });

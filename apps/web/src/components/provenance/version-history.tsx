@@ -57,7 +57,7 @@ export function VersionHistory({
     nodeId,
   });
 
-  const rollbackMutation = trpc.provenance.rollback.useMutation({
+  const _rollbackMutation = trpc.provenance.rollback.useMutation({
     onSuccess: () => {
       utils.provenance.getHistory.invalidate({ nodeId });
       utils.provenance.getVersionCount.invalidate({ nodeId });

@@ -351,6 +351,7 @@ describe("TagManager", () => {
       name: "New Tag",
       color: "#6366f1",
       type: "general",
+      projectId: null,
     });
   });
 
@@ -364,6 +365,7 @@ describe("TagManager", () => {
       name: "Enter Tag",
       color: "#6366f1",
       type: "general",
+      projectId: null,
     });
   });
 
@@ -395,6 +397,7 @@ describe("TagManager", () => {
       name: "Updated Character",
       color: "#6366f1",
       type: "character",
+      projectId: null,
     });
   });
 
@@ -441,6 +444,7 @@ describe("TagManager", () => {
       name: "Green Tag",
       color: "#10b981",
       type: "general",
+      projectId: null,
     });
   });
 

@@ -27,7 +27,7 @@ const TAG_TYPES = ["general", "character", "location", "event", "concept"];
  * - Shows filtered nodes
  */
 export function TagBrowser({
-  onSelectNode,
+  onSelectNode: _onSelectNode,
   onFilterChange,
   className,
 }: TagBrowserProps) {

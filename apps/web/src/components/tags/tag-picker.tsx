@@ -39,7 +39,9 @@ export function TagPicker({
   const utils = trpc.useUtils();
 
   // Fetch all tags and tags assigned to this node
-  const allTagsQuery = trpc.tags.getAll.useQuery({});
+  const allTagsQuery = trpc.tags.getAll.useQuery(
+    projectId ? { projectId } : {},
+  );
   const nodeTagsQuery = trpc.tags.getNodeTags.useQuery({ nodeId });
 
   const addMutation = trpc.tags.addToNode.useMutation({

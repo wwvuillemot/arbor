@@ -25,6 +25,8 @@ export const tagsRouter = router({
           .optional(),
         icon: z.string().max(50).nullable().optional(),
         type: z.enum(tagTypeEnum).optional(),
+        /** null/undefined = global tag; UUID = project-scoped tag */
+        projectId: z.string().uuid().nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -46,6 +48,8 @@ export const tagsRouter = router({
           .optional(),
         icon: z.string().max(50).nullable().optional(),
         type: z.enum(tagTypeEnum).optional(),
+        /** null = make global; UUID = scope to project */
+        projectId: z.string().uuid().nullable().optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -71,11 +75,13 @@ export const tagsRouter = router({
       z
         .object({
           type: z.enum(tagTypeEnum).optional(),
+          /** Pass project UUID to include that project's tags + global tags */
+          projectId: z.string().uuid().optional(),
         })
         .optional(),
     )
     .query(async ({ input }) => {
-      return await tagService.getAllTags(input?.type);
+      return await tagService.getAllTags(input?.type, input?.projectId);
     }),
 
   /**

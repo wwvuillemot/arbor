@@ -9,7 +9,7 @@ import { render, screen, fireEvent, act } from "@testing-library/react";
 
 // Mock next-intl
 vi.mock("next-intl", () => ({
-  useTranslations: () => (key: string) => key,
+  useTranslations: () => (key: string) => key.split(".").pop() ?? key,
   NextIntlClientProvider: ({ children }: { children: React.ReactNode }) =>
     children,
 }));
@@ -77,6 +77,12 @@ vi.mock("@/lib/trpc", () => {
       hybridSearch: makeQuery(searchResults),
       vectorSearch: makeQuery(searchResults),
       keywordSearch: makeQuery(searchResults),
+    },
+    nodes: {
+      getAllProjects: makeQuery([]),
+    },
+    tags: {
+      getAll: makeQuery([]),
     },
     useUtils: vi.fn(() => ({})),
   };

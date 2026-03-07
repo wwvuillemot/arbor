@@ -11,11 +11,9 @@ import {
   LayoutDashboard,
   FolderTree,
   Settings,
-  Command,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useCommandPalette } from "@/hooks/use-command-palette";
 import { ProjectSelector } from "@/components/project-selector";
 
 export interface SidebarItem {
@@ -29,15 +27,10 @@ export interface SidebarItem {
 export interface SidebarProps {
   className?: string;
   defaultCollapsed?: boolean;
+  onSearchOpen?: () => void;
 }
 
 const navigationItems: SidebarItem[] = [
-  {
-    id: "search",
-    labelKey: "search",
-    icon: Search,
-    href: "/search",
-  },
   {
     id: "dashboard",
     labelKey: "dashboard",
@@ -48,11 +41,15 @@ const navigationItems: SidebarItem[] = [
     id: "projects",
     labelKey: "projects",
     icon: FolderTree,
-    href: "/projects",
+    href: "/projects?list=1",
   },
 ];
 
-export function Sidebar({ className, defaultCollapsed = false }: SidebarProps) {
+export function Sidebar({
+  className,
+  defaultCollapsed = false,
+  onSearchOpen,
+}: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = React.useState(defaultCollapsed);
   const pathname = usePathname();
   const t = useTranslations("sidebar");
@@ -93,11 +90,34 @@ export function Sidebar({ className, defaultCollapsed = false }: SidebarProps) {
         )}
       </button>
 
+      {/* Search button */}
+      <div className="p-2 border-b">
+        <button
+          onClick={onSearchOpen}
+          className={cn(
+            "w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            "hover:bg-accent hover:text-accent-foreground text-muted-foreground",
+            isCollapsed && "justify-center px-2",
+          )}
+          title={isCollapsed ? t("search") : undefined}
+        >
+          <Search className="h-5 w-5 flex-shrink-0" />
+          {!isCollapsed && (
+            <span className="flex-1 text-left">{t("search")}</span>
+          )}
+          {!isCollapsed && (
+            <kbd className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 border rounded bg-muted font-mono">
+              ⌘F
+            </kbd>
+          )}
+        </button>
+      </div>
+
       {/* Navigation items */}
       <nav className="flex-1 space-y-1 p-2">
         {navigationItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href.split("?")[0];
           const label = t(item.labelKey);
 
           return (

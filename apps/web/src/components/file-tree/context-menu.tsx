@@ -92,7 +92,7 @@ export function NodeContextMenu({
       style={{ left: position.x, top: position.y }}
       data-testid="context-menu"
     >
-      {menuItems.map((item, index) => (
+      {menuItems.map((item, _index) => (
         <React.Fragment key={item.type}>
           {item.type === "rename" && isContainer && (
             <div className="my-1 border-t" />

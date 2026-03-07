@@ -14,6 +14,14 @@ vi.mock("next-intl", () => ({
     children,
 }));
 
+// Mock next/navigation - ChatMessage uses useRouter for link navigation
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+  usePathname: () => "/projects",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 // Mock toast context
 const mockAddToast = vi.fn();
 vi.mock("@/contexts/toast-context", () => ({
@@ -187,7 +195,12 @@ vi.mock("@/lib/trpc", () => {
         })),
       },
     },
-    useUtils: vi.fn(() => ({})),
+    useUtils: vi.fn(() => ({
+      nodes: {
+        getById: { invalidate: vi.fn() },
+        getChildren: { invalidate: vi.fn() },
+      },
+    })),
   };
 
   return { trpc: mockTrpc, getTRPCClient: vi.fn() };
@@ -403,6 +416,91 @@ describe("ChatMessage", () => {
       screen.queryByTestId("message-token-breakdown"),
     ).not.toBeInTheDocument();
   });
+
+  // ─── Link navigation ─────────────────────────────────────────────────
+  describe("link navigation in assistant messages", () => {
+    const assistantBase: ChatMessageData = {
+      id: "msg-link",
+      role: "assistant",
+      content: "",
+      createdAt: "2024-01-01T10:00:00Z",
+    };
+
+    beforeEach(() => {
+      mockPush.mockClear();
+    });
+
+    it("should call router.push with /projects?node= when a ?node= link is clicked", () => {
+      render(
+        <ChatMessage
+          message={{ ...assistantBase, content: "[a node](?node=test-uuid)" }}
+        />,
+      );
+      const link = screen.getByRole("link", { name: "a node" });
+      fireEvent.click(link);
+      expect(mockPush).toHaveBeenCalledWith("/projects?node=test-uuid");
+    });
+
+    it("should call router.push with node when a full app URL with ?node= is clicked", () => {
+      render(
+        <ChatMessage
+          message={{
+            ...assistantBase,
+            content:
+              "[note](http://app.arbor.local/projects?node=2f080cd1-673f-41e6-948a-4a0c76b7a20f)",
+          }}
+        />,
+      );
+      const link = screen.getByRole("link", { name: "note" });
+      // Temporarily override location.origin to match the test URL
+      Object.defineProperty(window, "location", {
+        value: { ...window.location, origin: "http://app.arbor.local" },
+        writable: true,
+      });
+      fireEvent.click(link);
+      expect(mockPush).toHaveBeenCalledWith(
+        "/projects?node=2f080cd1-673f-41e6-948a-4a0c76b7a20f",
+      );
+    });
+
+    it("should prevent default browser navigation on link click", () => {
+      render(
+        <ChatMessage
+          message={{ ...assistantBase, content: "[link](?node=abc)" }}
+        />,
+      );
+      const link = screen.getByRole("link", { name: "link" });
+      const nativeEvent = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+      });
+      link.dispatchEvent(nativeEvent);
+      expect(nativeEvent.defaultPrevented).toBe(true);
+    });
+
+    it("should navigate current window for external URLs", () => {
+      const originalLocation = window.location;
+      // jsdom doesn't let you assign window.location.href directly, so spy on it
+      const assignSpy = vi.spyOn(window, "location", "get").mockReturnValue({
+        ...originalLocation,
+        href: "",
+      } as Location);
+
+      render(
+        <ChatMessage
+          message={{
+            ...assistantBase,
+            content: "[ext](https://totally-external.example.com/page)",
+          }}
+        />,
+      );
+      const link = screen.getByRole("link", { name: "ext" });
+      fireEvent.click(link);
+      // The link click should NOT call router.push for external URLs
+      expect(mockPush).not.toHaveBeenCalled();
+      assignSpy.mockRestore();
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -539,6 +637,8 @@ describe("ChatPanel", () => {
       threadId: "thread-1",
       content: "Hello AI!",
       masterKey: "mock-master-key-for-testing",
+      contextNodeIds: [],
+      projectId: null,
     });
   });
 

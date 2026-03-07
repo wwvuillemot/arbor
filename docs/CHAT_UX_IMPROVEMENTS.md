@@ -49,7 +49,7 @@
 const agentModeConfig = await getAgentModeConfig(thread.agentMode);
 
 // ADD: Get MCP tools and filter by agent mode
-import { getMCPTools } from '../../services/mcp-integration-service'; // NEW SERVICE
+import { getMCPTools } from "../../services/mcp-integration-service"; // NEW SERVICE
 const allTools = await getMCPTools();
 const allowedTools = await filterToolsForMode(thread.agentMode, allTools);
 
@@ -65,8 +65,8 @@ const response = await llmService.chat(llmMessages, {
 
 ```typescript
 // apps/api/src/services/mcp-integration-service.ts
-import { createMcpServer } from '@mcp-server/server';
-import type { ToolDefinition } from './llm-service';
+import { createMcpServer } from "@mcp-server/server";
+import type { ToolDefinition } from "./llm-service";
 
 export async function getMCPTools(): Promise<ToolDefinition[]> {
   const mcpServer = createMcpServer();
@@ -76,7 +76,7 @@ export async function getMCPTools(): Promise<ToolDefinition[]> {
 
 export async function executeMCPTool(
   toolName: string,
-  args: Record<string, unknown>
+  args: Record<string, unknown>,
 ): Promise<string> {
   const mcpServer = createMcpServer();
   // Execute the tool
@@ -94,7 +94,7 @@ export async function executeMCPTool(
 // REPLACE single LLM call with iteration loop:
 const MAX_ITERATIONS = 5;
 let iteration = 0;
-let currentMessages = [...llmMessages, { role: 'user', content }];
+let currentMessages = [...llmMessages, { role: "user", content }];
 
 while (iteration < MAX_ITERATIONS) {
   const response = await llmService.chat(currentMessages, {
@@ -106,14 +106,14 @@ while (iteration < MAX_ITERATIONS) {
   // Store assistant message with tool calls
   const assistantMessage = await chatService.addMessage({
     threadId,
-    role: 'assistant',
+    role: "assistant",
     content: response.content,
     toolCalls: response.toolCalls,
     // ... other fields
   });
 
   // If no tool calls, we're done
-  if (response.finishReason !== 'tool_calls' || !response.toolCalls) {
+  if (response.finishReason !== "tool_calls" || !response.toolCalls) {
     break;
   }
 
@@ -121,25 +121,25 @@ while (iteration < MAX_ITERATIONS) {
   for (const toolCall of response.toolCalls) {
     const result = await executeMCPTool(
       toolCall.function.name,
-      JSON.parse(toolCall.function.arguments)
+      JSON.parse(toolCall.function.arguments),
     );
 
     // Add tool result message
     const toolMessage = await chatService.addMessage({
       threadId,
-      role: 'tool',
+      role: "tool",
       content: result,
       metadata: { toolCallId: toolCall.id },
     });
 
     // Add to conversation for next iteration
     currentMessages.push({
-      role: 'assistant',
+      role: "assistant",
       content: response.content,
       toolCalls: response.toolCalls,
     });
     currentMessages.push({
-      role: 'tool',
+      role: "tool",
       content: result,
       toolCallId: toolCall.id,
     });
@@ -254,9 +254,12 @@ ALTER TABLE chat_threads ADD COLUMN conversation_id UUID REFERENCES conversation
 ```typescript
 // apps/api/src/services/conversation-service.ts (NEW)
 export class ConversationService {
-  async createConversation(params: { name: string; projectId?: string }): Promise<Conversation>
-  async getConversations(): Promise<Conversation[]>
-  async deleteConversation(id: string): Promise<boolean>
+  async createConversation(params: {
+    name: string;
+    projectId?: string;
+  }): Promise<Conversation>;
+  async getConversations(): Promise<Conversation[]>;
+  async deleteConversation(id: string): Promise<boolean>;
 }
 
 // apps/api/src/api/routers/chat.ts
@@ -265,11 +268,16 @@ export const chatRouter = router({
   // ... existing endpoints
 
   createConversation: publicProcedure
-    .input(z.object({ name: z.string(), projectId: z.string().uuid().optional() }))
-    .mutation(async ({ input }) => conversationService.createConversation(input)),
+    .input(
+      z.object({ name: z.string(), projectId: z.string().uuid().optional() }),
+    )
+    .mutation(async ({ input }) =>
+      conversationService.createConversation(input),
+    ),
 
-  getConversations: publicProcedure
-    .query(async () => conversationService.getConversations()),
+  getConversations: publicProcedure.query(async () =>
+    conversationService.getConversations(),
+  ),
 });
 ```
 
@@ -310,14 +318,14 @@ const threadsInConversation = threads.filter(
 export async function buildSystemPrompt(
   mode: AgentMode,
   projectId?: string | null,
-  nodeIds?: string[]
+  nodeIds?: string[],
 ): Promise<string> {
   const config = await getAgentModeConfig(mode);
   if (!config) {
     throw new Error(`Unknown agent mode: ${mode}`);
   }
 
-  let contextSection = '';
+  let contextSection = "";
 
   // ADD: Project context
   if (projectId) {
@@ -371,7 +379,7 @@ sendMessage.mutate({
   content: inputValue.trim(),
   masterKey,
   projectId: selectedProjectId, // ADD
-  nodeIds: selectedNodeIds,     // ADD
+  nodeIds: selectedNodeIds, // ADD
 });
 ```
 
@@ -404,7 +412,7 @@ export interface AgentRule {
   id: string;
   threadId: string;
   ruleText: string;
-  createdBy: 'user' | 'agent';
+  createdBy: "user" | "agent";
   createdAt: Date;
   updatedAt: Date;
   isActive: boolean;
@@ -414,7 +422,7 @@ export class AgentRulesService {
   async createRule(params: {
     threadId: string;
     ruleText: string;
-    createdBy: 'user' | 'agent';
+    createdBy: "user" | "agent";
   }): Promise<AgentRule> {
     const [rule] = await db
       .insert(agentRules)
@@ -431,10 +439,9 @@ export class AgentRulesService {
     return db
       .select()
       .from(agentRules)
-      .where(and(
-        eq(agentRules.threadId, threadId),
-        eq(agentRules.isActive, true)
-      ))
+      .where(
+        and(eq(agentRules.threadId, threadId), eq(agentRules.isActive, true)),
+      )
       .orderBy(asc(agentRules.createdAt));
   }
 
@@ -463,20 +470,26 @@ export const chatRouter = router({
   // ... existing endpoints
 
   createAgentRule: publicProcedure
-    .input(z.object({
-      threadId: z.string().uuid(),
-      ruleText: z.string().min(1),
-      createdBy: z.enum(['user', 'agent'])
-    }))
+    .input(
+      z.object({
+        threadId: z.string().uuid(),
+        ruleText: z.string().min(1),
+        createdBy: z.enum(["user", "agent"]),
+      }),
+    )
     .mutation(async ({ input }) => agentRulesService.createRule(input)),
 
   getAgentRules: publicProcedure
     .input(z.object({ threadId: z.string().uuid() }))
-    .query(async ({ input }) => agentRulesService.getRulesForThread(input.threadId)),
+    .query(async ({ input }) =>
+      agentRulesService.getRulesForThread(input.threadId),
+    ),
 
   updateAgentRule: publicProcedure
     .input(z.object({ id: z.string().uuid(), ruleText: z.string().min(1) }))
-    .mutation(async ({ input }) => agentRulesService.updateRule(input.id, input.ruleText)),
+    .mutation(async ({ input }) =>
+      agentRulesService.updateRule(input.id, input.ruleText),
+    ),
 
   deleteAgentRule: publicProcedure
     .input(z.object({ id: z.string().uuid() }))
@@ -494,7 +507,8 @@ server.registerTool(
   "add_conversation_rule",
   {
     title: "Add Conversation Rule",
-    description: "Add a rule or guideline for the current conversation that both user and agent should follow",
+    description:
+      "Add a rule or guideline for the current conversation that both user and agent should follow",
     inputSchema: {
       threadId: z.string().uuid(),
       ruleText: z.string().min(1),
@@ -504,12 +518,12 @@ server.registerTool(
     const rule = await agentRulesService.createRule({
       threadId,
       ruleText,
-      createdBy: 'agent',
+      createdBy: "agent",
     });
     return {
       content: [{ type: "text" as const, text: JSON.stringify(rule) }],
     };
-  }
+  },
 );
 
 server.registerTool(
@@ -526,7 +540,7 @@ server.registerTool(
     return {
       content: [{ type: "text" as const, text: JSON.stringify(rules) }],
     };
-  }
+  },
 );
 ```
 
@@ -539,14 +553,14 @@ export async function buildSystemPrompt(
   mode: AgentMode,
   threadId?: string,
   projectId?: string | null,
-  nodeIds?: string[]
+  nodeIds?: string[],
 ): Promise<string> {
   const config = await getAgentModeConfig(mode);
   if (!config) {
     throw new Error(`Unknown agent mode: ${mode}`);
   }
 
-  let contextSection = '';
+  let contextSection = "";
 
   // ADD: Conversation rules
   if (threadId) {
@@ -555,7 +569,7 @@ export async function buildSystemPrompt(
     if (rules.length > 0) {
       contextSection += `\n\nConversation Rules (follow these strictly):`;
       for (const rule of rules) {
-        contextSection += `\n- ${rule.ruleText} [${rule.createdBy === 'user' ? 'User-defined' : 'Agent-defined'}]`;
+        contextSection += `\n- ${rule.ruleText} [${rule.createdBy === "user" ? "User-defined" : "Agent-defined"}]`;
       }
     }
   }
@@ -707,7 +721,7 @@ export interface AgentTask {
   threadId: string;
   title: string;
   description: string | null;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status: "pending" | "in_progress" | "completed" | "cancelled";
   parentTaskId: string | null;
   position: number;
   createdAt: Date;
@@ -729,7 +743,7 @@ export class AgentTasksService {
         title: params.title,
         description: params.description ?? null,
         parentTaskId: params.parentTaskId ?? null,
-        status: 'pending',
+        status: "pending",
       })
       .returning();
     return task;
@@ -745,10 +759,10 @@ export class AgentTasksService {
 
   async updateTaskStatus(
     id: string,
-    status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
+    status: "pending" | "in_progress" | "completed" | "cancelled",
   ): Promise<AgentTask> {
     const updates: any = { status, updatedAt: new Date() };
-    if (status === 'completed') {
+    if (status === "completed") {
       updates.completedAt = new Date();
     }
 
@@ -760,11 +774,14 @@ export class AgentTasksService {
     return task;
   }
 
-  async updateTask(id: string, params: {
-    title?: string;
-    description?: string;
-    status?: string;
-  }): Promise<AgentTask> {
+  async updateTask(
+    id: string,
+    params: {
+      title?: string;
+      description?: string;
+      status?: string;
+    },
+  ): Promise<AgentTask> {
     const [task] = await db
       .update(agentTasks)
       .set({ ...params, updatedAt: new Date() })
@@ -788,25 +805,33 @@ export const chatRouter = router({
   // ... existing endpoints
 
   createAgentTask: publicProcedure
-    .input(z.object({
-      threadId: z.string().uuid(),
-      title: z.string().min(1),
-      description: z.string().optional(),
-      parentTaskId: z.string().uuid().optional(),
-    }))
+    .input(
+      z.object({
+        threadId: z.string().uuid(),
+        title: z.string().min(1),
+        description: z.string().optional(),
+        parentTaskId: z.string().uuid().optional(),
+      }),
+    )
     .mutation(async ({ input }) => agentTasksService.createTask(input)),
 
   getAgentTasks: publicProcedure
     .input(z.object({ threadId: z.string().uuid() }))
-    .query(async ({ input }) => agentTasksService.getTasksForThread(input.threadId)),
+    .query(async ({ input }) =>
+      agentTasksService.getTasksForThread(input.threadId),
+    ),
 
   updateAgentTask: publicProcedure
-    .input(z.object({
-      id: z.string().uuid(),
-      title: z.string().optional(),
-      description: z.string().optional(),
-      status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional(),
-    }))
+    .input(
+      z.object({
+        id: z.string().uuid(),
+        title: z.string().optional(),
+        description: z.string().optional(),
+        status: z
+          .enum(["pending", "in_progress", "completed", "cancelled"])
+          .optional(),
+      }),
+    )
     .mutation(async ({ input }) => {
       const { id, ...params } = input;
       return agentTasksService.updateTask(id, params);
@@ -828,7 +853,8 @@ server.registerTool(
   "create_task",
   {
     title: "Create Task",
-    description: "Create a task in your task list for the current conversation. Use this to plan and track your work.",
+    description:
+      "Create a task in your task list for the current conversation. Use this to plan and track your work.",
     inputSchema: {
       threadId: z.string().uuid(),
       title: z.string().min(1),
@@ -846,17 +872,18 @@ server.registerTool(
     return {
       content: [{ type: "text" as const, text: JSON.stringify(task) }],
     };
-  }
+  },
 );
 
 server.registerTool(
   "update_task_status",
   {
     title: "Update Task Status",
-    description: "Update the status of a task (pending, in_progress, completed, cancelled)",
+    description:
+      "Update the status of a task (pending, in_progress, completed, cancelled)",
     inputSchema: {
       taskId: z.string().uuid(),
-      status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]),
     },
   },
   async ({ taskId, status }) => {
@@ -864,14 +891,15 @@ server.registerTool(
     return {
       content: [{ type: "text" as const, text: JSON.stringify(task) }],
     };
-  }
+  },
 );
 
 server.registerTool(
   "get_tasks",
   {
     title: "Get Tasks",
-    description: "Get all tasks for the current conversation to see what work is planned and completed",
+    description:
+      "Get all tasks for the current conversation to see what work is planned and completed",
     inputSchema: {
       threadId: z.string().uuid(),
     },
@@ -881,7 +909,7 @@ server.registerTool(
     return {
       content: [{ type: "text" as const, text: JSON.stringify(tasks) }],
     };
-  }
+  },
 );
 
 server.registerTool(
@@ -893,7 +921,9 @@ server.registerTool(
       taskId: z.string().uuid(),
       title: z.string().optional(),
       description: z.string().optional(),
-      status: z.enum(['pending', 'in_progress', 'completed', 'cancelled']).optional(),
+      status: z
+        .enum(["pending", "in_progress", "completed", "cancelled"])
+        .optional(),
     },
   },
   async ({ taskId, title, description, status }) => {
@@ -905,7 +935,7 @@ server.registerTool(
     return {
       content: [{ type: "text" as const, text: JSON.stringify(task) }],
     };
-  }
+  },
 );
 ```
 

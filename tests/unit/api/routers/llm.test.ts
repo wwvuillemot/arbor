@@ -8,6 +8,7 @@ function createCaller() {
     createContext({
       req: {} as any,
       res: {} as any,
+      info: {} as any,
     }),
   );
 }

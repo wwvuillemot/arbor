@@ -1,13 +1,15 @@
 import { db } from "../db/index";
 import { tags, nodeTags, nodes } from "../db/schema";
 import type { Tag, TagType } from "../db/schema";
-import { eq, and, inArray, sql, count } from "drizzle-orm";
+import { eq, and, inArray, isNull, or, sql, count } from "drizzle-orm";
 
 export interface CreateTagParams {
   name: string;
   color?: string | null;
   icon?: string | null;
   type?: TagType;
+  /** If set, tag is scoped to this project. If null/undefined, tag is global. */
+  projectId?: string | null;
 }
 
 export interface UpdateTagParams {
@@ -16,6 +18,8 @@ export interface UpdateTagParams {
   icon?: string | null;
   type?: TagType;
   entityNodeId?: string | null;
+  /** null = make global; UUID = scope to project */
+  projectId?: string | null;
 }
 
 /**
@@ -36,6 +40,7 @@ export class TagService {
         color: params.color ?? null,
         icon: params.icon ?? null,
         type: params.type || "general",
+        projectId: params.projectId ?? null,
       })
       .returning();
 
@@ -51,13 +56,23 @@ export class TagService {
   }
 
   /**
-   * Get all tags, optionally filtered by type
+   * Get tags visible for a given context:
+   * - If projectId provided: returns global tags + tags scoped to that project.
+   * - If no projectId: returns only global tags.
+   * - Optionally filter by type.
    */
-  async getAllTags(type?: TagType): Promise<Tag[]> {
+  async getAllTags(type?: TagType, projectId?: string): Promise<Tag[]> {
+    const scopeCondition = projectId
+      ? or(isNull(tags.projectId), eq(tags.projectId, projectId))!
+      : isNull(tags.projectId);
+
     if (type) {
-      return await db.select().from(tags).where(eq(tags.type, type));
+      return await db
+        .select()
+        .from(tags)
+        .where(and(scopeCondition, eq(tags.type, type)));
     }
-    return await db.select().from(tags);
+    return await db.select().from(tags).where(scopeCondition);
   }
 
   /**
@@ -204,6 +219,7 @@ export class TagService {
         tags.icon,
         tags.type,
         tags.entityNodeId,
+        tags.projectId,
         tags.createdAt,
         tags.updatedAt,
       );
@@ -250,6 +266,7 @@ export class TagService {
         tags.icon,
         tags.type,
         tags.entityNodeId,
+        tags.projectId,
         tags.createdAt,
         tags.updatedAt,
       )

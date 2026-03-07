@@ -61,13 +61,13 @@ export function FilterPanel({
   }, [attributionFilter, onAttributionChange]);
 
   // Check if any filters are active
-  const hasActiveFilters =
+  const _hasActiveFilters =
     searchQuery.length > 0 ||
     selectedTagIds.length > 0 ||
     attributionFilter !== "all";
 
   // Clear all filters
-  const handleClearAll = () => {
+  const _handleClearAll = () => {
     setSearchQuery("");
     setSelectedTagIds([]);
     setTagOperator("OR");
@@ -112,24 +112,41 @@ export function FilterPanel({
       </div>
 
       {/* Tag Selector */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">
-          {tFilter("tags")}:
-        </span>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-muted-foreground">
+            {tFilter("tags")}:
+          </span>
+
+          {/* Operator Toggle (only show if multiple tags selected) */}
+          {selectedTagIds.length > 1 && (
+            <button
+              onClick={handleOperatorToggle}
+              data-testid="filter-panel-operator-toggle"
+              className="rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-accent"
+            >
+              {tagOperator}
+            </button>
+          )}
+        </div>
+
         <div className="relative">
           <button
             onClick={() => setTagPopoverOpen(!tagPopoverOpen)}
-            className="inline-flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+            className="inline-flex w-full items-center justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm transition-colors hover:bg-accent"
             data-testid="filter-panel-tag-selector"
           >
-            {selectedTagIds.length === 0
-              ? tFilter("selectTags")
-              : `${selectedTagIds.length} selected`}
-            <ChevronDown className="h-3 w-3" />
+            <span className="truncate text-left">
+              {selectedTagIds.length === 0
+                ? tFilter("selectTags")
+                : `${selectedTagIds.length} selected`}
+            </span>
+            <ChevronDown className="h-3 w-3 shrink-0" />
           </button>
+
           {tagPopoverOpen && (
-            <div className="absolute left-0 top-full mt-1 w-64 rounded-md border bg-popover p-2 shadow-md z-10">
-              <div className="space-y-1 max-h-64 overflow-y-auto">
+            <div className="absolute left-0 right-0 top-full z-10 mt-1 min-w-[16rem] rounded-md border bg-popover p-2 shadow-md">
+              <div className="max-h-64 space-y-1 overflow-y-auto">
                 {allTags.map((tag) => (
                   <div
                     key={tag.id}
@@ -156,27 +173,19 @@ export function FilterPanel({
           )}
         </div>
 
-        {/* Operator Toggle (only show if multiple tags selected) */}
-        {selectedTagIds.length > 1 && (
-          <button
-            onClick={handleOperatorToggle}
-            data-testid="filter-panel-operator-toggle"
-            className="rounded-md px-2 py-1 text-xs font-medium hover:bg-accent transition-colors"
-          >
-            {tagOperator}
-          </button>
-        )}
-
-        {/* Selected Tags */}
         {selectedTagIds.length > 0 && (
-          <div className="flex flex-wrap gap-1">
+          <div
+            className="flex flex-wrap gap-1"
+            data-testid="filter-panel-selected-tags"
+          >
             {selectedTagIds.map((tagId) => {
-              const tag = allTags.find((t) => t.id === tagId);
+              const tag = allTags.find((tagOption) => tagOption.id === tagId);
               if (!tag) return null;
+
               return (
                 <span
                   key={tagId}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white cursor-pointer hover:opacity-80 transition-opacity"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white transition-opacity hover:opacity-80"
                   style={{ backgroundColor: tag.color || "#6b7280" }}
                   onClick={() => handleTagToggle(tagId)}
                 >

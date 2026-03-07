@@ -62,7 +62,7 @@ describe("GraphQL Tag Queries and DataLoader", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.nodesByTags).toBeDefined();
-      expect(result.data?.nodesByTags.length).toBe(3);
+      expect((result.data as any)?.nodesByTags.length).toBe(3);
     });
 
     it("should find nodes with ALL matching tags (AND operator)", async () => {
@@ -109,7 +109,7 @@ describe("GraphQL Tag Queries and DataLoader", () => {
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.nodesByTags).toBeDefined();
-      expect(result.data?.nodesByTags.length).toBe(1);
+      expect((result.data as any)?.nodesByTags.length).toBe(1);
       expect(result.data?.nodesByTags[0].name).toBe("Note 1");
     });
 
@@ -200,7 +200,7 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.nodes.length).toBe(3);
+      expect((result.data as any)?.nodes.length).toBe(3);
 
       // DataLoader should batch all parent lookups into a single query
       // Without DataLoader, this would be 1 query for nodes + 3 queries for parents (N+1)
@@ -264,8 +264,8 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.node.parent.id).toBe(project.id);
-      expect(result.data?.node.project.id).toBe(project.id);
+      expect((result.data as any)?.node.parent.id).toBe(project.id);
+      expect((result.data as any)?.node.project.id).toBe(project.id);
       // DataLoader should cache the project lookup and reuse it
     });
   });

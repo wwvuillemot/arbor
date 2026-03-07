@@ -23,6 +23,9 @@ if (process.env.NODE_ENV !== "production") {
 
 let testClient: postgres.Sql | null = null;
 let testDb: ReturnType<typeof drizzle> | null = null;
+let holdsTestSuiteLock = false;
+
+const TEST_DB_SUITE_LOCK_KEY = 874_231;
 
 /**
  * Get or create test database connection
@@ -39,19 +42,48 @@ export function getTestDb() {
   return testDb;
 }
 
+function getTestClient() {
+  if (!testClient) {
+    getTestDb();
+  }
+
+  return testClient!;
+}
+
+/**
+ * Prevent multiple DB-backed test processes from truncating the shared test
+ * database at the same time.
+ */
+export async function acquireTestDbSuiteLock() {
+  if (holdsTestSuiteLock) {
+    return;
+  }
+
+  const client = getTestClient();
+  await client`SELECT pg_advisory_lock(${TEST_DB_SUITE_LOCK_KEY})`;
+  holdsTestSuiteLock = true;
+}
+
+export async function releaseTestDbSuiteLock() {
+  if (!holdsTestSuiteLock || !testClient) {
+    return;
+  }
+
+  await testClient`SELECT pg_advisory_unlock(${TEST_DB_SUITE_LOCK_KEY})`;
+  holdsTestSuiteLock = false;
+}
+
 /**
  * Reset test database - delete all data from tables
  */
 export async function resetTestDb() {
-  if (!testClient) {
-    getTestDb(); // Initialize the connection
-  }
+  const client = getTestClient();
 
   // Use the raw postgres client to ensure the TRUNCATE is committed immediately
   // Drizzle's execute() might wrap queries in transactions
   try {
     // First, verify we're using the test database
-    const result = await testClient!`SELECT current_database()`;
+    const result = await client`SELECT current_database()`;
     const dbName = result[0].current_database;
     if (dbName !== "arbor_test") {
       throw new Error(
@@ -62,10 +94,10 @@ export async function resetTestDb() {
     // Use raw SQL to truncate all tables
     // TRUNCATE is faster than DELETE and resets auto-increment sequences
     // CASCADE ensures that dependent rows in other tables are also deleted
-    await testClient!`TRUNCATE TABLE node_history, chat_messages, chat_threads, agent_modes, node_tags, tags, media_attachments, nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`;
+    await client`TRUNCATE TABLE node_history, chat_messages, chat_threads, agent_modes, node_tags, tags, media_attachments, nodes, user_preferences, app_settings RESTART IDENTITY CASCADE`;
 
     // Verify the truncate worked
-    const counts = await testClient!`
+    const counts = await client`
       SELECT
         (SELECT COUNT(*) FROM nodes) as nodes_count,
         (SELECT COUNT(*) FROM user_preferences) as prefs_count,
@@ -141,6 +173,7 @@ export async function resetTestDb() {
  */
 export async function cleanupTestDb() {
   if (testClient) {
+    await releaseTestDbSuiteLock();
     await testClient.end();
     testClient = null;
     testDb = null;

@@ -199,6 +199,7 @@
       "title": "Arborへようこそ",
       "description": "すべてをセットアップしましょう。",
       "steps": {
+        "checkingServices": "サービスを確認中...",
         "checkingDocker": "Dockerのインストールを確認中...",
         "startingServices": "サービスを起動中...",
         "initializingDatabase": "データベースを初期化中...",
@@ -276,13 +277,15 @@
     "error": "メッセージの送信に失敗しました",
     "loadingModels": "モデルを読み込み中...",
     "defaultModel": "デフォルト",
-    "useProviderDefault": "プロバイダーのデフォルトを使用"
+    "useProviderDefault": "プロバイダーのデフォルトを使用",
+    "selectThread": "スレッドを選択..."
   },
   "search": {
     "title": "検索",
     "description": "すべてのノート、プロジェクト、コンテンツを検索します。",
     "placeholder": "コンテンツを検索...",
     "clear": "検索をクリア",
+    "close": "検索を閉じる",
     "mode": {
       "hybrid": "ハイブリッド",
       "vector": "セマンティック",
@@ -295,6 +298,10 @@
     },
     "filters": "フィルター",
     "filterNodeType": "ノードタイプ",
+    "filterProject": "プロジェクト",
+    "allProjects": "すべてのプロジェクト",
+    "filterTags": "タグ",
+    "clearFilters": "すべてのフィルターをクリア",
     "searching": "検索中...",
     "noResults": "結果が見つかりません",
     "prompt": "検索クエリを入力してコンテンツを見つけます",
@@ -316,7 +323,10 @@
       "name": "プロジェクト名",
       "namePlaceholder": "私の小説",
       "creating": "作成中...",
-      "create": "プロジェクトを作成"
+      "create": "プロジェクトを作成",
+      "createBlank": "空のプロジェクトを作成",
+      "importFromFolder": "フォルダからインポート",
+      "importing": "インポート中..."
     },
     "editDialog": {
       "title": "プロジェクトを編集",
@@ -361,6 +371,8 @@
     "saving": "保存中...",
     "saved": "保存済み",
     "saveFailed": "保存に失敗しました",
+    "insertLink": "リンクを挿入",
+    "removeLink": "リンクを削除",
     "insertImage": "画像を挿入",
     "imageUpload": {
       "uploading": "画像をアップロード中...",
@@ -489,6 +501,8 @@
     "entityUnlinkError": "エンティティページのリンク解除に失敗しました",
     "unlinkEntity": "エンティティページのリンクを解除",
     "entityTag": "エンティティタグ",
+    "scopeProject": "このプロジェクト",
+    "scopeGlobal": "グローバル",
     "browser": {
       "browse": "閲覧",
       "cloudView": "クラウド表示",

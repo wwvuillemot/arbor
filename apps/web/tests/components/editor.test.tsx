@@ -72,7 +72,9 @@ vi.mock("@tiptap/react", () => ({
 }));
 
 vi.mock("@tiptap/starter-kit", () => ({
-  default: {},
+  default: {
+    configure: vi.fn().mockReturnValue({}),
+  },
 }));
 
 vi.mock("@tiptap/extension-placeholder", () => ({
@@ -85,6 +87,29 @@ vi.mock("@tiptap/extension-image", () => ({
   default: {
     configure: vi.fn().mockReturnValue({}),
   },
+}));
+
+// Mock next-intl is already above; also mock next/navigation for any components needing router
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => "/projects",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+// Mock @tiptap/extension-link so Link.extend() works without full browser environment
+vi.mock("@tiptap/extension-link", () => ({
+  default: {
+    extend: vi.fn(() => ({
+      configure: vi.fn().mockReturnValue({}),
+    })),
+    configure: vi.fn().mockReturnValue({}),
+  },
+}));
+
+// mergeAttributes is used by SafeLink.renderHTML — provide a real-enough shim
+vi.mock("@tiptap/core", () => ({
+  mergeAttributes: (...args: Record<string, unknown>[]) =>
+    Object.assign({}, ...args),
 }));
 
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
@@ -115,8 +140,8 @@ describe("EditorToolbar", () => {
     render(<EditorToolbar editor={mockEditor as any} />);
     const toolbar = screen.getByRole("toolbar");
     const buttons = toolbar.querySelectorAll("button");
-    // undo, redo, h1, h2, h3, bold, italic, strike, code, bullet, ordered, quote, hr, clear = 14
-    expect(buttons.length).toBe(14);
+    // undo, redo, h1, h2, h3, bold, italic, strike, code, link, bullet, ordered, quote, hr, clear = 15
+    expect(buttons.length).toBe(15);
   });
 
   it("should call bold toggle when bold button clicked", () => {
@@ -164,6 +189,54 @@ describe("EditorToolbar", () => {
     const clearButton = screen.getByTitle("clearFormatting");
     fireEvent.click(clearButton);
     expect(mockEditor.chain).toHaveBeenCalled();
+  });
+
+  it("should show insert link button when cursor is not in a link", () => {
+    mockEditor.isActive.mockReturnValue(false);
+    render(<EditorToolbar editor={mockEditor as any} onInsertLink={vi.fn()} />);
+    expect(screen.getByTitle("insertLink")).toBeInTheDocument();
+    expect(screen.queryByTitle("removeLink")).not.toBeInTheDocument();
+  });
+
+  it("should show both insert-link and remove-link buttons when cursor is inside a link", () => {
+    mockEditor.isActive.mockImplementation((type: string) => type === "link");
+    render(<EditorToolbar editor={mockEditor as any} onInsertLink={vi.fn()} />);
+    expect(screen.getByTitle("insertLink")).toBeInTheDocument();
+    expect(screen.getByTitle("removeLink")).toBeInTheDocument();
+  });
+
+  it("should call onInsertLink when insert link button is clicked", () => {
+    mockEditor.isActive.mockReturnValue(false);
+    const onInsertLink = vi.fn();
+    render(
+      <EditorToolbar editor={mockEditor as any} onInsertLink={onInsertLink} />,
+    );
+    fireEvent.click(screen.getByTitle("insertLink"));
+    expect(onInsertLink).toHaveBeenCalledOnce();
+  });
+
+  it("should call unsetLink when remove link button is clicked", () => {
+    mockEditor.isActive.mockImplementation((type: string) => type === "link");
+    const unsetLinkRun = vi.fn();
+    mockEditor.chain.mockReturnValue({
+      focus: vi.fn().mockReturnValue({
+        unsetLink: vi.fn().mockReturnValue({ run: unsetLinkRun }),
+      }),
+    });
+    render(<EditorToolbar editor={mockEditor as any} onInsertLink={vi.fn()} />);
+    fireEvent.click(screen.getByTitle("removeLink"));
+    expect(unsetLinkRun).toHaveBeenCalled();
+  });
+
+  it("should prevent default on toolbar button mousedown to preserve editor focus", () => {
+    render(<EditorToolbar editor={mockEditor as any} />);
+    const boldButton = screen.getByTitle("bold");
+    let prevented = false;
+    document.addEventListener("mousedown", (e) => {
+      prevented = e.defaultPrevented;
+    });
+    fireEvent.mouseDown(boldButton);
+    expect(prevented).toBe(true);
   });
 
   it("should not render image button when onInsertImage is not provided", () => {
@@ -253,6 +326,212 @@ describe("TiptapEditor", () => {
     if (capturedOnUpdate) {
       expect(() => capturedOnUpdate!({ editor: mockEditor })).not.toThrow();
     }
+  });
+
+  it("should not call onLinkClick when a link is clicked while editing", () => {
+    const onLinkClick = vi.fn();
+    render(<TiptapEditor content={null} onLinkClick={onLinkClick} />);
+
+    const editorContent = screen.getByTestId("editor-content");
+    const anchor = document.createElement("a");
+    anchor.setAttribute("href", "?node=test-uuid-1234");
+    anchor.textContent = "A node link";
+    editorContent.appendChild(anchor);
+
+    fireEvent.click(anchor);
+    expect(onLinkClick).not.toHaveBeenCalled();
+  });
+
+  it("should not prevent default browser navigation when a link is clicked while editing", () => {
+    render(<TiptapEditor content={null} />);
+    const editorContent = screen.getByTestId("editor-content");
+    const anchor = document.createElement("a");
+    anchor.setAttribute("href", "https://external.example.com");
+    editorContent.appendChild(anchor);
+
+    const nativeEvent = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+    anchor.dispatchEvent(nativeEvent);
+    expect(nativeEvent.defaultPrevented).toBe(false);
+  });
+
+  it("should call onLinkClick with href when a read-only link is clicked", () => {
+    const onLinkClick = vi.fn();
+    render(
+      <TiptapEditor
+        content={null}
+        editable={false}
+        onLinkClick={onLinkClick}
+      />,
+    );
+
+    const editorContent = screen.getByTestId("editor-content");
+    const anchor = document.createElement("a");
+    anchor.setAttribute("href", "?node=test-uuid-1234");
+    anchor.textContent = "A node link";
+    editorContent.appendChild(anchor);
+
+    fireEvent.click(anchor);
+
+    expect(onLinkClick).toHaveBeenCalledTimes(1);
+    expect(onLinkClick).toHaveBeenCalledWith("?node=test-uuid-1234");
+  });
+
+  it("should prevent default browser navigation for read-only links", () => {
+    render(
+      <TiptapEditor content={null} editable={false} onLinkClick={vi.fn()} />,
+    );
+    const editorContent = screen.getByTestId("editor-content");
+    const anchor = document.createElement("a");
+    anchor.setAttribute("href", "https://external.example.com");
+    editorContent.appendChild(anchor);
+
+    const nativeEvent = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+    anchor.dispatchEvent(nativeEvent);
+
+    expect(nativeEvent.defaultPrevented).toBe(true);
+  });
+
+  it("should stop propagation before inner anchor handlers can run in read-only mode", () => {
+    render(
+      <TiptapEditor content={null} editable={false} onLinkClick={vi.fn()} />,
+    );
+    const editorContent = screen.getByTestId("editor-content");
+    const anchor = document.createElement("a");
+    const innerClickHandler = vi.fn();
+
+    anchor.setAttribute("href", "https://external.example.com");
+    anchor.addEventListener("click", innerClickHandler);
+    editorContent.appendChild(anchor);
+
+    const nativeEvent = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+    anchor.dispatchEvent(nativeEvent);
+
+    expect(nativeEvent.defaultPrevented).toBe(true);
+    expect(innerClickHandler).not.toHaveBeenCalled();
+  });
+
+  it("should keep exactly one active read-only link listener after rerender", () => {
+    const firstOnLinkClick = vi.fn();
+    const secondOnLinkClick = vi.fn();
+    const { rerender } = render(
+      <TiptapEditor
+        content={null}
+        editable={false}
+        onLinkClick={firstOnLinkClick}
+      />,
+    );
+
+    const firstEditorContent = screen.getByTestId("editor-content");
+    const firstAnchor = document.createElement("a");
+    firstAnchor.setAttribute("href", "?node=first");
+    firstEditorContent.appendChild(firstAnchor);
+
+    fireEvent.click(firstAnchor);
+
+    rerender(
+      <TiptapEditor
+        content={null}
+        editable={false}
+        onLinkClick={secondOnLinkClick}
+      />,
+    );
+
+    const secondEditorContent = screen.getByTestId("editor-content");
+    const secondAnchor = document.createElement("a");
+    secondAnchor.setAttribute("href", "?node=second");
+    secondEditorContent.appendChild(secondAnchor);
+
+    fireEvent.click(secondAnchor);
+
+    expect(firstOnLinkClick).toHaveBeenCalledTimes(1);
+    expect(firstOnLinkClick).toHaveBeenCalledWith("?node=first");
+    expect(secondOnLinkClick).toHaveBeenCalledTimes(1);
+    expect(secondOnLinkClick).toHaveBeenCalledWith("?node=second");
+  });
+
+  it("should stop intercepting links when rerendered from read-only to editable", () => {
+    const onLinkClick = vi.fn();
+    const { rerender } = render(
+      <TiptapEditor
+        content={null}
+        editable={false}
+        onLinkClick={onLinkClick}
+      />,
+    );
+
+    const readOnlyEditorContent = screen.getByTestId("editor-content");
+    const readOnlyAnchor = document.createElement("a");
+    readOnlyAnchor.setAttribute("href", "?node=read-only");
+    readOnlyEditorContent.appendChild(readOnlyAnchor);
+
+    fireEvent.click(readOnlyAnchor);
+
+    rerender(
+      <TiptapEditor content={null} editable={true} onLinkClick={onLinkClick} />,
+    );
+
+    const editableEditorContent = screen.getByTestId("editor-content");
+    const editableAnchor = document.createElement("a");
+    editableAnchor.setAttribute("href", "?node=editable");
+    editableEditorContent.appendChild(editableAnchor);
+
+    const editableClickEvent = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+    editableAnchor.dispatchEvent(editableClickEvent);
+
+    expect(onLinkClick).toHaveBeenCalledTimes(1);
+    expect(onLinkClick).toHaveBeenCalledWith("?node=read-only");
+    expect(editableClickEvent.defaultPrevented).toBe(false);
+  });
+
+  it("should call onLinkClick when the read-only click target is link text", () => {
+    const onLinkClick = vi.fn();
+    render(
+      <TiptapEditor
+        content={null}
+        editable={false}
+        onLinkClick={onLinkClick}
+      />,
+    );
+
+    const editorContent = screen.getByTestId("editor-content");
+    const anchor = document.createElement("a");
+    anchor.setAttribute("href", "?node=text-target");
+    anchor.appendChild(document.createTextNode("Text target link"));
+    editorContent.appendChild(anchor);
+
+    const textNode = anchor.firstChild;
+    expect(textNode).not.toBeNull();
+
+    const nativeEvent = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    textNode!.dispatchEvent(nativeEvent);
+
+    expect(nativeEvent.defaultPrevented).toBe(true);
+    expect(onLinkClick).toHaveBeenCalledTimes(1);
+    expect(onLinkClick).toHaveBeenCalledWith("?node=text-target");
+  });
+
+  it("should not call onLinkClick for plain clicks outside anchors", () => {
+    const onLinkClick = vi.fn();
+    render(<TiptapEditor content={null} onLinkClick={onLinkClick} />);
+    const editorContent = screen.getByTestId("editor-content");
+    fireEvent.click(editorContent);
+    expect(onLinkClick).not.toHaveBeenCalled();
   });
 });
 

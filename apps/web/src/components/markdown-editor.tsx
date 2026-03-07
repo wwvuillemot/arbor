@@ -36,7 +36,7 @@ export function MarkdownEditor({
   value,
   onChange,
   placeholder = "Start typing...",
-  required = false,
+  required: _required = false,
   className,
   minHeight = "200px",
 }: MarkdownEditorProps) {
