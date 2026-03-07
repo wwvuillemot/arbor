@@ -381,9 +381,9 @@ export class OpenAIProvider implements LLMProvider {
                     type: "function",
                     function: tc.function
                       ? {
-                          name: tc.function.name || "",
-                          arguments: tc.function.arguments || "",
-                        }
+                        name: tc.function.name || "",
+                        arguments: tc.function.arguments || "",
+                      }
                       : undefined,
                   },
                 };
@@ -820,14 +820,14 @@ type AnthropicContentBlock =
   | { type: "text"; text: string; id?: never; name?: never; input?: never }
   | { type: "tool_use"; id: string; name: string; input: unknown; text?: never }
   | {
-      type: "tool_result";
-      tool_use_id: string;
-      content: string;
-      text?: never;
-      id?: never;
-      name?: never;
-      input?: never;
-    };
+    type: "tool_result";
+    tool_use_id: string;
+    content: string;
+    text?: never;
+    id?: never;
+    name?: never;
+    input?: never;
+  };
 
 interface AnthropicMessage {
   role: "user" | "assistant";
@@ -922,6 +922,8 @@ export class LocalLLMProvider implements LLMProvider {
     if (options?.temperature !== undefined)
       body.temperature = options.temperature;
     if (options?.maxTokens !== undefined) body.max_tokens = options.maxTokens;
+    if (options?.tools && options.tools.length > 0) body.tools = options.tools;
+    if (options?.stopSequences) body.stop = options.stopSequences;
 
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
@@ -941,12 +943,31 @@ export class LocalLLMProvider implements LLMProvider {
     const rawContent = choice.message.content;
     const parsed = LocalLLMProvider.parseReasoningFromContent(rawContent);
 
+    // Handle tool calls (same format as OpenAI)
+    const toolCalls = choice.message.tool_calls?.map((tc) => ({
+      id: tc.id,
+      type: "function" as const,
+      function: {
+        name: tc.function.name,
+        arguments: tc.function.arguments,
+      },
+    }));
+
+    // Determine finish reason
+    let finishReason: "stop" | "tool_calls" | "length" | "error" = "stop";
+    if (choice.finish_reason === "tool_calls" || toolCalls) {
+      finishReason = "tool_calls";
+    } else if (choice.finish_reason === "length") {
+      finishReason = "length";
+    }
+
     return {
       content: parsed.content,
       model: data.model,
       tokensUsed:
         (data.usage?.prompt_tokens ?? 0) + (data.usage?.completion_tokens ?? 0),
-      finishReason: "stop",
+      toolCalls,
+      finishReason,
       reasoning: parsed.reasoning,
     };
   }
