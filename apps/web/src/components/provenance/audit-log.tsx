@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
+import { downloadTextFile, openHtmlPrintWindow } from "@/lib/browser-export";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { AttributionBadge, type ActorType } from "./attribution-badge";
@@ -123,24 +124,14 @@ export function AuditLog({ className }: AuditLogProps) {
   const handleExportCsv = async () => {
     const result = await csvExportQuery.refetch();
     if (result.data) {
-      const blob = new Blob([result.data], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "audit-report.csv";
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadTextFile(result.data, "audit-report.csv", "text/csv");
     }
   };
 
   const handleExportHtml = async () => {
     const result = await htmlExportQuery.refetch();
     if (result.data) {
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.write(result.data);
-        printWindow.document.close();
-      }
+      openHtmlPrintWindow(result.data);
     }
   };
 

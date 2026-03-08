@@ -159,6 +159,19 @@ vi.mock("@/components/chat", () => ({
   ChatSidebar: () => <div data-testid="chat-sidebar" />,
 }));
 
+vi.mock("@/app/[locale]/(app)/projects/projects-import-directory", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/app/[locale]/(app)/projects/projects-import-directory")
+  >("@/app/[locale]/(app)/projects/projects-import-directory");
+
+  return {
+    ...actual,
+    prepareImportDirectoryWorkflow: vi.fn(
+      actual.prepareImportDirectoryWorkflow,
+    ),
+  };
+});
+
 // Mock FileTree component - calls onSelectNode on mount to simulate selecting a node
 vi.mock("@/components/file-tree", () => ({
   FileTree: React.forwardRef<FileTreeHandle, MockFileTreeProps>(
@@ -348,6 +361,7 @@ vi.mock("@/lib/trpc", () => {
 });
 
 // Import the page component AFTER mocks
+import * as projectsImportDirectory from "@/app/[locale]/(app)/projects/projects-import-directory";
 import ProjectsPage from "@/app/[locale]/(app)/projects/page";
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
@@ -557,15 +571,33 @@ describe("ProjectsPage Export", () => {
 
   it("should call exportHtml and open print window for PDF export", async () => {
     const mockPrint = vi.fn();
-    const mockClose = vi.fn();
-    const mockWrite = vi.fn();
+    const mockFocus = vi.fn();
+    const mockAddEventListener = vi.fn(
+      (eventName: string, listener: EventListenerOrEventListenerObject) => {
+        if (eventName === "load") {
+          if (typeof listener === "function") {
+            listener(new Event("load"));
+          } else {
+            listener.handleEvent(new Event("load"));
+          }
+        }
+      },
+    );
+    const mockRemoveEventListener = vi.fn();
     const mockWindowObj = {
-      document: { write: mockWrite, close: mockClose },
-      focus: vi.fn(),
+      addEventListener: mockAddEventListener,
+      removeEventListener: mockRemoveEventListener,
+      focus: mockFocus,
       print: mockPrint,
     };
     const originalOpen = window.open;
     const mockOpenFn = vi.fn().mockReturnValue(mockWindowObj);
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:test-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
     Object.defineProperty(window, "open", {
       value: mockOpenFn,
       writable: true,
@@ -587,8 +619,9 @@ describe("ProjectsPage Export", () => {
         id: "node-1",
         includeDescendants: false,
       });
-      expect(mockOpenFn).toHaveBeenCalledWith("", "_blank");
-      expect(mockWrite).toHaveBeenCalled();
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockOpenFn).toHaveBeenCalledWith("blob:test-url", "_blank");
+      expect(mockFocus).toHaveBeenCalled();
       expect(mockPrint).toHaveBeenCalled();
       expect(mockAddToast).toHaveBeenCalledWith("exportSuccess", "success");
     });
@@ -599,6 +632,8 @@ describe("ProjectsPage Export", () => {
       writable: true,
       configurable: true,
     });
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
   it("should show error toast when export fails", async () => {
@@ -1200,6 +1235,77 @@ describe("ProjectsPage Export", () => {
     await waitFor(() => {
       expect(mockImportDirectoryMutateAsync).toHaveBeenCalledWith({
         projectName: "pathfinders",
+        parentNodeId: undefined,
+        files: expect.any(Array),
+      });
+    });
+
+    expect(mockSetCurrentProject).toHaveBeenCalledWith("proj-imported");
+  });
+
+  it("should prompt for a project name when importing loose files", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "list" ? "1" : null,
+    );
+    mockImportDirectoryMutateAsync.mockResolvedValueOnce({
+      imported: 2,
+      folders: 0,
+      projectId: "proj-imported",
+      importTargetNodeId: "proj-imported",
+      nodeMap: {
+        "alpha.md": "node-alpha",
+        "beta.md": "node-beta",
+      },
+    });
+    vi.mocked(
+      projectsImportDirectory.prepareImportDirectoryWorkflow,
+    ).mockResolvedValueOnce({
+      kind: "prompt-for-project-name",
+      initialProjectName: "",
+      createNewProject: true,
+      entries: [
+        { path: "alpha.md", content: { type: "doc", content: [] } },
+        { path: "beta.md", content: { type: "doc", content: [] } },
+      ],
+      imageFilesByNotePath: new Map(),
+    });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    const alphaMarkdownFile = new File(["# Alpha"], "alpha.md", {
+      type: "text/markdown",
+    });
+
+    const betaMarkdownFile = new File(["# Beta"], "beta.md", {
+      type: "text/markdown",
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("import-directory-input"), {
+        target: { files: [alphaMarkdownFile, betaMarkdownFile] },
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        projectsImportDirectory.prepareImportDirectoryWorkflow,
+      ).toHaveBeenCalledWith({
+        allFiles: [alphaMarkdownFile, betaMarkdownFile],
+        preferredProjectName: "",
+        createNewProject: true,
+      });
+    });
+
+    const projectNameInput = await screen.findByPlaceholderText("Project name");
+
+    fireEvent.change(projectNameInput, {
+      target: { value: "Loose Files Project" },
+    });
+    fireEvent.keyDown(projectNameInput, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(mockImportDirectoryMutateAsync).toHaveBeenCalledWith({
+        projectName: "Loose Files Project",
         parentNodeId: undefined,
         files: expect.any(Array),
       });

@@ -5,7 +5,7 @@
  */
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 // Mock next-intl
 vi.mock("next-intl", () => ({
@@ -605,19 +605,96 @@ describe("AuditLog", () => {
     expect(screen.getByText("timeline.empty")).toBeInTheDocument();
   });
 
-  it("should trigger CSV export on button click", () => {
+  it("should trigger CSV export on button click", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:audit-csv-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) => {
+        if (tagName === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+
+        return originalCreateElement(tagName);
+      });
+
     render(<AuditLog />);
     const csvButton = screen.getByTestId("audit-export-csv");
     fireEvent.click(csvButton);
-    // CSV export refetch should be called
-    expect(csvButton).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockClick).toHaveBeenCalled();
+      expect(mockRevokeObjectURL).toHaveBeenCalledWith("blob:audit-csv-url");
+    });
+
+    createElementSpy.mockRestore();
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
-  it("should trigger HTML/PDF export on button click", () => {
+  it("should trigger HTML/PDF export on button click", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:audit-html-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockPrint = vi.fn();
+    const mockFocus = vi.fn();
+    const mockAddEventListener = vi.fn(
+      (eventName: string, listener: EventListenerOrEventListenerObject) => {
+        if (eventName === "load") {
+          if (typeof listener === "function") {
+            listener(new Event("load"));
+          } else {
+            listener.handleEvent(new Event("load"));
+          }
+        }
+      },
+    );
+    const mockRemoveEventListener = vi.fn();
+    const originalOpen = window.open;
+    const mockOpen = vi.fn().mockReturnValue({
+      addEventListener: mockAddEventListener,
+      removeEventListener: mockRemoveEventListener,
+      focus: mockFocus,
+      print: mockPrint,
+    });
+    Object.defineProperty(window, "open", {
+      value: mockOpen,
+      writable: true,
+      configurable: true,
+    });
+
     render(<AuditLog />);
     const pdfButton = screen.getByTestId("audit-export-pdf");
     fireEvent.click(pdfButton);
-    expect(pdfButton).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockOpen).toHaveBeenCalledWith("blob:audit-html-url", "_blank");
+      expect(mockFocus).toHaveBeenCalled();
+      expect(mockPrint).toHaveBeenCalled();
+    });
+
+    Object.defineProperty(window, "open", {
+      value: originalOpen,
+      writable: true,
+      configurable: true,
+    });
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 });
 

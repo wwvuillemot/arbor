@@ -37,27 +37,41 @@ import {
   TiptapEditor,
   ImageUpload,
   LinkPickerDialog,
-  type LinkPickerTreeNode,
 } from "@/components/editor";
 import { TagManager, TagPicker } from "@/components/tags";
 import { NodeAttribution } from "@/components/provenance";
 import { ChatSidebar } from "@/components/chat";
 import { Dialog } from "@/components/dialog";
-import { markdownToTipTap, extractImagePaths } from "@/lib/markdown-to-tiptap";
-import { rewriteImportedInternalHref } from "@/lib/import-link-rewrite";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
+import { downloadTextFile, openHtmlPrintWindow } from "@/lib/browser-export";
 import { extractHeroImage, tiptapToMarkdown } from "@/lib/tiptap-utils";
 import { HeroGradient } from "@/components/hero-gradient";
 import {
-  getImportSourcePath,
-  getNoteFileNameCandidates,
-  joinImportSourcePath,
-  normalizeImportSourcePath,
+  buildFlatLinkPickerTreeNodes,
+  deriveEditorLinkNavigationTarget,
+  deriveFilteredNodeIds,
+  deriveImportTargetNodeId,
+  deriveNodeMoveMutationInput,
   normalizeTiptapContent,
-  stripTopLevelImportSegment,
-  transformTiptapContent,
-  type ImportHealingNode,
+  resolveArborEditorLinkTargetNodeId,
+  type LinkPickerSourceNode,
 } from "./projects-page-helpers";
+import {
+  runProjectMarkdownExport,
+  runProjectPdfExport,
+} from "./projects-export-workflow";
+import { CreateProjectDialog } from "./projects-create-dialog";
+import {
+  applyPreparedImportDirectoryOutcome,
+  prepareImportDirectoryWorkflow,
+  type PendingImportDirectoryRequest,
+} from "./projects-import-directory";
+import {
+  healImportedProjectInternalLinks,
+  patchImportedNodeInternalLinks,
+  uploadImportedImagesAndPatchNodes,
+} from "./projects-import-side-effects";
+import { runProjectImportWorkflow } from "./projects-import-workflow";
 import type { Editor } from "@tiptap/react";
 
 function NoteCard({
@@ -152,9 +166,6 @@ function FolderCardView({
 }
 
 // ── End folder card view ──────────────────────────────────────────────────────
-
-/** Chunk size for chunked btoa binary conversion (avoids call stack overflow) */
-const BASE64_CHUNK_SIZE = 8192;
 
 export default function ProjectsPage() {
   const utils = trpc.useUtils();
@@ -435,53 +446,23 @@ export default function ProjectsPage() {
 
   // Flat list of project nodes sorted into tree order with depth, for the link picker.
   const flatTreeNodes = React.useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allNodes = (projectDescendantsQuery.data ?? []) as any[];
-    const result: LinkPickerTreeNode[] = [];
-    const addChildren = (parentId: string, depth: number) => {
-      allNodes
-        .filter((n) => n.parentId === parentId)
-        .forEach((n) => {
-          result.push({ id: n.id, name: n.name, type: n.type, depth });
-          if (n.type === "folder") addChildren(n.id, depth + 1);
-        });
-    };
-    if (currentProjectId) addChildren(currentProjectId, 0);
-    return result;
+    const allNodes = (projectDescendantsQuery.data ??
+      []) as LinkPickerSourceNode[];
+    return buildFlatLinkPickerTreeNodes(currentProjectId, allNodes);
   }, [projectDescendantsQuery.data, currentProjectId]);
 
   const filterNodeIds = React.useMemo(() => {
-    const hasTagFilter = selectedTagIds.length > 0;
-    const hasSearchFilter = searchQuery.length > 0;
-
-    // No filters active
-    if (!hasTagFilter && !hasSearchFilter) return null;
-
-    // Combine tag and search results
-    const tagNodeIds =
-      hasTagFilter && filteredNodesQuery.data
-        ? new Set(filteredNodesQuery.data.map((n) => n.id))
-        : null;
-    const searchNodeIds =
-      hasSearchFilter && searchResultsQuery.data
-        ? new Set(searchResultsQuery.data.map((r) => r.node.id))
-        : null;
-
-    // If both filters are active, intersect the results
-    if (tagNodeIds && searchNodeIds) {
-      const intersection = new Set<string>();
-      for (const id of tagNodeIds) {
-        if (searchNodeIds.has(id)) intersection.add(id);
-      }
-      return intersection;
-    }
-
-    // Return whichever filter is active
-    return tagNodeIds || searchNodeIds || new Set<string>();
+    return deriveFilteredNodeIds(
+      selectedTagIds,
+      filteredNodesQuery.data?.map((node) => node.id),
+      searchQuery,
+      searchResultsQuery.data?.map((result) => result.node.id),
+    );
   }, [
+    selectedTagIds,
+    searchQuery,
     selectedTagIds.length,
     filteredNodesQuery.data,
-    searchQuery.length,
     searchResultsQuery.data,
   ]);
 
@@ -541,14 +522,14 @@ export default function ProjectsPage() {
     },
   });
 
-  const handleCreate = () => {
+  const handleCreate = React.useCallback(() => {
     if (!projectName.trim()) return;
     createMutation.mutate({
       type: "project",
       name: projectName.trim(),
       parentId: null,
     });
-  };
+  }, [createMutation, projectName]);
 
   const handleEdit = () => {
     if (!selectedProject || !projectName.trim()) return;
@@ -642,33 +623,24 @@ export default function ProjectsPage() {
 
   const handleMoveNode = React.useCallback(
     (draggedNodeId: string, targetNodeId: string, position: DropPosition) => {
-      if (position === "inside") {
-        nodeMoveMutation.mutate({
-          id: draggedNodeId,
-          newParentId: targetNodeId,
-        });
-      } else {
-        const targetNode = utils.nodes.getById.getData({ id: targetNodeId });
-        if (targetNode && targetNode.parentId) {
-          const siblings =
-            utils.nodes.getChildren.getData({
-              parentId: targetNode.parentId,
-            }) ?? [];
-          const targetIndex = siblings.findIndex((s) => s.id === targetNodeId);
-          let insertPosition: number;
-          if (targetIndex === -1) {
-            insertPosition = position === "before" ? 0 : siblings.length;
-          } else if (position === "before") {
-            insertPosition = targetIndex;
-          } else {
-            insertPosition = targetIndex + 1;
-          }
-          nodeMoveMutation.mutate({
-            id: draggedNodeId,
-            newParentId: targetNode.parentId,
-            position: insertPosition,
-          });
-        }
+      const targetNode = utils.nodes.getById.getData({ id: targetNodeId }) as
+        | { id: string; parentId: string | null }
+        | undefined;
+      const siblingNodes = targetNode?.parentId
+        ? (utils.nodes.getChildren.getData({
+            parentId: targetNode.parentId,
+          }) ?? [])
+        : [];
+      const moveInput = deriveNodeMoveMutationInput(
+        draggedNodeId,
+        targetNodeId,
+        position,
+        targetNode,
+        siblingNodes,
+      );
+
+      if (moveInput) {
+        nodeMoveMutation.mutate(moveInput);
       }
     },
     [nodeMoveMutation, utils.nodes.getById, utils.nodes.getChildren],
@@ -707,14 +679,9 @@ export default function ProjectsPage() {
   );
 
   // For the "ask for project name" case (loose files without a single root dir)
-  const [pendingImportEntries, setPendingImportEntries] = React.useState<
-    { path: string; content: unknown }[] | null
-  >(null);
-  const [pendingImagesByNotePath, setPendingImagesByNotePath] =
-    React.useState<Map<string, Map<string, File>> | null>(null);
+  const [pendingImportRequest, setPendingImportRequest] =
+    React.useState<PendingImportDirectoryRequest<File> | null>(null);
   const [importProjectName, setImportProjectName] = React.useState("");
-  const [pendingImportCreatesProject, setPendingImportCreatesProject] =
-    React.useState(false);
   const [queuedImportProjectName, setQueuedImportProjectName] =
     React.useState("");
 
@@ -723,13 +690,49 @@ export default function ProjectsPage() {
     setProjectName("");
   }, []);
 
+  const openCreateDialog = React.useCallback(() => {
+    setCreateDialogOpen(true);
+  }, []);
+
+  const handleCreateProjectNameChange = React.useCallback(
+    (nextProjectName: string) => {
+      setProjectName(nextProjectName);
+    },
+    [],
+  );
+
+  const handleCreateDialogImportFromFolder = React.useCallback(() => {
+    setQueuedImportProjectName(projectName.trim());
+    closeCreateDialog();
+    importInputRef.current?.click();
+  }, [closeCreateDialog, projectName]);
+
   const closeImportNameDialog = React.useCallback(() => {
-    setPendingImportEntries(null);
-    setPendingImagesByNotePath(null);
+    setPendingImportRequest(null);
     setImportProjectName("");
-    setPendingImportCreatesProject(false);
     setQueuedImportProjectName("");
   }, []);
+
+  const showImportNameDialog = React.useCallback(
+    (nextPendingImportRequest: PendingImportDirectoryRequest<File>) => {
+      setPendingImportRequest(nextPendingImportRequest);
+      setImportProjectName(nextPendingImportRequest.initialProjectName);
+    },
+    [],
+  );
+
+  const navigateToProjects = React.useCallback(() => {
+    router.push("/projects");
+  }, [router]);
+
+  const updateImportedNodeContent = React.useCallback(
+    async ({ id, content }: { id: string; content: Record<string, unknown> }) =>
+      updateNodeMutation.mutateAsync({
+        id,
+        data: { content },
+      }),
+    [updateNodeMutation],
+  );
 
   // After nodes are created, upload images and patch node content
   const uploadImagesAndPatch = React.useCallback(
@@ -737,71 +740,16 @@ export default function ProjectsPage() {
       nodeMap: Record<string, string>,
       projectId: string,
       imageFilesByNotePath: Map<string, Map<string, File>>,
-    ) => {
-      for (const [notePath, imageFiles] of imageFilesByNotePath.entries()) {
-        const nodeId = nodeMap[notePath];
-        if (!nodeId) continue;
-        const srcMap = new Map<string, string>();
-        for (const [localPath, file] of imageFiles.entries()) {
-          try {
-            const arrayBuffer = await file.arrayBuffer();
-            // Chunked btoa to avoid call stack overflow for large images
-            const bytes = new Uint8Array(arrayBuffer);
-            let binary = "";
-            for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
-              binary += String.fromCharCode(
-                ...bytes.subarray(i, i + BASE64_CHUNK_SIZE),
-              );
-            }
-            const base64 = btoa(binary);
-            const attachment = await mediaUploadForImport.mutateAsync({
-              nodeId,
-              projectId,
-              filename: file.name,
-              mimeType: file.type || "application/octet-stream",
-              data: base64,
-              createdBy: "user:import",
-            });
-            srcMap.set(localPath, getMediaAttachmentUrl(attachment.id));
-          } catch (err) {
-            console.error("Image upload failed for", file.name, err);
-          }
-        }
-        if (srcMap.size === 0) continue;
-        // Fetch current node content and replace placeholder srcs
-        // (the markdownToTipTap call already used the placeholder; patch in the real URLs)
-        // We stored the tiptap JSON with local path srcs — need to patch them
-        try {
-          const node = await utils.nodes.getById.fetch({ id: nodeId });
-          if (!node?.content) continue;
-
-          let changed = false;
-          const patchedContent = transformTiptapContent(
-            node.content,
-            (key, value) => {
-              if (key === "src" && typeof value === "string") {
-                const uploadedImageUrl = srcMap.get(value);
-                if (uploadedImageUrl && uploadedImageUrl !== value) {
-                  changed = true;
-                  return uploadedImageUrl;
-                }
-              }
-              return value;
-            },
-          );
-
-          if (!changed || !patchedContent) continue;
-
-          await updateNodeMutation.mutateAsync({
-            id: nodeId,
-            data: { content: patchedContent },
-          });
-        } catch {
-          // Non-fatal
-        }
-      }
-    },
-    [mediaUploadForImport, updateNodeMutation, utils.nodes.getById],
+    ) =>
+      uploadImportedImagesAndPatchNodes({
+        nodeMap,
+        projectId,
+        imageFilesByNotePath,
+        uploadImportedMedia: mediaUploadForImport.mutateAsync,
+        fetchNodeById: utils.nodes.getById.fetch,
+        updateNodeContent: updateImportedNodeContent,
+      }),
+    [mediaUploadForImport, updateImportedNodeContent, utils.nodes.getById],
   );
 
   // Patch relative imported note links to resolve to internal node IDs
@@ -809,242 +757,39 @@ export default function ProjectsPage() {
     async (
       nodeMap: Record<string, string>,
       entries: { path: string; content: unknown }[],
-    ) => {
-      for (const { path } of entries) {
-        const nodeId = nodeMap[path];
-        if (!nodeId) continue;
-        try {
-          const node = await utils.nodes.getById.fetch({ id: nodeId });
-          if (!node?.content) continue;
-
-          let changed = false;
-
-          const patchedContent = transformTiptapContent(
-            node.content,
-            (key, value) => {
-              if (key === "href" && typeof value === "string") {
-                const rewrittenHref = rewriteImportedInternalHref(
-                  value,
-                  path,
-                  nodeMap,
-                );
-
-                if (rewrittenHref !== null && rewrittenHref !== value) {
-                  changed = true;
-                  // Patch to internal node URL if target exists, otherwise use # to
-                  // prevent broken navigation to a raw imported file path.
-                  return rewrittenHref;
-                }
-              }
-              return value;
-            },
-          );
-
-          if (changed && patchedContent) {
-            await updateNodeMutation.mutateAsync({
-              id: nodeId,
-              data: { content: patchedContent },
-            });
-          }
-        } catch {
-          // Non-fatal — skip this node
-        }
-      }
-    },
-    [utils.nodes.getById, updateNodeMutation],
+    ) =>
+      patchImportedNodeInternalLinks({
+        nodeMap,
+        entries,
+        fetchNodeById: utils.nodes.getById.fetch,
+        updateNodeContent: updateImportedNodeContent,
+      }),
+    [updateImportedNodeContent, utils.nodes.getById],
   );
 
   const healImportedInternalLinks = React.useCallback(
-    async (projectId: string, importedNodeMap: Record<string, string>) => {
-      const descendants = (await utils.nodes.getDescendants.fetch({
-        nodeId: projectId,
-      })) as ImportHealingNode[];
-      const nodesById = new Map(
-        descendants.map((descendant) => [descendant.id, descendant]),
-      );
-      const folderAliasesById = new Map<string, string[]>();
-      const aliasToNodeIds = new Map<string, Set<string>>();
-
-      const addAlias = (alias: string | null, nodeId: string) => {
-        if (!alias) {
-          return;
-        }
-
-        const normalizedAlias = normalizeImportSourcePath(alias);
-        if (!normalizedAlias) {
-          return;
-        }
-
-        const matchingNodeIds =
-          aliasToNodeIds.get(normalizedAlias) ?? new Set();
-        matchingNodeIds.add(nodeId);
-        aliasToNodeIds.set(normalizedAlias, matchingNodeIds);
-      };
-
-      const getFolderAliases = (folderId: string | null): string[] => {
-        if (!folderId || folderId === projectId) {
-          return [""];
-        }
-
-        const cachedAliases = folderAliasesById.get(folderId);
-        if (cachedAliases) {
-          return cachedAliases;
-        }
-
-        const folderNode = nodesById.get(folderId);
-        if (!folderNode || folderNode.type !== "folder") {
-          return [""];
-        }
-
-        const folderAliases = new Set<string>();
-        const importSourcePath = getImportSourcePath(folderNode.metadata);
-
-        if (importSourcePath) {
-          folderAliases.add(importSourcePath);
-          const rootlessFolderPath =
-            stripTopLevelImportSegment(importSourcePath);
-          if (rootlessFolderPath) {
-            folderAliases.add(rootlessFolderPath);
-          }
-        }
-
-        const trimmedFolderName = folderNode.name.trim();
-        if (trimmedFolderName) {
-          for (const parentAlias of getFolderAliases(folderNode.parentId)) {
-            folderAliases.add(
-              joinImportSourcePath(parentAlias, trimmedFolderName),
-            );
-          }
-        }
-
-        const resolvedFolderAliases = [...folderAliases].filter(Boolean);
-        folderAliasesById.set(
-          folderId,
-          resolvedFolderAliases.length > 0 ? resolvedFolderAliases : [""],
-        );
-
-        return folderAliasesById.get(folderId) ?? [""];
-      };
-
-      const getNotePathCandidates = (node: ImportHealingNode): string[] => {
-        const notePathCandidates = new Set<string>();
-        const importSourcePath = getImportSourcePath(node.metadata);
-
-        if (importSourcePath) {
-          notePathCandidates.add(importSourcePath);
-          const rootlessImportSourcePath =
-            stripTopLevelImportSegment(importSourcePath);
-          if (rootlessImportSourcePath) {
-            notePathCandidates.add(rootlessImportSourcePath);
-          }
-        }
-
-        const fileNameCandidates = getNoteFileNameCandidates(node);
-        for (const parentAlias of getFolderAliases(node.parentId)) {
-          for (const fileNameCandidate of fileNameCandidates) {
-            notePathCandidates.add(
-              joinImportSourcePath(parentAlias, fileNameCandidate),
-            );
-          }
-        }
-
-        return [...notePathCandidates].filter(Boolean);
-      };
-
-      for (const [nodePath, nodeId] of Object.entries(importedNodeMap)) {
-        addAlias(nodePath, nodeId);
-      }
-
-      for (const descendant of descendants) {
-        if (descendant.type !== "note") {
-          continue;
-        }
-
-        for (const notePathCandidate of getNotePathCandidates(descendant)) {
-          addAlias(notePathCandidate, descendant.id);
-        }
-      }
-
-      const projectWideNodeMap = Object.fromEntries(
-        [...aliasToNodeIds.entries()]
-          .filter(([, matchingNodeIds]) => matchingNodeIds.size === 1)
-          .map(([alias, matchingNodeIds]) => [
-            alias,
-            [...matchingNodeIds][0] as string,
-          ]),
-      );
-
-      for (const descendant of descendants) {
-        if (descendant.type !== "note" || !descendant.content) {
-          continue;
-        }
-
-        const importingNotePathCandidates = getNotePathCandidates(descendant);
-        if (importingNotePathCandidates.length === 0) {
-          continue;
-        }
-
-        let changed = false;
-        const patchedContent = transformTiptapContent(
-          descendant.content,
-          (key, value) => {
-            if (key !== "href" || typeof value !== "string") {
-              return value;
-            }
-
-            for (const importingNotePath of importingNotePathCandidates) {
-              const rewrittenHref = rewriteImportedInternalHref(
-                value,
-                importingNotePath,
-                projectWideNodeMap,
-              );
-
-              if (rewrittenHref !== null && rewrittenHref !== value) {
-                changed = true;
-                return rewrittenHref;
-              }
-            }
-
-            return value;
-          },
-        );
-
-        if (changed && patchedContent) {
-          await updateNodeMutation.mutateAsync({
-            id: descendant.id,
-            data: { content: patchedContent },
-          });
-        }
-      }
-    },
-    [updateNodeMutation, utils.nodes.getDescendants],
+    async (projectId: string, importedNodeMap: Record<string, string>) =>
+      healImportedProjectInternalLinks({
+        projectId,
+        importedNodeMap,
+        fetchDescendants: utils.nodes.getDescendants.fetch,
+        updateNodeContent: updateImportedNodeContent,
+      }),
+    [updateImportedNodeContent, utils.nodes.getDescendants],
   );
 
   const getImportTargetNodeId = React.useCallback(
     (createNewProject = false) => {
-      if (createNewProject || !currentProject || forceList) {
-        return undefined;
-      }
-
-      const selectedNode = selectedNodeQuery.data as
-        | { id: string; type: string; parentId: string | null }
-        | undefined;
-
-      if (!selectedNode) {
-        return currentProject.id;
-      }
-
-      if (selectedNode.type === "folder") {
-        return selectedNode.id;
-      }
-
-      if (selectedNode.type === "note") {
-        return selectedNode.parentId ?? currentProject.id;
-      }
-
-      return currentProject.id;
+      return deriveImportTargetNodeId(
+        createNewProject,
+        currentProject?.id,
+        forceList,
+        selectedNodeQuery.data as
+          | { id: string; type: string; parentId: string | null }
+          | undefined,
+      );
     },
-    [currentProject, forceList, selectedNodeQuery.data],
+    [currentProject?.id, forceList, selectedNodeQuery.data],
   );
 
   const runImport = React.useCallback(
@@ -1053,48 +798,29 @@ export default function ProjectsPage() {
       entries: { path: string; content: unknown }[],
       imageFilesByNotePath: Map<string, Map<string, File>>,
       options?: { createNewProject?: boolean },
-    ) => {
-      const importTargetNodeId = getImportTargetNodeId(
-        options?.createNewProject ?? false,
-      );
-
-      const result = await importDirectoryMutation.mutateAsync({
+    ) =>
+      runProjectImportWorkflow({
         projectName,
-        parentNodeId: importTargetNodeId,
-        files: entries,
-      });
-      // Patch images first (updates node content with stable media URLs)
-      if (imageFilesByNotePath.size > 0) {
-        await uploadImagesAndPatch(
-          result.nodeMap,
-          result.projectId,
-          imageFilesByNotePath,
-        );
-        // Flush the node cache so patchInternalLinks fetches fresh content
-        // (otherwise it would overwrite the just-patched image URLs with stale data)
-        await utils.nodes.getById.invalidate();
-      }
-      // Patch internal markdown links to resolve to node IDs
-      await patchInternalLinks(result.nodeMap, entries);
-      // Flush descendants cache so the healing pass does not rewrite notes from
-      // stale content and accidentally clobber already-patched image URLs.
-      await utils.nodes.getDescendants.invalidate();
-      // Revisit older imported notes now that new targets may exist.
-      await healImportedInternalLinks(result.projectId, result.nodeMap);
-      // Navigate to the newly imported project so the user can see it
-      await setCurrentProject(result.projectId);
-      await Promise.all([
-        utils.nodes.getAllProjects.invalidate(),
-        utils.nodes.getChildren.invalidate(),
-        utils.nodes.getById.invalidate(),
-        utils.nodes.getDescendants.invalidate(),
-      ]);
-      router.push("/projects");
-    },
+        entries,
+        imageFilesByNotePath,
+        createNewProject: options?.createNewProject,
+        getImportTargetNodeId,
+        importDirectory: importDirectoryMutation.mutateAsync,
+        uploadImagesAndPatch,
+        patchInternalLinks,
+        healImportedInternalLinks,
+        setCurrentProject,
+        invalidateAllProjects: () => utils.nodes.getAllProjects.invalidate(),
+        invalidateChildren: () => utils.nodes.getChildren.invalidate(),
+        invalidateNodeById: () => utils.nodes.getById.invalidate(),
+        invalidateDescendants: () => utils.nodes.getDescendants.invalidate(),
+        navigateToProjects,
+      }),
     [
       getImportTargetNodeId,
       healImportedInternalLinks,
       importDirectoryMutation,
+      navigateToProjects,
       uploadImagesAndPatch,
       patchInternalLinks,
       setCurrentProject,
@@ -1102,7 +828,6 @@ export default function ProjectsPage() {
       utils.nodes.getChildren,
       utils.nodes.getById,
       utils.nodes.getDescendants,
-      router,
     ],
   );
 
@@ -1116,140 +841,36 @@ export default function ProjectsPage() {
       e.target.value = "";
       if (allFiles.length === 0) return;
 
-      const IMAGE_EXTS = /\.(png|jpg|jpeg|gif|webp|svg)$/i;
-      const MARKDOWN_EXTS = /\.(md|txt|markdown|mdown|mkd|mdx)$/i;
+      const importDirectoryOutcome = await prepareImportDirectoryWorkflow({
+        allFiles,
+        preferredProjectName,
+        createNewProject,
+      });
 
-      // Index all image files by full relative path and by filename (for references)
-      const imageFilesByPath = new Map<string, File>(); // localPath/filename → File
-      for (const file of allFiles) {
-        const f = file as File & { webkitRelativePath: string };
-        if (!f.name.startsWith(".") && IMAGE_EXTS.test(f.name)) {
-          const path = f.webkitRelativePath || f.name;
-          imageFilesByPath.set(path, file);
-          imageFilesByPath.set(f.name, file); // alias for relative references
-        }
-      }
-
-      // Parse markdown/text files → TipTap JSON, track referenced images
-      const entries: { path: string; content: unknown }[] = [];
-      const imageFilesByNotePath = new Map<string, Map<string, File>>(); // notePath → (imgLocalPath → File)
-      const referencedImages = new Set<File>();
-
-      for (const file of allFiles) {
-        const f = file as File & { webkitRelativePath: string };
-        if (!MARKDOWN_EXTS.test(f.name) || f.name.startsWith(".")) continue;
-        const path = f.webkitRelativePath || f.name;
-        const rawText = await file.text();
-        const tiptapContent = markdownToTipTap(rawText);
-
-        // Track which images this note references
-        const imgPaths = extractImagePaths(rawText);
-        if (imgPaths.length > 0) {
-          const noteImgMap = new Map<string, File>();
-          for (const imgPath of imgPaths) {
-            const noteDir = path.split("/").slice(0, -1).join("/");
-            const candidates = [
-              imgPath,
-              `${noteDir}/${imgPath}`,
-              imgPath.split("/").pop() ?? imgPath,
-            ];
-            for (const candidate of candidates) {
-              if (imageFilesByPath.has(candidate)) {
-                const imgFile = imageFilesByPath.get(candidate)!;
-                noteImgMap.set(imgPath, imgFile);
-                referencedImages.add(imgFile);
-                break;
-              }
-            }
-          }
-          if (noteImgMap.size > 0) imageFilesByNotePath.set(path, noteImgMap);
-        }
-
-        entries.push({ path, content: tiptapContent });
-      }
-
-      // Create standalone image notes for ALL images so the folder structure appears in the
-      // project tree. Referenced images will also be patched inline into their parent notes.
-      const processedImages = new Set<File>();
-      for (const file of allFiles) {
-        const f = file as File & { webkitRelativePath: string };
-        if (!IMAGE_EXTS.test(f.name) || f.name.startsWith(".")) continue;
-        if (processedImages.has(file)) continue;
-        processedImages.add(file);
-
-        const imgPath = f.webkitRelativePath || f.name;
-        const imgName = f.name.replace(IMAGE_EXTS, "");
-        // Use .md extension so the API router accepts the entry as a note
-        const syntheticPath = imgPath.replace(IMAGE_EXTS, ".md");
-        const content = {
-          type: "doc",
-          content: [
-            {
-              type: "image",
-              attrs: { src: imgPath, alt: imgName, title: null },
-            },
-          ],
-        };
-        entries.push({ path: syntheticPath, content });
-        imageFilesByNotePath.set(syntheticPath, new Map([[imgPath, file]]));
-      }
-
-      if (entries.length === 0) {
-        const exts = [
-          ...new Set(
-            allFiles.map((f) =>
-              f.name.includes(".")
-                ? f.name.split(".").pop()!.toLowerCase()
-                : "(no ext)",
-            ),
-          ),
-        ]
-          .slice(0, 10)
-          .join(", ");
-        addToast(
-          allFiles.length === 0
-            ? "No files were received from the browser. Try selecting the folder again."
-            : `No supported files found among ${allFiles.length} files (extensions: ${exts || "none"}). Supported: .md, .txt, .png, .jpg, .jpeg, .gif, .webp, .svg`,
-          "error",
-        );
-        return;
-      }
-
-      const roots = new Set(
-        entries.map((f) => (f.path as string).split("/")[0]),
-      );
-      if (roots.size === 1) {
-        const rootDirectoryName = [...roots][0];
-        const projectName = preferredProjectName || rootDirectoryName;
-        await runImport(projectName, entries, imageFilesByNotePath, {
-          createNewProject,
-        });
-      } else {
-        setPendingImportEntries(entries);
-        setPendingImagesByNotePath(imageFilesByNotePath);
-        setImportProjectName(preferredProjectName);
-        setPendingImportCreatesProject(createNewProject);
-      }
+      await applyPreparedImportDirectoryOutcome({
+        outcome: importDirectoryOutcome,
+        runImport,
+        showUnsupportedImportMessage: (message) => addToast(message, "error"),
+        setPendingImportRequest: showImportNameDialog,
+      });
     },
-    [addToast, queuedImportProjectName, runImport],
+    [addToast, queuedImportProjectName, runImport, showImportNameDialog],
   );
 
   const handleImportWithName = React.useCallback(() => {
-    if (!pendingImportEntries || !importProjectName.trim()) return;
+    if (!pendingImportRequest || !importProjectName.trim()) return;
     void runImport(
       importProjectName.trim(),
-      pendingImportEntries,
-      pendingImagesByNotePath ?? new Map(),
-      { createNewProject: pendingImportCreatesProject },
+      pendingImportRequest.entries,
+      pendingImportRequest.imageFilesByNotePath,
+      { createNewProject: pendingImportRequest.createNewProject },
     );
     closeImportNameDialog();
   }, [
     closeImportNameDialog,
     runImport,
-    pendingImportEntries,
-    pendingImportCreatesProject,
     importProjectName,
-    pendingImagesByNotePath,
+    pendingImportRequest,
   ]);
 
   const handleImageUpload = React.useCallback(
@@ -1291,62 +912,35 @@ export default function ProjectsPage() {
   // Handle link clicks from TipTap editor — navigate in the current window, never new tab
   const handleEditorLinkClick = React.useCallback(
     async (href: string) => {
-      // Handle full URLs that may point to this app (e.g. http://app.arbor.local/projects?node=uuid)
-      try {
-        const url = new URL(href, window.location.href);
-        const nodeId = url.searchParams.get("node");
-        if (nodeId) {
-          router.push(`/projects?node=${nodeId}`);
-          return;
-        }
-        if (url.origin === window.location.origin) {
-          router.push(url.pathname + url.search);
-          return;
-        }
+      const navigationTarget = deriveEditorLinkNavigationTarget(
+        href,
+        window.location.href,
+        window.location.origin,
+      );
 
-        // Handle LLM-generated arbor internal URLs like https://arbor/path/to/node-name.
-        // Try to resolve each path segment from most-specific to least.
-        if (url.hostname === "arbor" || url.hostname.endsWith(".arbor")) {
-          const segments = url.pathname.split("/").filter(Boolean);
-          for (let i = segments.length - 1; i >= 0; i--) {
-            const rawSeg = segments[i];
-            // Convert underscores/hyphens to spaces for name matching
-            const nameCandidates = [
-              rawSeg,
-              rawSeg.replace(/_/g, " "),
-              rawSeg.replace(/-/g, " "),
-            ];
-            for (const candidate of nameCandidates) {
-              try {
-                const results = await utils.search.keywordSearch.fetch({
-                  query: candidate,
-                  filters: {},
-                  options: { limit: 5 },
-                });
-                const match = results.find(
-                  (r: { node: { name: string } }) =>
-                    r.node.name === candidate ||
-                    r.node.name.replace(/\s/g, "_") === rawSeg,
-                );
-                if (match) {
-                  router.push(`/projects?node=${match.node.id}`);
-                  return;
-                }
-              } catch {
-                /* ignore search errors */
-              }
-            }
-          }
-          return; // arbor URL but no match found — don't navigate externally
-        }
-      } catch {
-        /* not a URL */
-      }
-      if (href.startsWith("?") || href.startsWith("/")) {
-        router.push(href.startsWith("?") ? `/projects${href}` : href);
+      if (navigationTarget.kind === "push") {
+        router.push(navigationTarget.href);
         return;
       }
-      window.location.href = href;
+
+      if (navigationTarget.kind === "resolve-arbor-url") {
+        const matchedNodeId = await resolveArborEditorLinkTargetNodeId(
+          navigationTarget.pathSegments,
+          async (query) =>
+            utils.search.keywordSearch.fetch({
+              query,
+              filters: {},
+              options: { limit: 5 },
+            }),
+        );
+
+        if (matchedNodeId) {
+          router.push(`/projects?node=${matchedNodeId}`);
+        }
+        return;
+      }
+
+      window.location.href = navigationTarget.href;
     },
     [router, utils],
   );
@@ -1434,23 +1028,17 @@ export default function ProjectsPage() {
   const handleExportMarkdown = React.useCallback(
     async (includeDescendants: boolean) => {
       if (!selectedNodeId) return;
-      try {
-        const result = await utils.nodes.exportMarkdown.fetch({
-          id: selectedNodeId,
-          includeDescendants,
-        });
-        const blob = new Blob([result.content], { type: "text/markdown" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = `${selectedNodeQuery.data?.name || "export"}.md`;
-        anchor.click();
-        URL.revokeObjectURL(url);
-        addToast(tFileTree("exportSuccess"), "success");
-      } catch {
-        addToast(tFileTree("exportError"), "error");
-      }
-      setShowExportMenu(false);
+
+      await runProjectMarkdownExport({
+        nodeId: selectedNodeId,
+        nodeName: selectedNodeQuery.data?.name,
+        includeDescendants,
+        fetchMarkdown: utils.nodes.exportMarkdown.fetch,
+        downloadTextFile,
+        addSuccessToast: () => addToast(tFileTree("exportSuccess"), "success"),
+        addErrorToast: () => addToast(tFileTree("exportError"), "error"),
+        closeExportMenu: () => setShowExportMenu(false),
+      });
     },
     [selectedNodeId, selectedNodeQuery.data?.name, utils, addToast, tFileTree],
   );
@@ -1458,22 +1046,16 @@ export default function ProjectsPage() {
   const handleExportPdf = React.useCallback(
     async (includeDescendants: boolean) => {
       if (!selectedNodeId) return;
-      try {
-        const result = await utils.nodes.exportHtml.fetch({
-          id: selectedNodeId,
-          includeDescendants,
-        });
-        const printWindow = window.open("", "_blank");
-        if (printWindow) {
-          printWindow.document.write(result.content);
-          printWindow.document.close();
-          printWindow.print();
-        }
-        addToast(tFileTree("exportSuccess"), "success");
-      } catch {
-        addToast(tFileTree("exportError"), "error");
-      }
-      setShowExportMenu(false);
+
+      await runProjectPdfExport({
+        nodeId: selectedNodeId,
+        includeDescendants,
+        fetchHtml: utils.nodes.exportHtml.fetch,
+        openHtmlPrintWindow,
+        addSuccessToast: () => addToast(tFileTree("exportSuccess"), "success"),
+        addErrorToast: () => addToast(tFileTree("exportError"), "error"),
+        closeExportMenu: () => setShowExportMenu(false),
+      });
     },
     [selectedNodeId, utils, addToast, tFileTree],
   );
@@ -2238,7 +1820,7 @@ export default function ProjectsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCreateDialogOpen(true)}
+              onClick={openCreateDialog}
               className={cn(
                 "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium",
                 "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -2270,7 +1852,7 @@ export default function ProjectsPage() {
                   key={project.id}
                   onClick={async () => {
                     await setCurrentProject(project.id);
-                    router.push("/projects");
+                    navigateToProjects();
                   }}
                   className={cn(
                     "group relative flex flex-col rounded-lg border bg-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer",
@@ -2352,7 +1934,7 @@ export default function ProjectsPage() {
               {t("noProjectsDescription")}
             </p>
             <button
-              onClick={() => setCreateDialogOpen(true)}
+              onClick={openCreateDialog}
               className={cn(
                 "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium",
                 "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -2370,7 +1952,7 @@ export default function ProjectsPage() {
 
         {/* Import — name project dialog (shown when importing loose files without a single root dir) */}
         <Dialog
-          open={!!pendingImportEntries}
+          open={!!pendingImportRequest}
           onClose={closeImportNameDialog}
           title="Name Your Project"
           maxWidth="sm"
@@ -2414,112 +1996,16 @@ export default function ProjectsPage() {
           </div>
         </Dialog>
 
-        {/* Create Dialog */}
-        {createDialogOpen && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
-            <div className="fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 px-4">
-              <div className="overflow-hidden rounded-lg border bg-card shadow-lg">
-                {/* Header */}
-                <div className="flex items-center justify-between border-b px-6 py-4">
-                  <div>
-                    <h2 className="text-xl font-semibold">
-                      {t("createDialog.title")}
-                    </h2>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {t("createDialog.description")}
-                    </p>
-                  </div>
-                  <button
-                    onClick={closeCreateDialog}
-                    className="rounded-md p-1 hover:bg-accent transition-colors"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {/* Content */}
-                <div className="px-6 py-4 space-y-4">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="project-name"
-                      className="text-sm font-medium"
-                    >
-                      {t("createDialog.name")}
-                    </label>
-                    <input
-                      id="project-name"
-                      type="text"
-                      placeholder={t("createDialog.namePlaceholder")}
-                      value={projectName}
-                      onChange={(e) => setProjectName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleCreate();
-                        if (e.key === "Escape") {
-                          closeCreateDialog();
-                        }
-                      }}
-                      className={cn(
-                        "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                        "placeholder:text-muted-foreground",
-                      )}
-                      autoFocus
-                    />
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-2 border-t px-6 py-4">
-                  <button
-                    onClick={closeCreateDialog}
-                    className={cn(
-                      "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-                      "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      "transition-colors",
-                    )}
-                  >
-                    {tCommon("cancel")}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setQueuedImportProjectName(projectName.trim());
-                      closeCreateDialog();
-                      importInputRef.current?.click();
-                    }}
-                    disabled={importDirectoryMutation.isPending}
-                    className={cn(
-                      "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-                      "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      "disabled:pointer-events-none disabled:opacity-50",
-                      "transition-colors",
-                    )}
-                  >
-                    {importDirectoryMutation.isPending
-                      ? t("createDialog.importing")
-                      : t("createDialog.importFromFolder")}
-                  </button>
-                  <button
-                    onClick={handleCreate}
-                    disabled={!projectName.trim() || createMutation.isPending}
-                    className={cn(
-                      "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-                      "bg-primary text-primary-foreground hover:bg-primary/90",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      "disabled:pointer-events-none disabled:opacity-50",
-                      "transition-colors",
-                    )}
-                  >
-                    {createMutation.isPending
-                      ? t("createDialog.creating")
-                      : t("createDialog.createBlank")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <CreateProjectDialog
+          open={createDialogOpen}
+          projectName={projectName}
+          isCreating={createMutation.isPending}
+          isImporting={importDirectoryMutation.isPending}
+          onClose={closeCreateDialog}
+          onProjectNameChange={handleCreateProjectNameChange}
+          onCreateBlank={handleCreate}
+          onImportFromFolder={handleCreateDialogImportFromFolder}
+        />
 
         {/* Edit Dialog */}
         {editDialogOpen && (
