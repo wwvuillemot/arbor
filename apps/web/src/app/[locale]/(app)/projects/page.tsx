@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -46,123 +45,20 @@ import { ChatSidebar } from "@/components/chat";
 import { Dialog } from "@/components/dialog";
 import { markdownToTipTap, extractImagePaths } from "@/lib/markdown-to-tiptap";
 import { rewriteImportedInternalHref } from "@/lib/import-link-rewrite";
+import { getMediaAttachmentUrl } from "@/lib/media-url";
 import { extractHeroImage, tiptapToMarkdown } from "@/lib/tiptap-utils";
+import { HeroGradient } from "@/components/hero-gradient";
+import {
+  getImportSourcePath,
+  getNoteFileNameCandidates,
+  joinImportSourcePath,
+  normalizeImportSourcePath,
+  normalizeTiptapContent,
+  stripTopLevelImportSegment,
+  transformTiptapContent,
+  type ImportHealingNode,
+} from "./projects-page-helpers";
 import type { Editor } from "@tiptap/react";
-
-const NOTE_FILE_EXTENSION_REGEX = /\.(md|txt|markdown|mdown|mkd|mdx)$/i;
-
-type ImportHealingNode = {
-  id: string;
-  name: string;
-  type: string;
-  parentId: string | null;
-  content?: unknown;
-  metadata?: unknown;
-};
-
-function normalizeImportSourcePath(path: string): string {
-  return path
-    .replace(/\\/g, "/")
-    .split("/")
-    .map((segment) => segment.trim())
-    .filter(Boolean)
-    .join("/");
-}
-
-function joinImportSourcePath(parentPath: string, childPath: string): string {
-  const normalizedParentPath = normalizeImportSourcePath(parentPath);
-  const normalizedChildPath = normalizeImportSourcePath(childPath);
-
-  if (!normalizedParentPath) {
-    return normalizedChildPath;
-  }
-
-  if (!normalizedChildPath) {
-    return normalizedParentPath;
-  }
-
-  return `${normalizedParentPath}/${normalizedChildPath}`;
-}
-
-function stripTopLevelImportSegment(path: string): string | null {
-  const normalizedPath = normalizeImportSourcePath(path);
-  const pathSegments = normalizedPath.split("/");
-
-  if (pathSegments.length <= 1) {
-    return null;
-  }
-
-  const rootlessPath = pathSegments.slice(1).join("/");
-  return rootlessPath || null;
-}
-
-function getImportSourcePath(metadata: unknown): string | null {
-  if (!metadata || typeof metadata !== "object") {
-    return null;
-  }
-
-  const importSourcePath = (metadata as Record<string, unknown>)
-    .importSourcePath;
-  if (typeof importSourcePath !== "string" || !importSourcePath.trim()) {
-    return null;
-  }
-
-  return normalizeImportSourcePath(importSourcePath);
-}
-
-function getNoteFileNameCandidates(node: ImportHealingNode): string[] {
-  const fileNameCandidates = new Set<string>();
-  const importSourcePath = getImportSourcePath(node.metadata);
-  const importSourceBasename = importSourcePath?.split("/").pop();
-
-  if (importSourceBasename) {
-    fileNameCandidates.add(importSourceBasename);
-  }
-
-  const trimmedNodeName = node.name.trim();
-  if (trimmedNodeName) {
-    fileNameCandidates.add(
-      NOTE_FILE_EXTENSION_REGEX.test(trimmedNodeName)
-        ? trimmedNodeName
-        : `${trimmedNodeName}.md`,
-    );
-  }
-
-  return [...fileNameCandidates];
-}
-
-function normalizeTiptapContent(
-  rawContent: unknown,
-): Record<string, unknown> | null {
-  if (!rawContent) return null;
-
-  if (typeof rawContent === "string") {
-    try {
-      const parsedContent = JSON.parse(rawContent) as unknown;
-      return parsedContent && typeof parsedContent === "object"
-        ? (parsedContent as Record<string, unknown>)
-        : null;
-    } catch {
-      return null;
-    }
-  }
-
-  return typeof rawContent === "object"
-    ? (rawContent as Record<string, unknown>)
-    : null;
-}
-
-function transformTiptapContent(
-  rawContent: unknown,
-  transformValue: (key: string, value: unknown) => unknown,
-): Record<string, unknown> | null {
-  const normalizedContent = normalizeTiptapContent(rawContent);
-  if (!normalizedContent) return null;
-
-  return JSON.parse(
-    JSON.stringify(normalizedContent, transformValue),
-  ) as Record<string, unknown>;
-}
 
 function NoteCard({
   node,
@@ -185,16 +81,14 @@ function NoteCard({
       className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
       onClick={onClick}
     >
-      {heroImage && (
-        <Image
-          src={heroImage}
-          alt={node.name}
-          width={400}
-          height={160}
-          className="w-full h-40 object-cover"
-          unoptimized
+      <div className="w-full h-40">
+        <HeroGradient
+          seed={node.name}
+          imageUrl={heroImage}
+          imageAlt={node.name}
+          className="w-full h-full"
         />
-      )}
+      </div>
       <div className="p-4 space-y-2">
         <div className="flex items-center gap-2">
           <button
@@ -261,8 +155,6 @@ function FolderCardView({
 
 /** Chunk size for chunked btoa binary conversion (avoids call stack overflow) */
 const BASE64_CHUNK_SIZE = 8192;
-//** 7 days in seconds — MinIO max allowed presigned URL expiry */
-const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60;
 
 export default function ProjectsPage() {
   const utils = trpc.useUtils();
@@ -870,12 +762,7 @@ export default function ProjectsPage() {
               data: base64,
               createdBy: "user:import",
             });
-            // Get a pre-signed Minio URL for the uploaded image
-            const { url } = await utils.media.getDownloadUrl.fetch({
-              id: attachment.id,
-              expirySeconds: SEVEN_DAYS_IN_SECONDS,
-            });
-            srcMap.set(localPath, url);
+            srcMap.set(localPath, getMediaAttachmentUrl(attachment.id));
           } catch (err) {
             console.error("Image upload failed for", file.name, err);
           }
@@ -914,12 +801,7 @@ export default function ProjectsPage() {
         }
       }
     },
-    [
-      mediaUploadForImport,
-      utils.media.getDownloadUrl,
-      updateNodeMutation,
-      utils.nodes.getById,
-    ],
+    [mediaUploadForImport, updateNodeMutation, utils.nodes.getById],
   );
 
   // Patch relative imported note links to resolve to internal node IDs
@@ -1181,7 +1063,7 @@ export default function ProjectsPage() {
         parentNodeId: importTargetNodeId,
         files: entries,
       });
-      // Patch images first (updates node content with Minio URLs)
+      // Patch images first (updates node content with stable media URLs)
       if (imageFilesByNotePath.size > 0) {
         await uploadImagesAndPatch(
           result.nodeMap,
@@ -1384,18 +1266,15 @@ export default function ProjectsPage() {
     [mediaUploadMutation],
   );
 
-  const handleGetDownloadUrl = React.useCallback(
-    async (params: { id: string }) => {
-      return await utils.media.getDownloadUrl.fetch(params);
-    },
-    [utils.media.getDownloadUrl],
-  );
-
   const handleImageUploadComplete = React.useCallback(
-    (_attachmentId: string, downloadUrl: string) => {
+    (attachmentId: string) => {
       const editor = editorInstanceRef.current;
       if (editor) {
-        editor.chain().focus().setImage({ src: downloadUrl }).run();
+        editor
+          .chain()
+          .focus()
+          .setImage({ src: getMediaAttachmentUrl(attachmentId) })
+          .run();
       }
       setShowImageUpload(false);
     },
@@ -2063,7 +1942,6 @@ export default function ProjectsPage() {
                                     nodeId={selectedNodeId!}
                                     projectId={currentProjectId}
                                     onUpload={handleImageUpload}
-                                    onGetDownloadUrl={handleGetDownloadUrl}
                                     onUploadComplete={handleImageUploadComplete}
                                     onUploadError={handleImageUploadError}
                                     isUploading={mediaUploadMutation.isPending}
@@ -2089,24 +1967,17 @@ export default function ProjectsPage() {
                                           .map((attachment) => (
                                             <button
                                               key={attachment.id}
-                                              onClick={async () => {
-                                                try {
-                                                  const { url } =
-                                                    await handleGetDownloadUrl({
-                                                      id: attachment.id,
-                                                    });
-                                                  editorInstanceRef.current
-                                                    ?.chain()
-                                                    .focus()
-                                                    .setImage({ src: url })
-                                                    .run();
-                                                  setShowImageUpload(false);
-                                                } catch {
-                                                  addToast(
-                                                    "Failed to load image",
-                                                    "error",
-                                                  );
-                                                }
+                                              onClick={() => {
+                                                editorInstanceRef.current
+                                                  ?.chain()
+                                                  .focus()
+                                                  .setImage({
+                                                    src: getMediaAttachmentUrl(
+                                                      attachment.id,
+                                                    ),
+                                                  })
+                                                  .run();
+                                                setShowImageUpload(false);
                                               }}
                                               className="aspect-square rounded border hover:border-primary overflow-hidden bg-muted/30 flex items-center justify-center transition-colors"
                                               title={attachment.filename}
@@ -2402,64 +2273,72 @@ export default function ProjectsPage() {
                     router.push("/projects");
                   }}
                   className={cn(
-                    "group relative rounded-lg border bg-card p-6 hover:shadow-md transition-shadow cursor-pointer",
+                    "group relative flex flex-col rounded-lg border bg-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer",
                     isSelected &&
                       "border-green-500 bg-green-50 dark:bg-green-950",
                   )}
                 >
-                  {/* Checkmark in upper-right corner */}
-                  {isSelected && (
-                    <div className="absolute top-3 right-3">
-                      <div className="rounded-full bg-green-500 p-1">
-                        <Check className="h-4 w-4 text-white" />
-                      </div>
-                    </div>
-                  )}
+                  {/* Hero gradient banner */}
+                  <HeroGradient seed={project.name} className="w-full h-24" />
 
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <FolderTree className="h-8 w-8 text-primary flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-lg truncate">
-                          {project.name}
-                        </h3>
+                  <div className="p-6 pt-4">
+                    {/* Checkmark in upper-right corner */}
+                    {isSelected && (
+                      <div className="absolute top-3 right-3">
+                        <div className="rounded-full bg-green-500 p-1">
+                          <Check className="h-4 w-4 text-white" />
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <FolderTree className="h-8 w-8 text-primary flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-lg truncate">
+                            {project.name}
+                          </h3>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditDialog({ id: project.id, name: project.name });
-                      }}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
-                        "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        "transition-colors",
-                      )}
-                    >
-                      <Pencil className="h-3 w-3" />
-                      {tCommon("edit")}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDeleteDialog({
-                          id: project.id,
-                          name: project.name,
-                        });
-                      }}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
-                        "border border-input bg-background hover:bg-destructive hover:text-destructive-foreground",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        "transition-colors",
-                      )}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      {tCommon("delete")}
-                    </button>
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditDialog({
+                            id: project.id,
+                            name: project.name,
+                          });
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
+                          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          "transition-colors",
+                        )}
+                      >
+                        <Pencil className="h-3 w-3" />
+                        {tCommon("edit")}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDeleteDialog({
+                            id: project.id,
+                            name: project.name,
+                          });
+                        }}
+                        className={cn(
+                          "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
+                          "border border-input bg-background hover:bg-destructive hover:text-destructive-foreground",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          "transition-colors",
+                        )}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        {tCommon("delete")}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

@@ -128,7 +128,7 @@ export function VersionHistory({
 
             <AttributionBadge
               actorType={entry.actorType as ActorType}
-              actorId={entry.actorId}
+              actorId={entry.actorId ?? undefined}
               size="sm"
             />
 

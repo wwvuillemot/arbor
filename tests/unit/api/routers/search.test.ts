@@ -1,12 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { appRouter } from "@/api/router";
 import { db } from "@/db";
 import { nodes } from "@/db/schema";
-import { eq } from "drizzle-orm";
 
 describe("Search Router", () => {
   let testProjectId: string;
-  let testNoteId: string;
 
   beforeEach(async () => {
     // Create test project
@@ -23,7 +21,7 @@ describe("Search Router", () => {
     testProjectId = project.id;
 
     // Create test note
-    const [note] = await db
+    await db
       .insert(nodes)
       .values({
         type: "note",
@@ -34,7 +32,6 @@ describe("Search Router", () => {
         authorType: "human",
       })
       .returning();
-    testNoteId = note.id;
 
     // Create another note
     await db.insert(nodes).values({

@@ -2,6 +2,53 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Hero gradient blob animations ─────────────────────────────────────────
+   Three independent drift paths. Blobs are oversized (150 %) so they always
+   fill the frame even when translated. Each card assigns its blobs to
+   different paths with hash-derived durations/delays for unique motion.
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes hero-blob-a {
+  0%,
+  100% {
+    transform: translate(0%, 0%) scale(1);
+  }
+  30% {
+    transform: translate(7%, -8%) scale(1.06);
+  }
+  65% {
+    transform: translate(-6%, 9%) scale(0.94);
+  }
+}
+
+@keyframes hero-blob-b {
+  0%,
+  100% {
+    transform: translate(0%, 0%) scale(1);
+  }
+  20% {
+    transform: translate(-9%, 6%) scale(1.08);
+  }
+  55% {
+    transform: translate(5%, -5%) scale(0.96);
+  }
+  80% {
+    transform: translate(-4%, -8%) scale(1.04);
+  }
+}
+
+@keyframes hero-blob-c {
+  0%,
+  100% {
+    transform: translate(0%, 0%) scale(1);
+  }
+  40% {
+    transform: translate(6%, 7%) scale(1.1);
+  }
+  70% {
+    transform: translate(-7%, -3%) scale(0.92);
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

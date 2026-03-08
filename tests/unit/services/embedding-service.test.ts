@@ -463,7 +463,7 @@ describe("EmbeddingService", () => {
 
     it("should return 0 when all nodes have embeddings", async () => {
       const project = await createTestProject();
-      const note = await createTestNote("Note", project.id, "Content");
+      await createTestNote("Note", project.id, "Content");
 
       // Embed all first
       await embeddingService.embedAllMissing();

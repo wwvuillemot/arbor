@@ -8,7 +8,7 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: [path.resolve(__dirname, "./tests/setup.ts")],
-    include: [path.resolve(__dirname, "./tests/**/*.test.{ts,tsx}")],
+    include: ["tests/**/*.test.{ts,tsx}"],
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
@@ -21,7 +21,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json", "lcov"],
       reportsDirectory: path.resolve(__dirname, "./coverage"),
-      include: [path.resolve(__dirname, "./src/**/*.{ts,tsx}")],
+      include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "**/node_modules/**",
         "**/tests/**",

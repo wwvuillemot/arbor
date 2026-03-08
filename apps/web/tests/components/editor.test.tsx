@@ -1,5 +1,6 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { Editor } from "@tiptap/react";
 import {
   render,
   screen,
@@ -119,7 +120,9 @@ import {
   ACCEPTED_IMAGE_TYPES,
   MAX_FILE_SIZE,
 } from "@/components/editor/image-upload";
-import { useAutoSave, type AutoSaveStatus } from "@/hooks/use-auto-save";
+import { useAutoSave } from "@/hooks/use-auto-save";
+
+const testEditor = mockEditor as unknown as Editor;
 
 describe("EditorToolbar", () => {
   beforeEach(() => {
@@ -132,12 +135,12 @@ describe("EditorToolbar", () => {
   });
 
   it("should render toolbar with role", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     expect(screen.getByRole("toolbar")).toBeInTheDocument();
   });
 
   it("should render all formatting buttons", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const toolbar = screen.getByRole("toolbar");
     const buttons = toolbar.querySelectorAll("button");
     // undo, redo, h1, h2, h3, bold, italic, strike, code, link, bullet, ordered, quote, hr, clear = 15
@@ -145,47 +148,47 @@ describe("EditorToolbar", () => {
   });
 
   it("should call bold toggle when bold button clicked", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const boldButton = screen.getByTitle("bold");
     fireEvent.click(boldButton);
     expect(mockEditor.chain).toHaveBeenCalled();
   });
 
   it("should call italic toggle when italic button clicked", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const italicButton = screen.getByTitle("italic");
     fireEvent.click(italicButton);
     expect(mockEditor.chain).toHaveBeenCalled();
   });
 
   it("should disable undo when cannot undo", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const undoButton = screen.getByTitle("undo");
     expect(undoButton).toBeDisabled();
   });
 
   it("should disable redo when cannot redo", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const redoButton = screen.getByTitle("redo");
     expect(redoButton).toBeDisabled();
   });
 
   it("should call heading toggle when H1 clicked", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const h1Button = screen.getByTitle("heading1");
     fireEvent.click(h1Button);
     expect(mockEditor.chain).toHaveBeenCalled();
   });
 
   it("should call bullet list toggle when clicked", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const bulletButton = screen.getByTitle("bulletList");
     fireEvent.click(bulletButton);
     expect(mockEditor.chain).toHaveBeenCalled();
   });
 
   it("should call clear formatting when clear button clicked", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const clearButton = screen.getByTitle("clearFormatting");
     fireEvent.click(clearButton);
     expect(mockEditor.chain).toHaveBeenCalled();
@@ -193,14 +196,14 @@ describe("EditorToolbar", () => {
 
   it("should show insert link button when cursor is not in a link", () => {
     mockEditor.isActive.mockReturnValue(false);
-    render(<EditorToolbar editor={mockEditor as any} onInsertLink={vi.fn()} />);
+    render(<EditorToolbar editor={testEditor} onInsertLink={vi.fn()} />);
     expect(screen.getByTitle("insertLink")).toBeInTheDocument();
     expect(screen.queryByTitle("removeLink")).not.toBeInTheDocument();
   });
 
   it("should show both insert-link and remove-link buttons when cursor is inside a link", () => {
     mockEditor.isActive.mockImplementation((type: string) => type === "link");
-    render(<EditorToolbar editor={mockEditor as any} onInsertLink={vi.fn()} />);
+    render(<EditorToolbar editor={testEditor} onInsertLink={vi.fn()} />);
     expect(screen.getByTitle("insertLink")).toBeInTheDocument();
     expect(screen.getByTitle("removeLink")).toBeInTheDocument();
   });
@@ -208,9 +211,7 @@ describe("EditorToolbar", () => {
   it("should call onInsertLink when insert link button is clicked", () => {
     mockEditor.isActive.mockReturnValue(false);
     const onInsertLink = vi.fn();
-    render(
-      <EditorToolbar editor={mockEditor as any} onInsertLink={onInsertLink} />,
-    );
+    render(<EditorToolbar editor={testEditor} onInsertLink={onInsertLink} />);
     fireEvent.click(screen.getByTitle("insertLink"));
     expect(onInsertLink).toHaveBeenCalledOnce();
   });
@@ -223,13 +224,13 @@ describe("EditorToolbar", () => {
         unsetLink: vi.fn().mockReturnValue({ run: unsetLinkRun }),
       }),
     });
-    render(<EditorToolbar editor={mockEditor as any} onInsertLink={vi.fn()} />);
+    render(<EditorToolbar editor={testEditor} onInsertLink={vi.fn()} />);
     fireEvent.click(screen.getByTitle("removeLink"));
     expect(unsetLinkRun).toHaveBeenCalled();
   });
 
   it("should prevent default on toolbar button mousedown to preserve editor focus", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     const boldButton = screen.getByTitle("bold");
     let prevented = false;
     document.addEventListener("mousedown", (e) => {
@@ -240,29 +241,19 @@ describe("EditorToolbar", () => {
   });
 
   it("should not render image button when onInsertImage is not provided", () => {
-    render(<EditorToolbar editor={mockEditor as any} />);
+    render(<EditorToolbar editor={testEditor} />);
     expect(screen.queryByTitle("insertImage")).not.toBeInTheDocument();
   });
 
   it("should render image button when onInsertImage is provided", () => {
     const onInsertImage = vi.fn();
-    render(
-      <EditorToolbar
-        editor={mockEditor as any}
-        onInsertImage={onInsertImage}
-      />,
-    );
+    render(<EditorToolbar editor={testEditor} onInsertImage={onInsertImage} />);
     expect(screen.getByTitle("insertImage")).toBeInTheDocument();
   });
 
   it("should call onInsertImage when image button clicked", () => {
     const onInsertImage = vi.fn();
-    render(
-      <EditorToolbar
-        editor={mockEditor as any}
-        onInsertImage={onInsertImage}
-      />,
-    );
+    render(<EditorToolbar editor={testEditor} onInsertImage={onInsertImage} />);
     fireEvent.click(screen.getByTitle("insertImage"));
     expect(onInsertImage).toHaveBeenCalledOnce();
   });
@@ -317,6 +308,14 @@ describe("TiptapEditor", () => {
     };
     render(<TiptapEditor content={content} />);
     expect(screen.getByTestId("tiptap-editor")).toBeInTheDocument();
+  });
+
+  it("should expose the editor instance through editorRef", () => {
+    const editorRef = React.createRef<Editor>();
+
+    render(<TiptapEditor content={null} editorRef={editorRef} />);
+
+    expect(editorRef.current).toBe(testEditor);
   });
 
   it("should not call onChange when onChange is not provided", () => {
@@ -708,9 +707,6 @@ describe("ImageUpload", () => {
     onUploadComplete: vi.fn(),
     onUploadError: vi.fn(),
     onUpload: vi.fn().mockResolvedValue({ id: "attachment-1" }),
-    onGetDownloadUrl: vi
-      .fn()
-      .mockResolvedValue({ url: "https://example.com/image.png" }),
   };
 
   beforeEach(() => {
@@ -838,14 +834,8 @@ describe("ImageUpload", () => {
       );
     });
     await waitFor(() => {
-      expect(defaultProps.onGetDownloadUrl).toHaveBeenCalledWith({
-        id: "attachment-1",
-      });
-    });
-    await waitFor(() => {
       expect(defaultProps.onUploadComplete).toHaveBeenCalledWith(
         "attachment-1",
-        "https://example.com/image.png",
       );
     });
   });

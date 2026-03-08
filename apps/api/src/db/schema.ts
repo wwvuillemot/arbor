@@ -1,5 +1,6 @@
 import {
   pgTable,
+  type PgColumn,
   uuid,
   varchar,
   text,
@@ -57,12 +58,12 @@ export const nodes = pgTable(
 
     // Self-referential hierarchy
     // NULL for top-level projects, otherwise references parent node
-    parentId: uuid("parent_id").references(() => nodes.id, {
+    parentId: uuid("parent_id").references((): PgColumn => nodes.id, {
       onDelete: "cascade",
     }),
 
     // Node type: project, folder, note, link, ai_suggestion, audio_note
-    type: varchar("type", { length: 50 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull().$type<NodeType>(),
 
     // Display name
     name: varchar("name", { length: 255 }).notNull(),
@@ -110,7 +111,9 @@ export const nodes = pgTable(
 
     // Track authorship (human, ai, mixed) - DEPRECATED in favor of createdBy/updatedBy
     // Keeping for backward compatibility, will remove in future migration
-    authorType: varchar("author_type", { length: 20 }).default("human"),
+    authorType: varchar("author_type", { length: 20 })
+      .default("human")
+      .$type<AuthorType | null>(),
 
     // Vector embedding for semantic search (pgvector)
     // Dimensions: 1536 (OpenAI text-embedding-3-small default)
@@ -314,7 +317,10 @@ export const tags = pgTable(
     icon: varchar("icon", { length: 50 }),
 
     // Tag type for categorization
-    type: varchar("type", { length: 50 }).default("general").notNull(),
+    type: varchar("type", { length: 50 })
+      .default("general")
+      .notNull()
+      .$type<TagType>(),
 
     // Optional reference to a dedicated entity node (character sheet, location page, etc.)
     // Only meaningful for entity-type tags: character, location, event, concept
@@ -496,7 +502,8 @@ export const chatThreads = pgTable(
     // Agent mode for this thread
     agentMode: varchar("agent_mode", { length: 50 })
       .default("assistant")
-      .notNull(),
+      .notNull()
+      .$type<AgentMode>(),
 
     // LLM model to use for this thread (e.g., "gpt-4o", "claude-3.5-sonnet")
     // If null, uses the provider's default model
@@ -536,7 +543,7 @@ export const chatMessages = pgTable(
       .notNull(),
 
     // Message role: user, assistant, system, tool
-    role: varchar("role", { length: 20 }).notNull(),
+    role: varchar("role", { length: 20 }).notNull().$type<ChatRole>(),
 
     // Message content (text)
     content: text("content"),
@@ -679,13 +686,15 @@ export const nodeHistory = pgTable(
     version: integer("version").notNull(),
 
     // Who made the change
-    actorType: varchar("actor_type", { length: 20 }).notNull(),
+    actorType: varchar("actor_type", { length: 20 })
+      .notNull()
+      .$type<ActorType>(),
 
     // Actor identifier (user_id or model name)
     actorId: varchar("actor_id", { length: 255 }),
 
     // What type of change was made
-    action: varchar("action", { length: 50 }).notNull(),
+    action: varchar("action", { length: 50 }).notNull().$type<HistoryAction>(),
 
     // Content before the change (null for create actions)
     contentBefore: jsonb("content_before"),

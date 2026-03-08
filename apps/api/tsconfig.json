@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "paths": {
+      "@/*": ["src/*"],
+      "@server": ["src"],
+      "@server/*": ["src/*"],
+      "@tests": ["../../tests"],
+      "@tests/*": ["../../tests/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage"]
+}

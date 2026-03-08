@@ -7,7 +7,21 @@ import {
   LocalLLMProvider,
   LLMService,
   type ChatMessage,
+  type StreamChunk,
 } from "@/services/llm-service";
+
+function createTextStream(chunks: string[]): ReadableStream<Uint8Array> {
+  const textEncoder = new TextEncoder();
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(textEncoder.encode(chunk));
+      }
+      controller.close();
+    },
+  });
+}
 
 // ─── Token Estimation ──────────────────────────────────────────────────────────
 
@@ -249,6 +263,72 @@ describe("OpenAIProvider", () => {
     );
     fetchSpy.mockRestore();
   });
+
+  it("should stream reasoning, text, tool-call deltas, and done events", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        createTextStream([
+          'data: {"model":"gpt-4o","choices":[{"delta":{"reasoning_content":"Plan: "}}]}\n',
+          'data: {"model":"gpt-4o","choices":[{"delta":{"content":"Hello there"}}]}\n',
+          'data: {"model":"gpt-4o","choices":[{"delta":{"tool_calls":[{"id":"call_1","function":{"name":"search_nodes","arguments":"{\\"query\\":\\"hero\\"}"}}]}}]}\n',
+          "data: not-json\n",
+          'data: {"model":"gpt-4o","choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n',
+          "data: [DONE]\n",
+        ]),
+        {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        },
+      ),
+    );
+
+    const provider = new OpenAIProvider("sk-test");
+    const streamedChunks: StreamChunk[] = [];
+
+    for await (const chunk of provider.chatStream(
+      [{ role: "user", content: "Hello" }],
+      {
+        model: "gpt-4o",
+        stopSequences: ["END"],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "search_nodes",
+              description: "Search nodes",
+              parameters: {
+                type: "object",
+                properties: { query: { type: "string" } },
+              },
+            },
+          },
+        ],
+      },
+    )) {
+      streamedChunks.push(chunk);
+    }
+
+    expect(streamedChunks).toEqual([
+      { type: "reasoning", reasoning: "Plan: " },
+      { type: "text", content: "Hello there" },
+      {
+        type: "tool_call",
+        toolCall: {
+          id: "call_1",
+          type: "function",
+          function: { name: "search_nodes", arguments: '{"query":"hero"}' },
+        },
+      },
+      { type: "done", finishReason: "tool_calls", model: "gpt-4o" },
+      { type: "done" },
+    ]);
+
+    const callBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    expect(callBody.stream).toBe(true);
+    expect(callBody.stop).toEqual(["END"]);
+    expect(callBody.tools).toHaveLength(1);
+    fetchSpy.mockRestore();
+  });
 });
 
 // ─── Anthropic Provider ──────────────────────────────────────────────────────
@@ -414,6 +494,62 @@ describe("AnthropicProvider", () => {
     expect(callBody.system).toBe("Be concise");
     fetchSpy.mockRestore();
   });
+
+  it("should stream reasoning, text, tool-call deltas, and done events", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        createTextStream([
+          'data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"Plan: "}}\n',
+          'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello',
+          ' there"}}\n',
+          'data: {"type":"content_block_delta","delta":{"type":"input_json_delta","partial_json":"{\\"query\\":\\"hero\\"}"}}\n',
+          "data: not-json\n",
+          'data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"input_tokens":12,"output_tokens":7}}\n',
+          'data: {"type":"message_stop"}\n',
+        ]),
+        {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        },
+      ),
+    );
+
+    const provider = new AnthropicProvider("sk-ant-test");
+    const streamedChunks: StreamChunk[] = [];
+
+    for await (const chunk of provider.chatStream(
+      [{ role: "user", content: "Hello" }],
+      {
+        model: "claude-sonnet-4-6",
+        stopSequences: ["END"],
+      },
+    )) {
+      streamedChunks.push(chunk);
+    }
+
+    expect(streamedChunks).toEqual([
+      { type: "reasoning", reasoning: "Plan: " },
+      { type: "text", content: "Hello there" },
+      {
+        type: "tool_call",
+        toolCall: {
+          function: { name: "", arguments: '{"query":"hero"}' },
+        },
+      },
+      {
+        type: "done",
+        tokensUsed: 19,
+        finishReason: "tool_use",
+        model: "claude-sonnet-4-6",
+      },
+      { type: "done", model: "claude-sonnet-4-6" },
+    ]);
+
+    const callBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    expect(callBody.stream).toBe(true);
+    expect(callBody.stop_sequences).toEqual(["END"]);
+    fetchSpy.mockRestore();
+  });
 });
 
 // ─── Local LLM Provider ─────────────────────────────────────────────────────
@@ -550,6 +686,88 @@ describe("LocalLLMProvider", () => {
     await expect(
       provider.chat([{ role: "user", content: "Hello" }]),
     ).rejects.toThrow("Local LLM API error (500)");
+    fetchSpy.mockRestore();
+  });
+
+  it("should stream reasoning, text, tool-call deltas, and done events", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(
+        createTextStream([
+          'data: {"model":"llama3.2","choices":[{"delta":{"reasoning_content":"Plan: "}}]}\n',
+          'data: {"model":"llama3.2","choices":[{"delta":{"content":"Hello there"}}]}\n',
+          'data: {"model":"llama3.2","choices":[{"delta":{"tool_calls":[{"id":"call_1","function":{"name":"search_nodes","arguments":"{\\"query\\":\\"hero\\"}"}}]}}]}\n',
+          "data: not-json\n",
+          'data: {"model":"llama3.2","choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n',
+          "data: [DONE]\n",
+        ]),
+        {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        },
+      ),
+    );
+
+    const provider = new LocalLLMProvider(
+      "http://localhost:11434/v1",
+      "llama3.2",
+      false,
+    );
+    const streamedChunks: StreamChunk[] = [];
+
+    for await (const chunk of provider.chatStream(
+      [{ role: "user", content: "Hello" }],
+      {
+        model: "llama3.2",
+        systemPrompt: "Be brief",
+        stopSequences: ["END"],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "search_nodes",
+              description: "Search nodes",
+              parameters: {
+                type: "object",
+                properties: { query: { type: "string" } },
+              },
+            },
+          },
+        ],
+      },
+    )) {
+      streamedChunks.push(chunk);
+    }
+
+    expect(streamedChunks).toEqual([
+      { type: "reasoning", reasoning: "Plan: " },
+      { type: "text", content: "Hello there" },
+      {
+        type: "tool_call",
+        toolCall: {
+          id: "call_1",
+          type: "function",
+          function: {
+            name: "search_nodes",
+            arguments: '{"query":"hero"}',
+          },
+        },
+      },
+      {
+        type: "done",
+        finishReason: "tool_calls",
+        model: "llama3.2",
+      },
+      { type: "done" },
+    ]);
+
+    const callBody = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    expect(callBody.stream).toBe(true);
+    expect(callBody.messages[0]).toEqual({
+      role: "system",
+      content: "Be brief",
+    });
+    expect(callBody.stop).toEqual(["END"]);
+    expect(callBody.tools).toHaveLength(1);
     fetchSpy.mockRestore();
   });
 

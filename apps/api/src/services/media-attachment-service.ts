@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import { db } from "../db/index";
 import { mediaAttachments } from "../db/schema";
 import type { MediaAttachment } from "../db/schema";
@@ -15,6 +16,11 @@ export interface CreateAttachmentParams {
   bucket?: string;
   metadata?: Record<string, any>;
   createdBy?: string;
+}
+
+export interface MediaAttachmentContent {
+  attachment: MediaAttachment;
+  stream: Readable;
 }
 
 /**
@@ -141,5 +147,23 @@ export class MediaAttachmentService {
       attachment.objectKey,
       expirySeconds,
     );
+  }
+
+  /**
+   * Get attachment metadata and a readable content stream.
+   * Throws if the attachment does not exist.
+   */
+  async getAttachmentContent(id: string): Promise<MediaAttachmentContent> {
+    const attachment = await this.getAttachmentById(id);
+    if (!attachment) {
+      throw new Error(`Attachment not found: ${id}`);
+    }
+
+    const stream = await this.minioService.getObject(
+      attachment.bucket,
+      attachment.objectKey,
+    );
+
+    return { attachment, stream };
   }
 }

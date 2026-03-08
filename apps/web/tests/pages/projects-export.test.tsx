@@ -13,6 +13,16 @@ import {
   act,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { FileTreeHandle } from "@/components/file-tree";
+import { getMediaAttachmentUrl } from "@/lib/media-url";
+
+interface MockTiptapEditorProps {
+  [key: string]: unknown;
+}
+
+interface MockFileTreeProps {
+  onSelectNode: (id: string) => void;
+}
 
 const {
   currentProjectState,
@@ -37,7 +47,7 @@ const {
   selectedNodeData,
 } = vi.hoisted(() => ({
   currentProjectState: { value: "proj-1" as string | null },
-  mockSearchParamGet: vi.fn(() => null),
+  mockSearchParamGet: vi.fn((_key: string): string | null => null),
   mockPush: vi.fn(),
   mockAddToast: vi.fn(),
   mockSetCurrentProject: vi.fn(),
@@ -119,7 +129,7 @@ vi.mock("@/hooks/use-auto-save", () => ({
 
 // Mock TipTap editor components
 vi.mock("@/components/editor", () => ({
-  TiptapEditor: (props: any) => {
+  TiptapEditor: (props: MockTiptapEditorProps) => {
     mockTiptapEditor(props);
     return <div data-testid="tiptap-editor" />;
   },
@@ -151,20 +161,27 @@ vi.mock("@/components/chat", () => ({
 
 // Mock FileTree component - calls onSelectNode on mount to simulate selecting a node
 vi.mock("@/components/file-tree", () => ({
-  FileTree: React.forwardRef(
-    ({ onSelectNode }: { onSelectNode: (id: string) => void }, _ref: any) => {
+  FileTree: React.forwardRef<FileTreeHandle, MockFileTreeProps>(
+    function MockFileTree(
+      { onSelectNode },
+      _ref: React.ForwardedRef<FileTreeHandle>,
+    ) {
       React.useEffect(() => {
         onSelectNode("node-1");
       }, [onSelectNode]);
+
       return <div data-testid="file-tree" />;
     },
   ),
-  CreateNodeDialog: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="create-node-dialog" /> : null,
-  RenameDialog: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="rename-dialog" /> : null,
-  NodeContextMenu: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="context-menu" /> : null,
+  CreateNodeDialog: function MockCreateNodeDialog({ open }: { open: boolean }) {
+    return open ? <div data-testid="create-node-dialog" /> : null;
+  },
+  RenameDialog: function MockRenameDialog({ open }: { open: boolean }) {
+    return open ? <div data-testid="rename-dialog" /> : null;
+  },
+  NodeContextMenu: function MockNodeContextMenu({ open }: { open: boolean }) {
+    return open ? <div data-testid="context-menu" /> : null;
+  },
 }));
 
 // Mock tRPC
@@ -349,7 +366,9 @@ describe("ProjectsPage Export", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentProjectState.value = "proj-1";
-    mockSearchParamGet.mockImplementation(() => null);
+    mockSearchParamGet.mockImplementation(
+      (_key: string): string | null => null,
+    );
     mockCreateProjectMutate.mockReset();
     selectedNodeData.name = "Test Note";
     selectedNodeData.id = "node-1";
@@ -846,7 +865,7 @@ describe("ProjectsPage Export", () => {
             {
               type: "image",
               attrs: {
-                src: "https://minio.test/img.png",
+                src: getMediaAttachmentUrl("media-1"),
                 alt: "Map",
                 title: null,
               },
@@ -875,7 +894,7 @@ describe("ProjectsPage Export", () => {
             {
               type: "image",
               attrs: {
-                src: "https://minio.test/img.png",
+                src: getMediaAttachmentUrl("media-1"),
                 alt: "Map",
                 title: null,
               },
@@ -994,7 +1013,7 @@ describe("ProjectsPage Export", () => {
               {
                 type: "image",
                 attrs: {
-                  src: "https://minio.test/img.png",
+                  src: getMediaAttachmentUrl("media-1"),
                   alt: "map",
                   title: null,
                 },

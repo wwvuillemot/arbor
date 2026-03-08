@@ -1,7 +1,20 @@
-import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { TagService } from "../../services/tag-service";
-import { tagTypeEnum } from "../../db/schema";
+import {
+  createEntityNodeInputSchema,
+  createSuccessResponse,
+  createTagInputSchema,
+  getAllTagsInputSchema,
+  getNodesByTagsInputSchema,
+  getRelatedTagsInputSchema,
+  getTagByIdOrThrow,
+  linkEntityNodeInputSchema,
+  nodeIdInputSchema,
+  nodeTagRelationInputSchema,
+  tagIdInputSchema,
+  tagIdLookupInputSchema,
+  updateTagInputSchema,
+} from "./tags-router-helpers";
 
 const tagService = new TagService();
 
@@ -15,20 +28,7 @@ export const tagsRouter = router({
    * Create a new tag
    */
   create: publicProcedure
-    .input(
-      z.object({
-        name: z.string().min(1).max(255),
-        color: z
-          .string()
-          .regex(/^#[0-9a-fA-F]{6}$/)
-          .nullable()
-          .optional(),
-        icon: z.string().max(50).nullable().optional(),
-        type: z.enum(tagTypeEnum).optional(),
-        /** null/undefined = global tag; UUID = project-scoped tag */
-        projectId: z.string().uuid().nullable().optional(),
-      }),
-    )
+    .input(createTagInputSchema)
     .mutation(async ({ input }) => {
       return await tagService.createTag(input);
     }),
@@ -37,21 +37,7 @@ export const tagsRouter = router({
    * Update an existing tag
    */
   update: publicProcedure
-    .input(
-      z.object({
-        id: z.string().uuid(),
-        name: z.string().min(1).max(255).optional(),
-        color: z
-          .string()
-          .regex(/^#[0-9a-fA-F]{6}$/)
-          .nullable()
-          .optional(),
-        icon: z.string().max(50).nullable().optional(),
-        type: z.enum(tagTypeEnum).optional(),
-        /** null = make global; UUID = scope to project */
-        projectId: z.string().uuid().nullable().optional(),
-      }),
-    )
+    .input(updateTagInputSchema)
     .mutation(async ({ input }) => {
       const { id, ...updates } = input;
       return await tagService.updateTag(id, updates);
@@ -61,25 +47,17 @@ export const tagsRouter = router({
    * Delete a tag
    */
   delete: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(tagIdInputSchema)
     .mutation(async ({ input }) => {
       await tagService.deleteTag(input.id);
-      return { success: true };
+      return createSuccessResponse();
     }),
 
   /**
    * Get all tags, optionally filtered by type
    */
   getAll: publicProcedure
-    .input(
-      z
-        .object({
-          type: z.enum(tagTypeEnum).optional(),
-          /** Pass project UUID to include that project's tags + global tags */
-          projectId: z.string().uuid().optional(),
-        })
-        .optional(),
-    )
+    .input(getAllTagsInputSchema)
     .query(async ({ input }) => {
       return await tagService.getAllTags(input?.type, input?.projectId);
     }),
@@ -87,51 +65,35 @@ export const tagsRouter = router({
   /**
    * Get a single tag by ID
    */
-  getById: publicProcedure
-    .input(z.object({ id: z.string().uuid() }))
-    .query(async ({ input }) => {
-      const tag = await tagService.getTagById(input.id);
-      if (!tag) {
-        throw new Error("Tag not found");
-      }
-      return tag;
-    }),
+  getById: publicProcedure.input(tagIdInputSchema).query(async ({ input }) => {
+    return getTagByIdOrThrow(tagService, input.id);
+  }),
 
   /**
    * Add a tag to a node
    */
   addToNode: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        tagId: z.string().uuid(),
-      }),
-    )
+    .input(nodeTagRelationInputSchema)
     .mutation(async ({ input }) => {
       await tagService.addTagToNode(input.nodeId, input.tagId);
-      return { success: true };
+      return createSuccessResponse();
     }),
 
   /**
    * Remove a tag from a node
    */
   removeFromNode: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        tagId: z.string().uuid(),
-      }),
-    )
+    .input(nodeTagRelationInputSchema)
     .mutation(async ({ input }) => {
       await tagService.removeTagFromNode(input.nodeId, input.tagId);
-      return { success: true };
+      return createSuccessResponse();
     }),
 
   /**
    * Get all tags for a node
    */
   getNodeTags: publicProcedure
-    .input(z.object({ nodeId: z.string().uuid() }))
+    .input(nodeIdInputSchema)
     .query(async ({ input }) => {
       return await tagService.getNodeTags(input.nodeId);
     }),
@@ -140,7 +102,7 @@ export const tagsRouter = router({
    * Get all nodes that have a specific tag
    */
   getNodesByTag: publicProcedure
-    .input(z.object({ tagId: z.string().uuid() }))
+    .input(tagIdLookupInputSchema)
     .query(async ({ input }) => {
       return await tagService.getNodesByTag(input.tagId);
     }),
@@ -149,12 +111,7 @@ export const tagsRouter = router({
    * Get nodes filtered by multiple tags with AND/OR logic
    */
   getNodesByTags: publicProcedure
-    .input(
-      z.object({
-        tagIds: z.array(z.string().uuid()).min(1),
-        operator: z.enum(["AND", "OR"]).optional().default("OR"),
-      }),
-    )
+    .input(getNodesByTagsInputSchema)
     .query(async ({ input }) => {
       return await tagService.getNodesByTags(input.tagIds, input.operator);
     }),
@@ -170,12 +127,7 @@ export const tagsRouter = router({
    * Get tags that co-occur with a given tag (related tags suggestions)
    */
   getRelatedTags: publicProcedure
-    .input(
-      z.object({
-        tagId: z.string().uuid(),
-        limit: z.number().int().min(1).max(50).optional().default(10),
-      }),
-    )
+    .input(getRelatedTagsInputSchema)
     .query(async ({ input }) => {
       return await tagService.getRelatedTags(input.tagId, input.limit);
     }),
@@ -184,12 +136,7 @@ export const tagsRouter = router({
    * Link an entity-type tag to an existing node
    */
   linkEntityNode: publicProcedure
-    .input(
-      z.object({
-        tagId: z.string().uuid(),
-        entityNodeId: z.string().uuid(),
-      }),
-    )
+    .input(linkEntityNodeInputSchema)
     .mutation(async ({ input }) => {
       return await tagService.linkEntityNode(input.tagId, input.entityNodeId);
     }),
@@ -198,7 +145,7 @@ export const tagsRouter = router({
    * Unlink an entity-type tag from its entity node
    */
   unlinkEntityNode: publicProcedure
-    .input(z.object({ tagId: z.string().uuid() }))
+    .input(tagIdLookupInputSchema)
     .mutation(async ({ input }) => {
       return await tagService.unlinkEntityNode(input.tagId);
     }),
@@ -207,12 +154,7 @@ export const tagsRouter = router({
    * Create a new entity node for a tag and link it
    */
   createEntityNode: publicProcedure
-    .input(
-      z.object({
-        tagId: z.string().uuid(),
-        parentId: z.string().uuid(),
-      }),
-    )
+    .input(createEntityNodeInputSchema)
     .mutation(async ({ input }) => {
       return await tagService.createEntityNode(input.tagId, input.parentId);
     }),

@@ -4,12 +4,10 @@ import { appSettings, userPreferences } from "../../apps/api/src/db/schema";
 import { eq } from "drizzle-orm";
 import { PreferencesService } from "../../apps/api/src/services/preferences-service";
 import { SettingsService } from "../../apps/api/src/services/settings-service";
-import { EncryptionService } from "../../apps/api/src/services/encryption-service";
 
 describe("API Key Persistence - Integration Test", () => {
   let preferencesService: PreferencesService;
   let settingsService: SettingsService;
-  let encryptionService: EncryptionService;
 
   beforeEach(async () => {
     // Clean database
@@ -18,8 +16,7 @@ describe("API Key Persistence - Integration Test", () => {
 
     // Create fresh service instances
     preferencesService = new PreferencesService();
-    encryptionService = new EncryptionService();
-    settingsService = new SettingsService(encryptionService);
+    settingsService = new SettingsService();
   });
 
   it("CRITICAL: Master key should NEVER be regenerated if it already exists", async () => {
@@ -99,8 +96,7 @@ describe("API Key Persistence - Integration Test", () => {
 
     // Step 3: SIMULATE RELOAD - create new service instances
     const newPreferencesService = new PreferencesService();
-    const newEncryptionService = new EncryptionService();
-    const newSettingsService = new SettingsService(newEncryptionService);
+    const newSettingsService = new SettingsService();
 
     // Step 4: Get master key from database
     const retrievedMasterKey = await newPreferencesService.getMasterKey();

@@ -350,7 +350,7 @@ function ChildrenList({
       return hasMatchingDescendants(
         child.id,
         allNodesMap,
-        filterNodeIds,
+        filterNodeIds ?? null,
         attributionFilter,
       );
     }

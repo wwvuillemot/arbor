@@ -32,6 +32,25 @@ const mockAddToNodeMutate = vi.fn();
 const mockRemoveFromNodeMutate = vi.fn();
 const mockCreateEntityNodeMutate = vi.fn();
 
+type MutationHandler = (...mutationArgs: unknown[]) => void;
+type MutationOptions = {
+  onSuccess?: (...successArgs: unknown[]) => void;
+};
+
+async function getMockTrpc() {
+  const trpcModule =
+    (await import("@/lib/trpc")) as typeof import("@/lib/trpc");
+  return trpcModule.trpc;
+}
+
+function mockProcedureQueryResult<
+  TProcedure extends { useQuery: (...queryArgs: never[]) => unknown },
+>(procedure: TProcedure, result: unknown) {
+  vi.mocked(procedure.useQuery).mockReturnValue(
+    result as ReturnType<TProcedure["useQuery"]>,
+  );
+}
+
 const mockTagsData = [
   {
     id: "tag-1",
@@ -81,7 +100,7 @@ const mockRelatedTags = [
 
 // Mock tRPC
 vi.mock("@/lib/trpc", () => {
-  const makeMutation = (mutateFn: any) => ({
+  const makeMutation = (mutateFn: MutationHandler) => ({
     mutate: mutateFn,
     mutateAsync: vi.fn().mockResolvedValue({}),
     isPending: false,
@@ -100,30 +119,30 @@ vi.mock("@/lib/trpc", () => {
         })),
       },
       create: {
-        useMutation: vi.fn((opts: any) => {
-          const mut = makeMutation((...args: any[]) => {
-            mockCreateMutate(...args);
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => {
+          const mutation = makeMutation((...mutationArgs: unknown[]) => {
+            mockCreateMutate(...mutationArgs);
+            options?.onSuccess?.();
           });
-          return mut;
+          return mutation;
         }),
       },
       update: {
-        useMutation: vi.fn((opts: any) => {
-          const mut = makeMutation((...args: any[]) => {
-            mockUpdateMutate(...args);
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => {
+          const mutation = makeMutation((...mutationArgs: unknown[]) => {
+            mockUpdateMutate(...mutationArgs);
+            options?.onSuccess?.();
           });
-          return mut;
+          return mutation;
         }),
       },
       delete: {
-        useMutation: vi.fn((opts: any) => {
-          const mut = makeMutation((...args: any[]) => {
-            mockDeleteMutate(...args);
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => {
+          const mutation = makeMutation((...mutationArgs: unknown[]) => {
+            mockDeleteMutate(...mutationArgs);
+            options?.onSuccess?.();
           });
-          return mut;
+          return mutation;
         }),
       },
       getNodeTags: {
@@ -135,30 +154,30 @@ vi.mock("@/lib/trpc", () => {
         })),
       },
       addToNode: {
-        useMutation: vi.fn((opts: any) => {
-          const mut = makeMutation((...args: any[]) => {
-            mockAddToNodeMutate(...args);
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => {
+          const mutation = makeMutation((...mutationArgs: unknown[]) => {
+            mockAddToNodeMutate(...mutationArgs);
+            options?.onSuccess?.();
           });
-          return mut;
+          return mutation;
         }),
       },
       removeFromNode: {
-        useMutation: vi.fn((opts: any) => {
-          const mut = makeMutation((...args: any[]) => {
-            mockRemoveFromNodeMutate(...args);
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => {
+          const mutation = makeMutation((...mutationArgs: unknown[]) => {
+            mockRemoveFromNodeMutate(...mutationArgs);
+            options?.onSuccess?.();
           });
-          return mut;
+          return mutation;
         }),
       },
       createEntityNode: {
-        useMutation: vi.fn((opts: any) => {
-          const mut = makeMutation((...args: any[]) => {
-            mockCreateEntityNodeMutate(...args);
-            opts?.onSuccess?.({ tag: {}, node: { id: "new-entity-node" } });
+        useMutation: vi.fn((options?: MutationOptions) => {
+          const mutation = makeMutation((...mutationArgs: unknown[]) => {
+            mockCreateEntityNodeMutate(...mutationArgs);
+            options?.onSuccess?.({ tag: {}, node: { id: "new-entity-node" } });
           });
-          return mut;
+          return mutation;
         }),
       },
       getTagsWithCounts: {
@@ -598,9 +617,9 @@ describe("TagPicker", () => {
 
   it("should show create entity button for entity-type tag without entityNodeId", async () => {
     // Need both tags assigned to test tag-2 (Location, no entityNodeId)
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.tags.getNodeTags.useQuery.mockReturnValue({
-      data: mockTagsData, // Both tags assigned
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.tags.getNodeTags, {
+      data: mockTagsData,
       isLoading: false,
       error: null,
       refetch: vi.fn(),
@@ -620,8 +639,8 @@ describe("TagPicker", () => {
   });
 
   it("should not show create entity button without projectId", async () => {
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.tags.getNodeTags.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.tags.getNodeTags, {
       data: mockTagsData,
       isLoading: false,
       error: null,
@@ -636,8 +655,8 @@ describe("TagPicker", () => {
   });
 
   it("should call createEntityNode when create entity button is clicked", async () => {
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.tags.getNodeTags.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.tags.getNodeTags, {
       data: mockTagsData,
       isLoading: false,
       error: null,
@@ -660,8 +679,8 @@ describe("TagPicker", () => {
 
   it("should show toast and navigate after entity node creation", async () => {
     const mockNavigate = vi.fn();
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.tags.getNodeTags.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.tags.getNodeTags, {
       data: mockTagsData,
       isLoading: false,
       error: null,

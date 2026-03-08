@@ -15,7 +15,6 @@ import { ExportService } from "@server/services/export-service";
 import {
   createTestProject,
   createTestFolder,
-  createTestNote,
   createTestNode,
 } from "@tests/helpers/fixtures";
 

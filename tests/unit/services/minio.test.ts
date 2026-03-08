@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { MinioService } from "@/services/minio";
-import * as Minio from "minio";
 
 describe("MinioService", () => {
   let minioService: MinioService;
@@ -30,7 +29,7 @@ describe("MinioService", () => {
       for (const obj of objects) {
         await minioService.deleteObject("arbor-test", obj.name);
       }
-    } catch (error) {
+    } catch (_error) {
       // Ignore cleanup errors
     }
   });

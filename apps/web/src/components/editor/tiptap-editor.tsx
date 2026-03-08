@@ -33,7 +33,7 @@ interface TiptapEditorProps {
   onInsertImage?: () => void;
   /** Called when the link toolbar button is clicked; parent opens node picker */
   onInsertLink?: () => void;
-  editorRef?: React.MutableRefObject<Editor | null>;
+  editorRef?: React.RefObject<Editor | null>;
   /** Called when a link is clicked; href is the raw href value from the anchor */
   onLinkClick?: (href: string) => void;
 }

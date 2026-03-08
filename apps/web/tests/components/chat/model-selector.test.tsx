@@ -1,7 +1,10 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { ModelSelector } from "@/components/chat/model-selector";
+import {
+  ModelSelector,
+  type ModelInfo,
+} from "@/components/chat/model-selector";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 
@@ -19,7 +22,7 @@ vi.mock("@/lib/trpc", () => ({
 // Mock next-intl
 vi.mock("next-intl", () => ({
   useTranslations: (namespace?: string) => (key: string) => {
-    const translations: Record<string, any> = {
+    const translations: Record<string, Record<string, string>> = {
       chat: {
         loadingModels: "Loading models...",
         defaultModel: "Default",
@@ -34,7 +37,7 @@ vi.mock("next-intl", () => ({
   },
 }));
 
-const mockModels = [
+const mockModels: ModelInfo[] = [
   {
     id: "gpt-4o",
     name: "GPT-4o",
@@ -77,6 +80,19 @@ function renderWithProviders(ui: React.ReactElement) {
   );
 }
 
+type ModelsQueryResult = {
+  data: ModelInfo[] | undefined;
+  isLoading: boolean;
+};
+
+function mockModelsQueryResult(result: ModelsQueryResult) {
+  vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue(
+    result as unknown as ReturnType<
+      typeof trpc.llm.listAvailableModels.useQuery
+    >,
+  );
+}
+
 describe("ModelSelector", () => {
   const mockOnChange = vi.fn();
 
@@ -85,20 +101,20 @@ describe("ModelSelector", () => {
   });
 
   it("should render loading state", () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: undefined,
       isLoading: true,
-    } as any);
+    });
 
     renderWithProviders(<ModelSelector value={null} onChange={mockOnChange} />);
     expect(screen.getByText("Loading models...")).toBeInTheDocument();
   });
 
   it("should render with default model selected", () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: mockModels,
       isLoading: false,
-    } as any);
+    });
 
     renderWithProviders(<ModelSelector value={null} onChange={mockOnChange} />);
     expect(screen.getByTestId("model-selector-button")).toHaveTextContent(
@@ -107,10 +123,10 @@ describe("ModelSelector", () => {
   });
 
   it("should render with specific model selected", () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: mockModels,
       isLoading: false,
-    } as any);
+    });
 
     renderWithProviders(
       <ModelSelector value="gpt-4o" onChange={mockOnChange} />,
@@ -121,10 +137,10 @@ describe("ModelSelector", () => {
   });
 
   it("should open dropdown when button is clicked", () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: mockModels,
       isLoading: false,
-    } as any);
+    });
 
     renderWithProviders(<ModelSelector value={null} onChange={mockOnChange} />);
 
@@ -135,10 +151,10 @@ describe("ModelSelector", () => {
   });
 
   it("should display grouped models by provider", () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: mockModels,
       isLoading: false,
-    } as any);
+    });
 
     renderWithProviders(<ModelSelector value={null} onChange={mockOnChange} />);
 
@@ -157,10 +173,10 @@ describe("ModelSelector", () => {
   });
 
   it("should call onChange when model is selected", async () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: mockModels,
       isLoading: false,
-    } as any);
+    });
 
     renderWithProviders(<ModelSelector value={null} onChange={mockOnChange} />);
 
@@ -176,10 +192,10 @@ describe("ModelSelector", () => {
   });
 
   it("should call onChange with null when default is selected", async () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: mockModels,
       isLoading: false,
-    } as any);
+    });
 
     renderWithProviders(
       <ModelSelector value="gpt-4o" onChange={mockOnChange} />,
@@ -197,10 +213,10 @@ describe("ModelSelector", () => {
   });
 
   it("should display model capabilities", () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: mockModels,
       isLoading: false,
-    } as any);
+    });
 
     renderWithProviders(<ModelSelector value={null} onChange={mockOnChange} />);
 
@@ -213,10 +229,10 @@ describe("ModelSelector", () => {
   });
 
   it("should close dropdown when clicking outside", async () => {
-    vi.mocked(trpc.llm.listAvailableModels.useQuery).mockReturnValue({
+    mockModelsQueryResult({
       data: mockModels,
       isLoading: false,
-    } as any);
+    });
 
     renderWithProviders(<ModelSelector value={null} onChange={mockOnChange} />);
 

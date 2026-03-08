@@ -17,7 +17,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 interface ImageUploadProps {
   nodeId: string;
   projectId: string;
-  onUploadComplete: (attachmentId: string, downloadUrl: string) => void;
+  onUploadComplete: (attachmentId: string) => void;
   onUploadError?: (error: string) => void;
   onUpload: (params: {
     nodeId: string;
@@ -26,7 +26,6 @@ interface ImageUploadProps {
     mimeType: string;
     data: string;
   }) => Promise<{ id: string }>;
-  onGetDownloadUrl: (params: { id: string }) => Promise<{ url: string }>;
   isUploading?: boolean;
 }
 
@@ -36,7 +35,6 @@ export function ImageUpload({
   onUploadComplete,
   onUploadError,
   onUpload,
-  onGetDownloadUrl,
   isUploading = false,
 }: ImageUploadProps) {
   const t = useTranslations("editor");
@@ -84,9 +82,7 @@ export function ImageUpload({
           data: base64,
         });
 
-        // Get download URL
-        const { url } = await onGetDownloadUrl({ id: attachment.id });
-        onUploadComplete(attachment.id, url);
+        onUploadComplete(attachment.id);
       } catch (error) {
         const message =
           error instanceof Error
@@ -100,7 +96,6 @@ export function ImageUpload({
       projectId,
       validateFile,
       onUpload,
-      onGetDownloadUrl,
       onUploadComplete,
       onUploadError,
       t,

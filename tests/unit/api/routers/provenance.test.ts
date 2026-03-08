@@ -419,8 +419,8 @@ describe("Provenance Router", () => {
     it("should return entries across all nodes", async () => {
       const caller = createCaller();
       const project = await createTestProject("AuditProject");
-      const noteA = await createTestNote(project.id, "A", { text: "a" });
-      const noteB = await createTestNote(project.id, "B", { text: "b" });
+      await createTestNote(project.id, "A", { text: "a" });
+      await createTestNote(project.id, "B", { text: "b" });
 
       const entries = await caller.provenance.getAuditLog({});
       // Both create events should appear (project + noteA + noteB)

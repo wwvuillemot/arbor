@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { db } from "../../db";
 import { userPreferences } from "../../db/schema";

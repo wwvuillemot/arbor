@@ -16,6 +16,17 @@ import { SearchResultCard, type SearchResultItem } from "./search-result-card";
 export type SearchMode = "hybrid" | "vector" | "keyword";
 export type SortBy = "relevance" | "date" | "name";
 
+const AVAILABLE_NODE_TYPES = [
+  "project",
+  "folder",
+  "note",
+  "link",
+  "ai_suggestion",
+  "audio_note",
+] as const;
+
+type SearchNodeType = (typeof AVAILABLE_NODE_TYPES)[number];
+
 export interface SearchPanelProps {
   onSelectNode?: (nodeId: string) => void;
   className?: string;
@@ -54,6 +65,7 @@ const SS = {
 
 export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
   const t = useTranslations("search");
+  const tFileTree = useTranslations("fileTree");
 
   const [query, setQuery] = React.useState<string>(() =>
     sessionGet(SS.query, ""),
@@ -78,7 +90,9 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
   const [tagFilters, setTagFilters] = React.useState<string[]>(() =>
     sessionGet(SS.tags, []),
   );
-  const [nodeTypeFilter, setNodeTypeFilter] = React.useState<string[]>([]);
+  const [nodeTypeFilter, setNodeTypeFilter] = React.useState<SearchNodeType[]>(
+    [],
+  );
 
   // Persist state to sessionStorage on change
   React.useEffect(() => {
@@ -206,15 +220,6 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
   const allTags = tagsQuery.data ?? [];
   const allProjects = projectsQuery.data ?? [];
 
-  const nodeTypes = [
-    "project",
-    "folder",
-    "note",
-    "link",
-    "ai_suggestion",
-    "audio_note",
-  ];
-
   const [showTagList, setShowTagList] = React.useState(false);
 
   return (
@@ -232,6 +237,7 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("placeholder")}
             autoFocus
+            onFocus={(e) => e.currentTarget.select()}
             className="w-full pl-10 pr-10 py-2.5 border rounded-lg bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             data-testid="search-input"
           />
@@ -263,13 +269,13 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
                 onClick={() => setSearchMode(mode)}
                 data-testid={`search-mode-${mode}`}
                 className={cn(
-                  "px-2.5 py-1 transition-colors capitalize",
+                  "px-2.5 py-1 transition-colors",
                   searchMode === mode
                     ? "bg-primary text-primary-foreground"
                     : "bg-background hover:bg-accent",
                 )}
               >
-                {mode}
+                {t(`mode.${mode}` as Parameters<typeof t>[0])}
               </button>
             ))}
           </div>
@@ -334,9 +340,9 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
                 className="w-full border rounded-lg px-2 py-1.5 text-xs bg-background"
               >
                 <option value="">{t("allProjects")}</option>
-                {allProjects.map((p: Record<string, string>) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
+                {allProjects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
                   </option>
                 ))}
               </select>
@@ -348,7 +354,7 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
                 {t("filterNodeType")}
               </label>
               <div className="flex flex-wrap gap-1">
-                {nodeTypes.map((type) => (
+                {AVAILABLE_NODE_TYPES.map((type) => (
                   <button
                     key={type}
                     onClick={() =>
@@ -360,13 +366,15 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
                     }
                     data-testid={`filter-type-${type}`}
                     className={cn(
-                      "px-2 py-0.5 text-xs rounded-full border transition-colors capitalize",
+                      "px-2 py-0.5 text-xs rounded-full border transition-colors",
                       nodeTypeFilter.includes(type)
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background hover:bg-accent",
                     )}
                   >
-                    {type.replace("_", " ")}
+                    {tFileTree(
+                      `nodeTypes.${type}` as Parameters<typeof tFileTree>[0],
+                    )}
                   </button>
                 ))}
               </div>
@@ -393,8 +401,8 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
                 </button>
                 {showTagList && (
                   <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                    {allTags.map((tag: Record<string, string | null>) => {
-                      const active = tagFilters.includes(tag.id!);
+                    {allTags.map((tag) => {
+                      const active = tagFilters.includes(tag.id);
                       return (
                         <button
                           key={tag.id}
@@ -402,7 +410,7 @@ export function SearchPanel({ onSelectNode, className }: SearchPanelProps) {
                             setTagFilters((prev) =>
                               active
                                 ? prev.filter((id) => id !== tag.id)
-                                : [...prev, tag.id!],
+                                : [...prev, tag.id],
                             )
                           }
                           className="px-2 py-0.5 text-xs rounded-full border transition-colors"

@@ -280,7 +280,7 @@ export function AuditLog({ className }: AuditLogProps) {
 
               <AttributionBadge
                 actorType={entry.actorType as ActorType}
-                actorId={entry.actorId}
+                actorId={entry.actorId ?? undefined}
                 size="sm"
               />
 

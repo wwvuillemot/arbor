@@ -1,14 +1,24 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   AGENT_MODES,
   buildSystemPrompt,
+  createAgentMode,
+  deleteAgentMode,
   filterToolsForMode,
   getAgentModeConfig,
+  getAgentModeById,
   getAllAgentModes,
   isToolAllowedForMode,
-  type AgentModeConfig,
+  listCustomAgentModes,
+  updateAgentMode,
+  validateToolNames,
 } from "@/services/agent-mode-service";
 import type { ToolDefinition } from "@/services/llm-service";
+import { resetTestDb } from "@tests/helpers/db";
+
+beforeEach(async () => {
+  await resetTestDb();
+});
 
 // ─── AGENT_MODES Configuration ──────────────────────────────────────────────────
 
@@ -239,6 +249,28 @@ describe("filterToolsForMode", () => {
   });
 });
 
+// ─── validateToolNames ──────────────────────────────────────────────────────────
+
+describe("validateToolNames", () => {
+  it("should return only invalid tool names", () => {
+    const invalidToolNames = validateToolNames(
+      ["create_node", "unknown_tool", "list_nodes", "missing_tool"],
+      ["create_node", "list_nodes", "search_nodes"],
+    );
+
+    expect(invalidToolNames).toEqual(["unknown_tool", "missing_tool"]);
+  });
+
+  it("should return an empty array when all tool names are valid", () => {
+    const invalidToolNames = validateToolNames(
+      ["create_node", "list_nodes"],
+      ["create_node", "list_nodes", "search_nodes"],
+    );
+
+    expect(invalidToolNames).toEqual([]);
+  });
+});
+
 // ─── getAgentModeConfig ─────────────────────────────────────────────────────────
 
 describe("getAgentModeConfig", () => {
@@ -286,6 +318,139 @@ describe("getAllAgentModes", () => {
       expect(mode).toHaveProperty("guidelines");
       expect(mode).toHaveProperty("temperature");
     }
+  });
+});
+
+// ─── CRUD Operations ───────────────────────────────────────────────────────────
+
+describe("createAgentMode", () => {
+  it("should create a custom agent mode", async () => {
+    const createdMode = await createAgentMode({
+      name: "story_coach",
+      displayName: "Story Coach",
+      description: "Helps strengthen scenes and story beats.",
+      allowedTools: ["list_nodes", "update_node"],
+      guidelines: "Focus on pacing and scene clarity.",
+      temperature: 0.55,
+    });
+
+    expect(createdMode.name).toBe("story_coach");
+    expect(createdMode.displayName).toBe("Story Coach");
+    expect(createdMode.allowedTools).toEqual(["list_nodes", "update_node"]);
+    expect(createdMode.temperature).toBe(0.55);
+    expect(createdMode.isBuiltIn).toBe(false);
+  });
+});
+
+describe("getAgentModeById", () => {
+  it("should return a created custom mode by id", async () => {
+    const createdMode = await createAgentMode({
+      name: "line_editor",
+      displayName: "Line Editor",
+      description: "Refines prose at the sentence level.",
+      allowedTools: ["update_node", "search_nodes"],
+      guidelines: "Focus on clarity, rhythm, and word choice.",
+      temperature: 0.35,
+    });
+
+    const foundMode = await getAgentModeById(createdMode.id);
+
+    expect(foundMode).not.toBeNull();
+    expect(foundMode?.id).toBe(createdMode.id);
+    expect(foundMode?.name).toBe("line_editor");
+  });
+
+  it("should return null for an unknown id", async () => {
+    const foundMode = await getAgentModeById(
+      "00000000-0000-0000-0000-000000000000",
+    );
+
+    expect(foundMode).toBeNull();
+  });
+});
+
+describe("updateAgentMode", () => {
+  it("should update a custom agent mode", async () => {
+    const createdMode = await createAgentMode({
+      name: "outline_helper",
+      displayName: "Outline Helper",
+      description: "Builds story outlines.",
+      allowedTools: ["create_node", "list_nodes"],
+      guidelines: "Keep outlines structured and concise.",
+      temperature: 0.4,
+    });
+
+    const updatedMode = await updateAgentMode(createdMode.id, {
+      displayName: "Outline Architect",
+      description: "Builds and revises story outlines.",
+      allowedTools: ["create_node", "move_node", "list_nodes"],
+      guidelines: "Prefer clear hierarchy and concrete next steps.",
+      temperature: 0.6,
+    });
+
+    expect(updatedMode.id).toBe(createdMode.id);
+    expect(updatedMode.name).toBe("outline_helper");
+    expect(updatedMode.displayName).toBe("Outline Architect");
+    expect(updatedMode.allowedTools).toEqual([
+      "create_node",
+      "move_node",
+      "list_nodes",
+    ]);
+    expect(updatedMode.temperature).toBe(0.6);
+  });
+});
+
+describe("deleteAgentMode", () => {
+  it("should delete a custom agent mode", async () => {
+    const createdMode = await createAgentMode({
+      name: "cleanup_mode",
+      displayName: "Cleanup Mode",
+      description: "Finds and fixes messy passages.",
+      allowedTools: ["search_nodes", "update_node"],
+      guidelines: "Prefer minimal, high-confidence edits.",
+      temperature: 0.25,
+    });
+
+    const deleted = await deleteAgentMode(createdMode.id);
+    const foundMode = await getAgentModeById(createdMode.id);
+
+    expect(deleted).toBe(true);
+    expect(foundMode).toBeNull();
+  });
+
+  it("should reject deleting a built-in mode", async () => {
+    const assistantMode = await getAgentModeConfig("assistant");
+
+    await expect(deleteAgentMode(assistantMode!.id)).rejects.toThrow(
+      "Cannot delete built-in mode: assistant. Built-in modes are permanent.",
+    );
+  });
+});
+
+describe("listCustomAgentModes", () => {
+  it("should return only custom modes", async () => {
+    await createAgentMode({
+      name: "scene_builder",
+      displayName: "Scene Builder",
+      description: "Improves scene construction.",
+      allowedTools: ["create_node", "update_node"],
+      guidelines: "Keep scenes focused on conflict and change.",
+      temperature: 0.5,
+    });
+    await createAgentMode({
+      name: "fact_checker",
+      displayName: "Fact Checker",
+      description: "Cross-checks project details.",
+      allowedTools: ["search_nodes", "search_semantic", "list_nodes"],
+      guidelines: "Prefer precise citations from the project.",
+      temperature: 0.2,
+    });
+
+    const customModes = await listCustomAgentModes();
+    const customModeNames = customModes.map((mode) => mode.name).sort();
+
+    expect(customModeNames).toEqual(["fact_checker", "scene_builder"]);
+    expect(customModes.every((mode) => mode.isBuiltIn === false)).toBe(true);
   });
 });
 

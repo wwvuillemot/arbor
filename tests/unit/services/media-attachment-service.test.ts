@@ -305,6 +305,44 @@ describe("MediaAttachmentService", () => {
     });
   });
 
+  describe("getAttachmentContent", () => {
+    it("should return attachment metadata and a readable stream", async () => {
+      const project = await createTestProject("Stream Project");
+      const note = await createTestNote("Note", project.id);
+      const body = "stream me directly";
+
+      const attachment = await mediaService.createAttachment({
+        nodeId: note.id,
+        projectId: project.id,
+        buffer: Buffer.from(body),
+        filename: "stream.txt",
+        mimeType: "text/plain",
+        bucket: "arbor-test",
+      });
+
+      const { attachment: fetchedAttachment, stream } =
+        await mediaService.getAttachmentContent(attachment.id);
+      const chunks: Buffer[] = [];
+
+      for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+
+      expect(fetchedAttachment.id).toBe(attachment.id);
+      expect(fetchedAttachment.filename).toBe("stream.txt");
+      expect(fetchedAttachment.mimeType).toBe("text/plain");
+      expect(Buffer.concat(chunks).toString("utf8")).toBe(body);
+    });
+
+    it("should throw for a missing attachment", async () => {
+      await expect(
+        mediaService.getAttachmentContent(
+          "00000000-0000-0000-0000-000000000000",
+        ),
+      ).rejects.toThrow();
+    });
+  });
+
   describe("cascade delete", () => {
     it("should delete media attachments when parent node is deleted", async () => {
       const project = await createTestProject("Cascade Project");

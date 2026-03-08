@@ -141,7 +141,7 @@ export async function resetTestDb() {
 
     // Seed built-in agent modes after truncate
     await seedAgentModes();
-  } catch (error) {
+  } catch (_error) {
     // If TRUNCATE fails (e.g., tables don't exist yet), fall back to DELETE
     const db = getTestDb();
     try {
@@ -155,14 +155,14 @@ export async function resetTestDb() {
       await db.delete(schema.userPreferences);
       await db.delete(schema.appSettings);
       await db.delete(schema.agentModes);
-    } catch (deleteError) {
+    } catch (_deleteError) {
       // Tables don't exist yet, ignore
     }
 
     // Seed built-in agent modes after delete
     try {
       await seedAgentModes();
-    } catch (seedError) {
+    } catch (_seedError) {
       // Ignore seed errors in case table doesn't exist yet
     }
   }

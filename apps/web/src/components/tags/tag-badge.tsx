@@ -38,15 +38,19 @@ export function TagBadge({
   onEntityClick,
   className,
 }: TagBadgeProps) {
-  const hasColor = tag.color && /^#[0-9a-fA-F]{6}$/.test(tag.color);
+  const validatedColor =
+    typeof tag.color === "string" && /^#[0-9a-fA-F]{6}$/.test(tag.color)
+      ? tag.color
+      : undefined;
+  const hasColor = validatedColor !== undefined;
   const isEntityType = ENTITY_TYPES.includes(tag.type);
   const hasEntityNode = isEntityType && !!tag.entityNodeId;
 
   const badgeStyle: React.CSSProperties = hasColor
     ? {
-        backgroundColor: `${tag.color}20`,
-        borderColor: `${tag.color}60`,
-        color: tag.color,
+        backgroundColor: `${validatedColor}20`,
+        borderColor: `${validatedColor}60`,
+        color: validatedColor,
       }
     : {};
 

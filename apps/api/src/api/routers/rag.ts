@@ -2,6 +2,7 @@ import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { RAGService } from "../../services/rag-service";
 import { LocalEmbeddingProvider } from "../../services/embedding-service";
+import { nodeTypeEnum } from "../../db/schema";
 
 // Use LocalEmbeddingProvider by default; swap to OpenAI when API key is configured
 const ragService = new RAGService(new LocalEmbeddingProvider());
@@ -10,7 +11,7 @@ const filtersSchema = z
   .object({
     projectId: z.string().uuid().optional(),
     parentId: z.string().uuid().optional(),
-    nodeTypes: z.array(z.string()).optional(),
+    nodeTypes: z.array(z.enum(nodeTypeEnum)).optional(),
     tagIds: z.array(z.string().uuid()).optional(),
     excludeDeleted: z.boolean().optional(),
   })

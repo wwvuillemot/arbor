@@ -1,7 +1,6 @@
 import * as React from "react";
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { NextIntlClientProvider } from "next-intl";
+import { describe, it, expect } from "vitest";
+import { render } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import messages from "@/i18n/messages/en.json";
 import ConfigurationPage from "@/app/[locale]/(app)/settings/configuration/page";
@@ -21,9 +20,7 @@ function renderWithProviders(component: React.ReactElement) {
   return render(
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        <NextIntlClientProvider locale="en" messages={messages}>
-          {component}
-        </NextIntlClientProvider>
+        {component}
       </QueryClientProvider>
     </trpc.Provider>,
   );

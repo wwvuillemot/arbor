@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { getTestDb, resetTestDb } from "../../helpers/db";
-import { nodes, nodeHistory } from "@server/db/schema";
+import { nodes } from "@server/db/schema";
 import { ProvenanceService } from "@server/services/provenance-service";
 import { NodeService } from "@server/services/node-service";
 import { eq } from "drizzle-orm";
@@ -8,31 +8,6 @@ import { eq } from "drizzle-orm";
 const testDb = getTestDb();
 const provenanceService = new ProvenanceService();
 const nodeService = new NodeService();
-
-// Helper: create a test node and return its ID
-async function createTestNode(
-  name = "Test Node",
-  content: unknown = {
-    type: "doc",
-    content: [
-      { type: "paragraph", content: [{ type: "text", text: "Hello world" }] },
-    ],
-  },
-): Promise<string> {
-  const [node] = await testDb
-    .insert(nodes)
-    .values({
-      type: "note",
-      name,
-      parentId: null, // We'll use a project node as parent
-      content,
-      createdBy: "user:test",
-      updatedBy: "user:test",
-    })
-    .returning();
-  // Need a project node to be valid, but for testing let's use a project
-  return node.id;
-}
 
 async function createTestProject(name = "Test Project"): Promise<string> {
   const [project] = await testDb

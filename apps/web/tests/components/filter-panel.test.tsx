@@ -1,8 +1,13 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { FilterPanel } from "@/components/navigation/filter-panel";
-import type { AttributionFilter } from "@/components/file-tree";
+
+type TranslationEntry = string | TranslationMap;
+
+interface TranslationMap {
+  [key: string]: TranslationEntry;
+}
 
 // Mock tRPC
 vi.mock("@/lib/trpc", () => ({
@@ -37,7 +42,7 @@ vi.mock("@/lib/trpc", () => ({
 // Mock next-intl
 vi.mock("next-intl", () => ({
   useTranslations: (namespace?: string) => (key: string) => {
-    const translations: Record<string, any> = {
+    const translations: TranslationMap = {
       fileTree: {
         filterPanel: {
           search: "Search nodes...",
@@ -60,12 +65,22 @@ vi.mock("next-intl", () => ({
     // Support nested namespaces like "fileTree.filterPanel"
     if (namespace) {
       const parts = namespace.split(".");
-      let current: any = translations;
+      let current: TranslationEntry = translations;
       for (const part of parts) {
+        if (typeof current === "string") {
+          return key;
+        }
+
         current = current[part];
         if (!current) return key;
       }
-      return current[key] || key;
+
+      if (typeof current === "string") {
+        return current;
+      }
+
+      const translatedValue = current[key];
+      return typeof translatedValue === "string" ? translatedValue : key;
     }
     return key;
   },

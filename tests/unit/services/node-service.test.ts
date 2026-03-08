@@ -5,7 +5,6 @@ import {
   createTestFolder,
   createTestNote,
 } from "@tests/helpers/fixtures";
-import type { NodeType } from "@server/db/schema";
 
 describe("NodeService", () => {
   let nodeService: NodeService;
