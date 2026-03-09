@@ -44,7 +44,7 @@ describe("projects import side-effect helpers", () => {
 
     expect(uploadImportedMedia).toHaveBeenCalledWith(
       expect.objectContaining({
-        nodeId: "node-map",
+        nodeId: "proj-imported",
         projectId: "proj-imported",
         filename: "map.png",
         mimeType: "image/png",

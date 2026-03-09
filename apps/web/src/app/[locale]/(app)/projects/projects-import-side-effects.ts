@@ -44,10 +44,15 @@ export async function uploadImportedImagesAndPatchNodes<
   updateNodeContent: (input: UpdateNodeContentInput) => Promise<unknown>;
 }): Promise<void> {
   for (const [notePath, imageFiles] of imageFilesByNotePath.entries()) {
-    const nodeId = nodeMap[notePath];
-    if (!nodeId) {
+    const importedNodeId = nodeMap[notePath];
+    if (!importedNodeId) {
       continue;
     }
+
+    // Keep imported attachments owned by the project so stable /media/:id URLs
+    // survive if an imported note or synthetic image note is later replaced,
+    // deleted, or re-imported.
+    const attachmentOwnerNodeId = projectId;
 
     const uploadedImageUrlsBySourcePath = new Map<string, string>();
     for (const [localPath, file] of imageFiles.entries()) {
@@ -55,7 +60,7 @@ export async function uploadImportedImagesAndPatchNodes<
         const imageBuffer = await file.arrayBuffer();
         const imageBase64 = arrayBufferToBase64(imageBuffer);
         const attachment = await uploadImportedMedia({
-          nodeId,
+          nodeId: attachmentOwnerNodeId,
           projectId,
           filename: file.name,
           mimeType: file.type || "application/octet-stream",
@@ -76,7 +81,7 @@ export async function uploadImportedImagesAndPatchNodes<
     }
 
     try {
-      const node = await fetchNodeById({ id: nodeId });
+      const node = await fetchNodeById({ id: importedNodeId });
       if (!node?.content) {
         continue;
       }
@@ -91,7 +96,7 @@ export async function uploadImportedImagesAndPatchNodes<
         continue;
       }
 
-      await updateNodeContent({ id: nodeId, content: patchedContent });
+      await updateNodeContent({ id: importedNodeId, content: patchedContent });
     } catch {
       // Non-fatal
     }
