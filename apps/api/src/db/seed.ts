@@ -13,148 +13,34 @@ import { eq } from "drizzle-orm";
 export async function seedAgentModes() {
   console.log("🤖 Seeding agent modes...");
 
+  // Import the single source of truth for built-in mode definitions.
+  // onConflictDoNothing means existing rows are left untouched (preserving
+  // any user edits in Settings) while new built-in modes are inserted.
+  const { AGENT_MODES } = await import("../services/agent-mode-helpers");
+
   try {
-    // Check if agent modes already exist
-    const existingModes = await db.select().from(schema.agentModes);
+    const rows = Object.values(AGENT_MODES).map((mode) => ({
+      name: mode.name,
+      displayName: mode.displayName,
+      description: mode.description,
+      allowedTools: mode.allowedTools,
+      guidelines: mode.guidelines,
+      temperature: String(mode.temperature.toFixed(2)),
+      isBuiltIn: true,
+    }));
 
-    if (existingModes.length > 0) {
-      console.log("ℹ️  Agent modes already exist. Skipping seed.");
-      console.log(`   Found ${existingModes.length} existing mode(s):`);
-      existingModes.forEach((m) => console.log(`   - ${m.name}`));
-      return;
+    const result = await db
+      .insert(schema.agentModes)
+      .values(rows)
+      .onConflictDoNothing()
+      .returning({ name: schema.agentModes.name });
+
+    if (result.length > 0) {
+      console.log(`✓ Inserted ${result.length} new built-in agent mode(s):`);
+      result.forEach((r) => console.log(`  - ${r.name}`));
+    } else {
+      console.log("ℹ️  All built-in agent modes already exist.");
     }
-
-    // Insert built-in agent modes
-    await db.insert(schema.agentModes).values([
-      {
-        name: "assistant",
-        displayName: "Assistant",
-        description:
-          "General-purpose writing assistant. Helps with brainstorming, drafting, editing, organizing, and any other writing tasks.",
-        allowedTools: [
-          "create_node",
-          "update_node",
-          "delete_node",
-          "move_node",
-          "list_nodes",
-          "search_nodes",
-          "search_semantic",
-          "add_tag",
-          "remove_tag",
-          "list_tags",
-          "export_node",
-          "export_project",
-        ],
-        guidelines: `- Be helpful and versatile across all writing tasks
-- Balance creativity with accuracy
-- Offer suggestions proactively when appropriate
-- Use all available tools to assist the user
-- Maintain a friendly, collaborative tone`,
-        temperature: "0.70",
-        isBuiltIn: true,
-      },
-      {
-        name: "planner",
-        displayName: "Planner",
-        description:
-          "Focuses on story structure, project organization, and outlining. Helps plan chapters, scenes, character arcs, and narrative flow.",
-        allowedTools: ["create_node", "move_node", "list_nodes", "add_tag"],
-        guidelines: `- Focus on high-level structure and organization
-- Think about narrative arcs, pacing, and flow
-- Suggest hierarchical structures for projects
-- Help create outlines and chapter plans
-- Prioritize logical reasoning over creative generation
-- Ask clarifying questions about story goals and structure`,
-        temperature: "0.40",
-        isBuiltIn: true,
-      },
-      {
-        name: "editor",
-        displayName: "Editor",
-        description:
-          "Content refinement specialist. Focuses on improving clarity, grammar, style, tone, and readability of existing text.",
-        allowedTools: ["update_node", "search_nodes", "list_nodes"],
-        guidelines: `- Focus on improving existing text, not generating new content
-- Pay attention to clarity, grammar, spelling, and punctuation
-- Maintain the author's voice while suggesting improvements
-- Provide specific, actionable feedback
-- Consider readability, sentence structure, and paragraph flow
-- Flag inconsistencies in tone or style`,
-        temperature: "0.30",
-        isBuiltIn: true,
-      },
-      {
-        name: "researcher",
-        displayName: "Researcher",
-        description:
-          "Information gathering and synthesis. Helps find relevant content within the project, identify patterns, and compile research notes.",
-        allowedTools: [
-          "search_semantic",
-          "search_nodes",
-          "list_nodes",
-          "list_tags",
-        ],
-        guidelines: `- Focus on finding and synthesizing information from the project
-- Cite specific nodes and content when referencing material
-- Identify patterns, themes, and connections across the project
-- Provide accurate, well-organized summaries
-- Suggest areas that need more research or development
-- Prioritize accuracy over creativity`,
-        temperature: "0.20",
-        isBuiltIn: true,
-      },
-      {
-        name: "art_director",
-        displayName: "Art Director",
-        description:
-          "Creative visual strategist. Researches story elements, synthesizes them into a visual concept, then generates compelling images. Thinks like a film director or concept artist.",
-        allowedTools: [
-          "search_semantic",
-          "search_nodes",
-          "list_nodes",
-          "list_tags",
-          "get_node_content",
-          "generate_image",
-        ],
-        guidelines: `You are a creative visual strategist and art director. Your process is always:
-
-STEP 1 — RESEARCH: Before proposing anything, gather source material.
-- Use search_semantic to find relevant content (characters, scenes, themes, symbols)
-- Use get_node_content to read the full text of promising nodes — not just excerpts
-- Use list_tags to find character, location, and concept tags that illuminate the subject
-- Ask the user to clarify the subject if it is ambiguous
-
-STEP 2 — SYNTHESIZE: Build a visual concept from the research.
-- Identify the emotional core: what feeling should this image evoke?
-- Consider: composition, camera angle, lighting quality, color temperature, time of day
-- Think about symbolism — what objects, postures, or settings reinforce the theme?
-- Note any visual details mentioned in the source material (clothing, scars, environments)
-- Reference the project's style profile (artStyle, colorPalette, moodKeywords) if present
-
-STEP 3 — PROPOSE: Present a detailed visual brief BEFORE generating.
-Format your proposal like this:
-  Subject: [who/what is the central focus]
-  Composition: [how the scene is framed]
-  Lighting: [quality and direction]
-  Palette: [dominant colors and emotional tone]
-  Mood: [the feeling the image should carry]
-  Key details: [specific visual elements from the research]
-  Prompt draft: [the actual text you plan to send to generate_image]
-
-Ask the user to approve, refine, or redirect before generating.
-
-STEP 4 — GENERATE: Only after the user approves the concept, call generate_image with a rich, specific, evocative prompt.`,
-        temperature: "0.85",
-        isBuiltIn: true,
-      },
-    ]);
-
-    console.log("✓ Created 5 built-in agent modes");
-    console.log("  - assistant (temperature: 0.70)");
-    console.log("  - planner (temperature: 0.40)");
-    console.log("  - editor (temperature: 0.30)");
-    console.log("  - researcher (temperature: 0.20)");
-    console.log("  - art_director (temperature: 0.85)");
   } catch (error) {
     console.error("❌ Agent mode seeding failed:", error);
     throw error;
