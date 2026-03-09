@@ -115,8 +115,8 @@ export function Dialog({
           </div>
         </div>
 
-        {/* Body - Scrollable */}
-        <div className="flex-1 overflow-auto min-h-0">{children}</div>
+        {/* Body - flex column so children can fill height with flex-1 */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0">{children}</div>
 
         {/* Footer - Fixed at bottom */}
         {footer && (
