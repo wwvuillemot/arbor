@@ -172,9 +172,11 @@ export default function ProjectsPage() {
   }, [nodeParam]);
 
   // Update the URL when a node is selected so the page is deep-linkable and
-  // reloading restores the open node.
+  // reloading restores the open node. Also update state directly so callers
+  // don't depend on the URL round-trip (which doesn't work in tests).
   const navigateToNode = React.useCallback(
     (nodeId: string | null) => {
+      setSelectedNodeId(nodeId);
       const params = new URLSearchParams(searchParams?.toString() ?? "");
       if (nodeId) {
         params.set("node", nodeId);

@@ -117,11 +117,15 @@ vi.mock("@tiptap/extension-link", () => ({
 
 // mergeAttributes is used by SafeLink.renderHTML — provide a real-enough shim
 // Mark is used by AiAttributionMark.create() at module load time
+// Node is used by ResizableImage.create() at module load time
 vi.mock("@tiptap/core", () => ({
   mergeAttributes: (...args: Record<string, unknown>[]) =>
     Object.assign({}, ...args),
   Mark: {
     create: vi.fn().mockReturnValue({ name: "aiAttribution" }),
+  },
+  Node: {
+    create: vi.fn().mockReturnValue({ name: "image" }),
   },
 }));
 
