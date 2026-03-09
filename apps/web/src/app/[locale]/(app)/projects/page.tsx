@@ -161,12 +161,16 @@ export default function ProjectsPage() {
     () => searchParams?.get("node") ?? null,
   );
 
+  // Note view/edit mode — starts read-only; user must click Edit to write.
+  const [isNoteEditing, setIsNoteEditing] = React.useState(false);
+
   // Sync selectedNodeId when the URL ?node= param changes — e.g. the user clicks
   // a node link in the chat sidebar while already on the projects page.
   const nodeParam = searchParams?.get("node") ?? null;
   React.useEffect(() => {
     if (nodeParam !== selectedNodeId) {
       setSelectedNodeId(nodeParam);
+      setIsNoteEditing(false); // reset to read-only when navigating to a new node
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeParam]);
@@ -1396,7 +1400,7 @@ export default function ProjectsPage() {
                       </h1>
                     )}
                     <div className="flex items-center gap-2">
-                      {selNode?.type === "note" && (
+                      {selNode?.type === "note" && isNoteEditing && (
                         <span
                           className={cn(
                             "text-xs px-2 py-1 rounded",
@@ -1414,6 +1418,30 @@ export default function ProjectsPage() {
                           {autoSaveStatus === "saved" && tEditor("saved")}
                           {autoSaveStatus === "error" && tEditor("saveFailed")}
                         </span>
+                      )}
+                      {selNode?.type === "note" && (
+                        <button
+                          onClick={() => setIsNoteEditing((v) => !v)}
+                          className={cn(
+                            "flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors",
+                            isNoteEditing
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                              : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                          )}
+                          data-testid="note-edit-toggle"
+                        >
+                          {isNoteEditing ? (
+                            <>
+                              <Check className="w-3 h-3" />
+                              {tEditor("doneEditing")}
+                            </>
+                          ) : (
+                            <>
+                              <Pencil className="w-3 h-3" />
+                              {tEditor("edit")}
+                            </>
+                          )}
+                        </button>
                       )}
                       <span className="text-xs text-muted-foreground px-2 py-1 rounded bg-muted">
                         {tFileTree(`nodeTypes.${selNode?.type}`)}
@@ -1537,12 +1565,17 @@ export default function ProjectsPage() {
                         <TiptapEditor
                           content={parsed}
                           nodeId={selectedNodeId ?? undefined}
-                          onChange={setEditorContent}
+                          editable={isNoteEditing}
+                          onChange={isNoteEditing ? setEditorContent : undefined}
                           editorRef={editorInstanceRef}
-                          onInsertImage={() =>
-                            setShowImageUpload((prev) => !prev)
+                          onInsertImage={
+                            isNoteEditing
+                              ? () => setShowImageUpload((prev) => !prev)
+                              : undefined
                           }
-                          onInsertLink={handleOpenLinkPicker}
+                          onInsertLink={
+                            isNoteEditing ? handleOpenLinkPicker : undefined
+                          }
                           onLinkClick={handleEditorLinkClick}
                         />
                         {/* Image upload/picker modal */}

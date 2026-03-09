@@ -570,7 +570,8 @@ describe("TiptapEditor", () => {
     });
   });
 
-  it("should not call onLinkClick when a link is clicked while editing", () => {
+  it("should open in new tab and not call onLinkClick when a link is clicked in edit mode", () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     const onLinkClick = vi.fn();
     render(<TiptapEditor content={null} onLinkClick={onLinkClick} />);
 
@@ -580,11 +581,23 @@ describe("TiptapEditor", () => {
     anchor.textContent = "A node link";
     editorContent.appendChild(anchor);
 
-    fireEvent.click(anchor);
+    const nativeEvent = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+    });
+    anchor.dispatchEvent(nativeEvent);
+
+    expect(nativeEvent.defaultPrevented).toBe(true);
+    expect(openSpy).toHaveBeenCalledWith(
+      "?node=test-uuid-1234",
+      "_blank",
+      "noopener,noreferrer",
+    );
     expect(onLinkClick).not.toHaveBeenCalled();
+    openSpy.mockRestore();
   });
 
-  it("should not prevent default browser navigation when a link is clicked while editing", () => {
+  it("should not intercept when onLinkClick is not provided", () => {
     render(<TiptapEditor content={null} />);
     const editorContent = screen.getByTestId("editor-content");
     const anchor = document.createElement("a");
@@ -700,7 +713,8 @@ describe("TiptapEditor", () => {
     expect(secondOnLinkClick).toHaveBeenCalledWith("?node=second");
   });
 
-  it("should stop intercepting links when rerendered from read-only to editable", () => {
+  it("should navigate in-place in read-only, open new tab in edit mode", () => {
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
     const onLinkClick = vi.fn();
     const { rerender } = render(
       <TiptapEditor
@@ -734,7 +748,13 @@ describe("TiptapEditor", () => {
 
     expect(onLinkClick).toHaveBeenCalledTimes(1);
     expect(onLinkClick).toHaveBeenCalledWith("?node=read-only");
-    expect(editableClickEvent.defaultPrevented).toBe(false);
+    expect(openSpy).toHaveBeenCalledWith(
+      "?node=editable",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    expect(editableClickEvent.defaultPrevented).toBe(true);
+    openSpy.mockRestore();
   });
 
   it("should call onLinkClick when the read-only click target is link text", () => {

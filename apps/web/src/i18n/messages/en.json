@@ -397,6 +397,8 @@
     "horizontalRule": "Horizontal rule",
     "clearFormatting": "Clear formatting",
     "placeholder": "Start writing...",
+    "edit": "Edit",
+    "doneEditing": "Done",
     "saving": "Saving...",
     "saved": "Saved",
     "saveFailed": "Save failed",

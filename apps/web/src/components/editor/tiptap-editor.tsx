@@ -360,7 +360,14 @@ export function TiptapEditor({
       AiAttributionMark,
       SafeLink.configure({
         openOnClick: false,
-        HTMLAttributes: { class: "cursor-pointer underline text-primary" },
+        // TipTap v3 configure() uses mergeDeep — explicitly null target/rel to
+        // prevent the defaults { target: "_blank", rel: "noopener noreferrer nofollow" }
+        // from surviving the merge and becoming the ProseMirror attribute default.
+        HTMLAttributes: {
+          target: null,
+          rel: null,
+          class: "cursor-pointer underline text-primary",
+        },
       }),
       Placeholder.configure({
         placeholder: placeholderText,
@@ -430,16 +437,21 @@ export function TiptapEditor({
 
       const anchor = targetElement.closest("a");
       if (!anchor || !container.contains(anchor)) return;
-      if (editableRef.current) return;
 
       e.preventDefault();
       e.stopPropagation();
       e.stopImmediatePropagation();
 
       const href = anchor.getAttribute("href");
-      if (href && href !== "#") {
-        onLinkClick(href);
+      if (!href || href === "#") return;
+
+      if (editableRef.current) {
+        // Edit mode: open in new tab so the current editing session is preserved.
+        window.open(href, "_blank", "noopener,noreferrer");
+        return;
       }
+
+      onLinkClick(href);
     };
     container.addEventListener("click", handleClick, { capture: true });
     return () =>
@@ -454,13 +466,15 @@ export function TiptapEditor({
       className={`flex flex-col h-full${showAiAttribution ? " ai-attribution-visible" : ""}`}
       data-testid="tiptap-editor"
     >
-      <EditorToolbar
-        editor={editor}
-        onInsertImage={onInsertImage}
-        onInsertLink={onInsertLink}
-        showAiAttribution={showAiAttribution}
-        onToggleAttribution={() => setShowAiAttribution((v) => !v)}
-      />
+      {editable && (
+        <EditorToolbar
+          editor={editor}
+          onInsertImage={onInsertImage}
+          onInsertLink={onInsertLink}
+          showAiAttribution={showAiAttribution}
+          onToggleAttribution={() => setShowAiAttribution((v) => !v)}
+        />
+      )}
       <div className="flex-1 overflow-y-auto">
         <EditorContent
           editor={editor}
