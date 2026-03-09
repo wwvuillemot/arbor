@@ -371,7 +371,13 @@
       "clearHero": "Clear hero image",
       "loadingImages": "Loading images...",
       "noImages": "No images in this project yet.",
-      "styleHint": "Style presets are automatically applied when generating images for this project. The active preset (✓) is used for generation."
+      "styleHint": "Style presets are automatically applied when generating images for this project. The active preset (✓) is used for generation.",
+      "dangerZone": "Danger zone",
+      "deleteProject": "Delete this project",
+      "deleteProjectWarning": "Once deleted, all notes, media, and settings for this project will be permanently removed. This action cannot be undone.",
+      "deleteConfirmPrompt": "To confirm, type the project name \"{name}\" below:",
+      "deleteConfirmButton": "I understand, delete this project permanently",
+      "cancel": "Cancel"
     },
     "toolbar": "Editor toolbar",
     "undo": "Undo",

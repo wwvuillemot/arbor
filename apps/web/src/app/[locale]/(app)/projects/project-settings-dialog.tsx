@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Check, Plus, Trash2, ImageIcon, X } from "lucide-react";
+import { Check, Plus, Trash2, ImageIcon, X, AlertTriangle } from "lucide-react";
 import { Dialog } from "@/components/dialog";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,83 @@ export function parseStylePresets(sp: Record<string, unknown> | undefined): {
   return { presets: [], activePresetId: undefined };
 }
 
+// ── Danger Zone ───────────────────────────────────────────────────────────────
+
+function DangerZone({
+  projectName,
+  onDelete,
+  t,
+}: {
+  projectName: string;
+  onDelete: () => void;
+  t: (key: string, values?: Record<string, string>) => string;
+}) {
+  const [confirming, setConfirming] = React.useState(false);
+  const [confirmInput, setConfirmInput] = React.useState("");
+
+  return (
+    <div className="mt-8 rounded-md border border-destructive/60 overflow-hidden">
+      {/* Header bar */}
+      <div className="flex items-center gap-2 bg-destructive/10 border-b border-destructive/60 px-4 py-2.5">
+        <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0" />
+        <span className="text-sm font-semibold text-destructive">
+          {t("dangerZone")}
+        </span>
+      </div>
+
+      {/* Body */}
+      <div className="p-4 flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium">{t("deleteProject")}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("deleteProjectWarning")}
+          </p>
+        </div>
+        {!confirming ? (
+          <button
+            onClick={() => setConfirming(true)}
+            className="flex-shrink-0 flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-destructive text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {t("deleteProject")}
+          </button>
+        ) : (
+          <button
+            onClick={() => setConfirming(false)}
+            className="flex-shrink-0 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {t("cancel")}
+          </button>
+        )}
+      </div>
+
+      {/* Confirmation step */}
+      {confirming && (
+        <div className="border-t border-destructive/30 bg-destructive/5 px-4 py-4 flex flex-col gap-3">
+          <p className="text-xs text-muted-foreground">
+            {t("deleteConfirmPrompt", { name: projectName })}
+          </p>
+          <input
+            autoFocus
+            value={confirmInput}
+            onChange={(e) => setConfirmInput(e.target.value)}
+            placeholder={projectName}
+            className="px-3 py-1.5 text-sm rounded-md border border-destructive/40 bg-background outline-none focus:ring-2 focus:ring-destructive/40"
+          />
+          <button
+            onClick={onDelete}
+            disabled={confirmInput !== projectName}
+            className="self-start flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            {t("deleteConfirmButton")}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Tab types ─────────────────────────────────────────────────────────────────
 
 type Tab = "general" | "appearance" | "style";
@@ -62,12 +139,15 @@ interface ProjectSettingsDialogProps {
     summary?: string | null;
     metadata: Record<string, unknown>;
   };
+  /** When provided, renders a "Delete project" danger zone in the General tab */
+  onDelete?: () => void;
 }
 
 export function ProjectSettingsDialog({
   open,
   onClose,
   project,
+  onDelete,
 }: ProjectSettingsDialogProps) {
   const t = useTranslations("editor.projectSettings");
   const tSp = useTranslations("editor.styleProfile");
@@ -76,9 +156,7 @@ export function ProjectSettingsDialog({
 
   // ── General tab state ───────────────────────────────────────────────────────
   const [name, setName] = React.useState(project.name);
-  const [description, setDescription] = React.useState(
-    project.summary ?? "",
-  );
+  const [description, setDescription] = React.useState(project.summary ?? "");
   const [generalSaved, setGeneralSaved] = React.useState(false);
 
   const updateGeneralMutation = trpc.nodes.update.useMutation({
@@ -303,6 +381,17 @@ export function ProjectSettingsDialog({
               >
                 {generalSaved ? t("saved") : t("save")}
               </button>
+
+              {onDelete && (
+                <DangerZone
+                  projectName={project.name}
+                  onDelete={() => {
+                    onClose();
+                    onDelete();
+                  }}
+                  t={t}
+                />
+              )}
             </div>
           )}
 
@@ -380,9 +469,7 @@ export function ProjectSettingsDialog({
           {activeTab === "style" && (
             <div className="flex flex-col gap-4 max-w-lg">
               <div>
-                <h3 className="text-sm font-medium mb-1">
-                  {tSp("title")}
-                </h3>
+                <h3 className="text-sm font-medium mb-1">{tSp("title")}</h3>
                 <p className="text-xs text-muted-foreground">
                   {t("styleHint")}
                 </p>
@@ -401,9 +488,7 @@ export function ProjectSettingsDialog({
                         : "bg-background border-border hover:border-primary/60 text-foreground",
                     )}
                   >
-                    {preset.id === spActiveId && (
-                      <Check className="w-3 h-3" />
-                    )}
+                    {preset.id === spActiveId && <Check className="w-3 h-3" />}
                     {preset.name}
                   </button>
                 ))}
@@ -469,9 +554,7 @@ export function ProjectSettingsDialog({
                       disabled={updateStyleMutation.isPending}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-2 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors"
                     >
-                      {presetSaved
-                        ? tSp("saved")
-                        : tSp("saveAndActivate")}
+                      {presetSaved ? tSp("saved") : tSp("saveAndActivate")}
                     </button>
                     <button
                       onClick={handleDeletePreset}

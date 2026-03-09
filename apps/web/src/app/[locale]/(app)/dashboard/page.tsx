@@ -27,7 +27,6 @@ export default function DashboardPage() {
     summary?: string | null;
     metadata: Record<string, unknown>;
   } | null>(null);
-
   const projectsQuery = trpc.nodes.getAllProjects.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
@@ -40,6 +39,9 @@ export default function DashboardPage() {
     refetchOnWindowFocus: false,
   });
   const utils = trpc.useUtils();
+  const deleteMutation = trpc.nodes.delete.useMutation({
+    onSuccess: () => utils.nodes.getAllProjects.invalidate(),
+  });
   const toggleFavoriteMutation = trpc.nodes.toggleFavorite.useMutation({
     onSuccess: () => {
       utils.nodes.getAllFavorites.invalidate();
@@ -93,6 +95,10 @@ export default function DashboardPage() {
           open
           onClose={() => setSettingsProject(null)}
           project={settingsProject}
+          onDelete={() => {
+            deleteMutation.mutate({ id: settingsProject.id });
+            setSettingsProject(null);
+          }}
         />
       )}
       <div>
@@ -137,23 +143,32 @@ export default function DashboardPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((project) => {
-              const meta = (project.metadata as Record<string, unknown> | null) ?? {};
+              const meta =
+                (project.metadata as Record<string, unknown> | null) ?? {};
               return (
                 <NoteCard
                   key={project.id}
                   node={{
                     id: project.id,
                     name: project.name,
-                    firstMediaId: meta.heroAttachmentId as string | null | undefined,
+                    firstMediaId: meta.heroAttachmentId as
+                      | string
+                      | null
+                      | undefined,
                   }}
                   variant="compact"
-                  description={(project as { summary?: string | null }).summary ?? undefined}
+                  description={
+                    (project as { summary?: string | null }).summary ??
+                    undefined
+                  }
                   onClick={() => handleOpenProject(project.id)}
                   onSettings={() =>
                     setSettingsProject({
                       id: project.id,
                       name: project.name,
-                      summary: (project as { summary?: string | null }).summary ?? null,
+                      summary:
+                        (project as { summary?: string | null }).summary ??
+                        null,
                       metadata: meta,
                     })
                   }

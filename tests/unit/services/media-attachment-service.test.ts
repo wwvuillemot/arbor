@@ -1,4 +1,12 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { MediaAttachmentService } from "@/services/media-attachment-service";
 import { MinioService } from "@/services/minio";
 import { resetTestDb } from "@tests/helpers/db";

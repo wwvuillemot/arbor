@@ -459,7 +459,8 @@ describe("NodeContextMenu", () => {
   it("should show New Folder, New Note, Rename, Delete for folders", () => {
     render(<NodeContextMenu {...defaultProps} node={folderNode} />);
     const menuItems = screen.getAllByRole("menuitem");
-    expect(menuItems).toHaveLength(4);
+    expect(menuItems).toHaveLength(5);
+    expect(screen.getByText("tagNode")).toBeInTheDocument();
     expect(screen.getByText("newFolder")).toBeInTheDocument();
     expect(screen.getByText("newNote")).toBeInTheDocument();
     expect(screen.getByText("rename")).toBeInTheDocument();
@@ -469,7 +470,8 @@ describe("NodeContextMenu", () => {
   it("should show only Rename and Delete for notes", () => {
     render(<NodeContextMenu {...defaultProps} node={noteNode} />);
     const menuItems = screen.getAllByRole("menuitem");
-    expect(menuItems).toHaveLength(2);
+    expect(menuItems).toHaveLength(3);
+    expect(screen.getByText("tagNode")).toBeInTheDocument();
     expect(screen.getByText("rename")).toBeInTheDocument();
     expect(screen.getByText("delete")).toBeInTheDocument();
     expect(screen.queryByText("newFolder")).not.toBeInTheDocument();

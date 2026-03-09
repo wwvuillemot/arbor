@@ -65,7 +65,10 @@ export function NoteCard({
   );
 
   const preview = React.useMemo(
-    () => (variant === "full" && !description ? tiptapToMarkdown(node.content) : null),
+    () =>
+      variant === "full" && !description
+        ? tiptapToMarkdown(node.content)
+        : null,
     [variant, description, node.content],
   );
 
@@ -200,7 +203,9 @@ export function NoteCard({
 
         {/* Description — plain text (for projects) */}
         {description && (
-          <p className="text-xs text-muted-foreground line-clamp-3">{description}</p>
+          <p className="text-xs text-muted-foreground line-clamp-3">
+            {description}
+          </p>
         )}
 
         {/* Content preview — full variant only, when no description */}

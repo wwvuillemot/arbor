@@ -19,7 +19,9 @@ type StyleProfile =
 
 function resolveActivePreset(
   profile: StyleProfile,
-): StylePreset | { artStyle?: string; colorPalette?: string; moodKeywords?: string } {
+):
+  | StylePreset
+  | { artStyle?: string; colorPalette?: string; moodKeywords?: string } {
   if ("presets" in profile) {
     return (
       profile.presets.find((p) => p.id === profile.activePresetId) ??

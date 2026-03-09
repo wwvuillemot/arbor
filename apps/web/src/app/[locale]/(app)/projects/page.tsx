@@ -594,8 +594,8 @@ export default function ProjectsPage() {
         | undefined;
       const siblingNodes = targetNode?.parentId
         ? (utils.nodes.getChildren.getData({
-          parentId: targetNode.parentId,
-        }) ?? [])
+            parentId: targetNode.parentId,
+          }) ?? [])
         : [];
       const moveInput = deriveNodeMoveMutationInput(
         draggedNodeId,
@@ -816,8 +816,8 @@ export default function ProjectsPage() {
         currentProject?.id,
         forceList,
         selectedNodeQuery.data as
-        | { id: string; type: string; parentId: string | null }
-        | undefined,
+          | { id: string; type: string; parentId: string | null }
+          | undefined,
       );
     },
     [currentProject?.id, forceList, selectedNodeQuery.data],
@@ -1338,7 +1338,6 @@ export default function ProjectsPage() {
                 </>
               )}
             </div>
-
           </div>
 
           {/* Right panel: Content — flex column so header is pinned, editor scrolls internally */}
@@ -1385,11 +1384,11 @@ export default function ProjectsPage() {
                           className={cn(
                             "text-xs px-2 py-1 rounded",
                             autoSaveStatus === "saving" &&
-                            "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
+                              "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
                             autoSaveStatus === "saved" &&
-                            "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
+                              "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
                             autoSaveStatus === "error" &&
-                            "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
+                              "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
                             autoSaveStatus === "idle" && "hidden",
                           )}
                           data-testid="auto-save-status"
@@ -1583,8 +1582,8 @@ export default function ProjectsPage() {
                                         Loading images...
                                       </p>
                                     ) : (projectImagesQuery.data ?? []).filter(
-                                      (a) => a.mimeType.startsWith("image/"),
-                                    ).length === 0 ? (
+                                        (a) => a.mimeType.startsWith("image/"),
+                                      ).length === 0 ? (
                                       <p className="text-sm text-muted-foreground text-center py-4">
                                         {tEditor("imageUpload.noImagesYet")}
                                       </p>
@@ -1754,16 +1753,11 @@ export default function ProjectsPage() {
               project={{
                 id: currentProject.id,
                 name: currentProject.name,
-                summary: (currentProject as { summary?: string | null }).summary ?? null,
+                summary:
+                  (currentProject as { summary?: string | null }).summary ??
+                  null,
                 metadata: projectMeta,
               }}
-            />
-          )}
-          {listSettingsProject && (
-            <ProjectSettingsDialog
-              open
-              onClose={() => setListSettingsProject(null)}
-              project={listSettingsProject}
             />
           )}
           <RenameDialog
@@ -1992,49 +1986,40 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projectsQuery.data.map((project) => {
               const isSelected = currentProjectId === project.id;
-              const meta = (project.metadata as Record<string, unknown> | null) ?? {};
+              const meta =
+                (project.metadata as Record<string, unknown> | null) ?? {};
               return (
-                <div key={project.id} className="group relative">
-                  <NoteCard
-                    node={{
+                <NoteCard
+                  key={project.id}
+                  node={{
+                    id: project.id,
+                    name: project.name,
+                    firstMediaId: meta.heroAttachmentId as
+                      | string
+                      | null
+                      | undefined,
+                  }}
+                  variant="compact"
+                  description={
+                    (project as { summary?: string | null }).summary ??
+                    undefined
+                  }
+                  isSelected={isSelected}
+                  onClick={async () => {
+                    await setCurrentProject(project.id);
+                    navigateToProjects();
+                  }}
+                  onSettings={() =>
+                    setListSettingsProject({
                       id: project.id,
                       name: project.name,
-                      firstMediaId: meta.heroAttachmentId as string | null | undefined,
-                    }}
-                    variant="compact"
-                    description={(project as { summary?: string | null }).summary ?? undefined}
-                    isSelected={isSelected}
-                    onClick={async () => {
-                      await setCurrentProject(project.id);
-                      navigateToProjects();
-                    }}
-                    onSettings={() =>
-                      setListSettingsProject({
-                        id: project.id,
-                        name: project.name,
-                        summary: (project as { summary?: string | null }).summary ?? null,
-                        metadata: meta,
-                      })
-                    }
-                  />
-                  {/* Delete button — bottom-left on hover */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openDeleteDialog({ id: project.id, name: project.name });
-                    }}
-                    className={cn(
-                      "absolute bottom-3 left-3 z-10",
-                      "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium",
-                      "border border-input bg-background/90 backdrop-blur-sm",
-                      "hover:bg-destructive hover:text-destructive-foreground hover:border-destructive",
-                      "opacity-0 group-hover:opacity-100 transition-all",
-                    )}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                    {tCommon("delete")}
-                  </button>
-                </div>
+                      summary:
+                        (project as { summary?: string | null }).summary ??
+                        null,
+                      metadata: meta,
+                    })
+                  }
+                />
               );
             })}
           </div>
@@ -2277,6 +2262,21 @@ export default function ProjectsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {listSettingsProject && (
+          <ProjectSettingsDialog
+            open
+            onClose={() => setListSettingsProject(null)}
+            project={listSettingsProject}
+            onDelete={() => {
+              setListSettingsProject(null);
+              openDeleteDialog({
+                id: listSettingsProject.id,
+                name: listSettingsProject.name,
+              });
+            }}
+          />
         )}
       </div>
     </>
