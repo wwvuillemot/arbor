@@ -132,7 +132,7 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
       <form
         id="agent-mode-form"
         onSubmit={handleSubmit}
-        className="flex-1 overflow-hidden flex flex-col"
+        className="h-full overflow-hidden flex flex-col"
       >
         <Tabs
           defaultValue="overview"
