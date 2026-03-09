@@ -28,7 +28,7 @@ export async function buildSystemPromptWithContext({
       if (projectNode) {
         const descendants = await nodeService.getDescendants(projectId);
         const projectOutline = buildProjectOutline(descendants, projectId);
-        systemPrompt += `\n\n---\n## Current Project Context\n\nThe user is currently working in the project: **${projectNode.name}** (id: ${projectNode.id})\n\nProject structure:\n${projectOutline || "(empty project)"}\n\nWhen the user refers to "the project", "here", or "this context", they mean this project. Use the node IDs above when calling tools that require a projectId or parentId.`;
+        systemPrompt += `\n\n---\n## Current Project Context\n\nThe user is currently working in the project: **${projectNode.name}** (id: ${projectNode.id})\n\nProject structure (id, type, name):\n${projectOutline || "(empty project)"}\n\nWhen the user refers to "the project", "here", or "this context", they mean this project. Use the node IDs above when calling tools that require a projectId or parentId.\n\nIMPORTANT: If you already know a node's ID from the project structure above, call get_node_content(nodeId) directly — do NOT call list_nodes or search_nodes first. search_semantic and search_nodes return metadata only; always follow up with get_node_content to read full content.`;
       }
     } catch (error) {
       console.warn("⚠️ Failed to load project context:", error);
@@ -59,7 +59,7 @@ export async function buildSystemPromptWithContext({
       }
 
       if (contextSections.length > 0) {
-        systemPrompt += `\n\n---\n## Additional Context\n\nThe user has pinned the following nodes as context for this conversation:\n\n${contextSections.join("\n\n")}`;
+        systemPrompt += `\n\n---\n## Additional Context\n\nThe user has pinned the following nodes as context for this conversation. Their full content is already included below — you do NOT need to call get_node_content or any other tool to read them:\n\n${contextSections.join("\n\n")}`;
       }
     } catch (error) {
       console.warn("⚠️ Failed to load context nodes:", error);

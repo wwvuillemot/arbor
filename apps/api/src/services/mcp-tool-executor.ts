@@ -95,15 +95,32 @@ async function executeMoveNode(args: ToolArgs): Promise<unknown> {
   );
 }
 
+function stripNodeContent<T extends { content?: unknown }>(
+  node: T,
+): Omit<T, "content"> {
+  const { content: _content, ...rest } = node;
+  return rest;
+}
+
+async function executeGetNode(args: ToolArgs): Promise<unknown> {
+  const nodeId = getRequiredStringArg(args, "nodeId");
+  const node = await nodeService.getNodeById(nodeId);
+  if (!node) {
+    return { error: `Node ${nodeId} not found` };
+  }
+  return stripNodeContent(node);
+}
+
 async function executeListNodes(args: ToolArgs): Promise<unknown> {
   const parentId = getListParentId(args);
   const nodeType = getOptionalNodeTypeArg(args, "type");
 
   if (parentId) {
     const childNodes = await nodeService.getNodesByParentId(parentId);
-    return nodeType
+    const filtered = nodeType
       ? childNodes.filter((childNode) => childNode.type === nodeType)
       : childNodes;
+    return filtered.map(stripNodeContent);
   }
 
   const conditions: SQL<unknown>[] = [isNull(nodes.parentId)];
@@ -111,11 +128,13 @@ async function executeListNodes(args: ToolArgs): Promise<unknown> {
     conditions.push(eq(nodes.type, nodeType));
   }
 
-  return await db
+  const results = await db
     .select()
     .from(nodes)
     .where(and(...conditions))
     .orderBy(asc(nodes.position));
+
+  return results.map(stripNodeContent);
 }
 
 async function executeSearchNodes(args: ToolArgs): Promise<unknown> {
@@ -130,15 +149,16 @@ async function executeSearchNodes(args: ToolArgs): Promise<unknown> {
     conditions.push(eq(nodes.type, nodeType));
   }
 
-  if (conditions.length === 0) {
-    return await db.select().from(nodes).limit(MAX_NODE_SEARCH_RESULTS);
-  }
+  const results =
+    conditions.length === 0
+      ? await db.select().from(nodes).limit(MAX_NODE_SEARCH_RESULTS)
+      : await db
+          .select()
+          .from(nodes)
+          .where(and(...conditions))
+          .limit(MAX_NODE_SEARCH_RESULTS);
 
-  return await db
-    .select()
-    .from(nodes)
-    .where(and(...conditions))
-    .limit(MAX_NODE_SEARCH_RESULTS);
+  return results.map(stripNodeContent);
 }
 
 async function executeSearchSemantic(args: ToolArgs): Promise<unknown> {
@@ -154,7 +174,7 @@ async function executeSearchSemantic(args: ToolArgs): Promise<unknown> {
   );
 
   return searchResults.map((searchResult) => ({
-    ...searchResult.node,
+    ...stripNodeContent(searchResult.node),
     score: searchResult.score,
   }));
 }
@@ -280,6 +300,8 @@ async function executeTool(
       return await executeDeleteNode(args);
     case "move_node":
       return await executeMoveNode(args);
+    case "get_node":
+      return await executeGetNode(args);
     case "list_nodes":
       return await executeListNodes(args);
     case "search_nodes":

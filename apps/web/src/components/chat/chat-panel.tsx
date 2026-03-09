@@ -21,6 +21,90 @@ import { ModelSelector } from "./model-selector";
 import { AgentModeSelector } from "./agent-mode-selector";
 import { McpToolsPanel } from "./mcp-tools-panel";
 
+const COMPACTION_THRESHOLD = 24_000;
+
+function ContextWindowIndicator({ messages }: { messages: ChatMessageData[] }) {
+  const [showTooltip, setShowTooltip] = React.useState(false);
+
+  const estimatedChars = messages.reduce((total, msg) => {
+    const contentChars =
+      typeof msg.content === "string" ? msg.content.length : 0;
+    const toolCallChars = msg.toolCalls
+      ? JSON.stringify(msg.toolCalls).length
+      : 0;
+    return total + contentChars + toolCallChars;
+  }, 0);
+
+  const ratio = Math.min(estimatedChars / COMPACTION_THRESHOLD, 1);
+  const pct = Math.round(ratio * 100);
+
+  const size = 16;
+  const radius = 6;
+  const cx = size / 2;
+  const cy = size / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - ratio);
+
+  const strokeColor =
+    ratio < 0.5
+      ? "#94a3b8"
+      : ratio < 0.75
+        ? "#eab308"
+        : ratio < 0.9
+          ? "#f97316"
+          : "#ef4444";
+
+  const statusLabel =
+    ratio < 0.5
+      ? "Context usage normal"
+      : ratio < 0.75
+        ? "Context filling up"
+        : ratio < 0.9
+          ? "Compaction will trigger soon"
+          : "Compacting context…";
+
+  return (
+    <div
+      className="relative ml-auto flex-shrink-0"
+      onMouseEnter={() => setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <svg width={size} height={size} className="opacity-70">
+        <circle
+          cx={cx}
+          cy={cy}
+          r={radius}
+          fill="none"
+          stroke="#94a3b8"
+          strokeWidth={2}
+          opacity={0.2}
+        />
+        <circle
+          cx={cx}
+          cy={cy}
+          r={radius}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={2}
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${cx} ${cy})`}
+        />
+      </svg>
+      {showTooltip && (
+        <div className="absolute bottom-full right-0 mb-2 whitespace-nowrap text-xs bg-popover border rounded shadow-md px-2 py-1.5 z-50 space-y-0.5">
+          <div className="font-medium">
+            ~{estimatedChars.toLocaleString()} /{" "}
+            {COMPACTION_THRESHOLD.toLocaleString()} chars ({pct}%)
+          </div>
+          <div className="text-muted-foreground">{statusLabel}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export interface ChatPanelProps {
   className?: string;
   showThreadSidebar?: boolean;
@@ -69,6 +153,9 @@ export function ChatPanel({
   const [pendingMessage, setPendingMessage] = React.useState<string | null>(
     null,
   );
+  // Tracks whether a sendMessage mutation is in-flight so the messages query
+  // can poll for live tool-call updates without a forward-reference to sendMessage.
+  const [isAwaitingResponse, setIsAwaitingResponse] = React.useState(false);
 
   // Save selected thread ID to localStorage whenever it changes
   React.useEffect(() => {
@@ -112,7 +199,12 @@ export function ChatPanel({
 
   const messagesQuery = trpc.chat.getMessages.useQuery(
     { threadId: selectedThreadId! },
-    { enabled: !!selectedThreadId, refetchOnWindowFocus: false },
+    {
+      enabled: !!selectedThreadId,
+      refetchOnWindowFocus: false,
+      // Poll while a message is being processed so tool results appear live.
+      refetchInterval: isAwaitingResponse ? 2000 : false,
+    },
   );
 
   // ─── Mutations ───────────────────────────────────────────────────────
@@ -138,12 +230,14 @@ export function ChatPanel({
 
   const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: () => {
+      setIsAwaitingResponse(false);
       messagesQuery.refetch();
       // Invalidate node cache so UI reflects any node changes made by LLM tools
       utils.nodes.getById.invalidate();
       utils.nodes.getChildren.invalidate();
     },
     onError: (error) => {
+      setIsAwaitingResponse(false);
       addToast(error.message || t("error"), "error");
     },
   });
@@ -158,14 +252,18 @@ export function ChatPanel({
     }
   }, [messagesQuery.data, sendMessage.isPending]);
 
-  // ─── Sync model selector with current thread ────────────────────────
+  // ─── Sync selectors with current thread ─────────────────────────────
   React.useEffect(() => {
     if (selectedThreadId && threadsQuery.data) {
       const currentThread = threadsQuery.data.find(
-        (t: { id: string; model?: string | null }) => t.id === selectedThreadId,
+        (t: { id: string; model?: string | null; agentMode?: string }) =>
+          t.id === selectedThreadId,
       );
       if (currentThread) {
         setSelectedModel(currentThread.model ?? null);
+        if (currentThread.agentMode) {
+          setAgentMode(currentThread.agentMode);
+        }
       }
     }
   }, [selectedThreadId, threadsQuery.data]);
@@ -174,11 +272,26 @@ export function ChatPanel({
   const handleModelChange = React.useCallback(
     (modelId: string | null) => {
       setSelectedModel(modelId);
-      // If a thread is selected, update its model in the database
+      if (selectedThreadId) {
+        updateThread.mutate({ id: selectedThreadId, model: modelId });
+      }
+    },
+    [selectedThreadId, updateThread],
+  );
+
+  // ─── Update thread agent mode when changed ───────────────────────────
+  const handleAgentModeChange = React.useCallback(
+    (mode: string) => {
+      setAgentMode(mode);
       if (selectedThreadId) {
         updateThread.mutate({
           id: selectedThreadId,
-          model: modelId,
+          agentMode: mode as
+            | "assistant"
+            | "planner"
+            | "editor"
+            | "researcher"
+            | "art_director",
         });
       }
     },
@@ -189,6 +302,7 @@ export function ChatPanel({
   React.useEffect(() => {
     // If we have a pending message and a thread was just created, send it
     if (pendingMessage && selectedThreadId && masterKey) {
+      setIsAwaitingResponse(true);
       sendMessage.mutate({
         threadId: selectedThreadId,
         content: pendingMessage,
@@ -253,6 +367,7 @@ export function ChatPanel({
 
     const content = inputValue.trim();
     setInputValue(""); // Clear immediately so the input feels responsive
+    setIsAwaitingResponse(true);
     sendMessage.mutate({
       threadId: selectedThreadId,
       content,
@@ -284,8 +399,37 @@ export function ChatPanel({
   );
 
   const threads = threadsQuery.data ?? [];
-  const messages: ChatMessageData[] = (messagesQuery.data ?? []).map(
-    (msg: Record<string, unknown>) => ({
+  const rawMessages = (messagesQuery.data ?? []) as Record<string, unknown>[];
+
+  // Mirror the server's compaction logic: measure only messages accumulated
+  // SINCE the last summary (the summary itself is fixed overhead, not counted).
+  let lastSummaryIdx = -1;
+  for (let i = rawMessages.length - 1; i >= 0; i--) {
+    const meta = rawMessages[i]?.metadata as Record<string, unknown> | null;
+    if (meta?.isSummary === true) {
+      lastSummaryIdx = i;
+      break;
+    }
+  }
+  // +1 to skip the summary message itself — same as server-side logic
+  const effectiveRawMessages =
+    lastSummaryIdx >= 0 ? rawMessages.slice(lastSummaryIdx + 1) : rawMessages;
+
+  const messages: ChatMessageData[] = rawMessages.map((msg) => ({
+    id: msg.id as string,
+    role: msg.role as string,
+    content: (msg.content as string) ?? null,
+    model: (msg.model as string) ?? null,
+    tokensUsed: (msg.tokensUsed as number) ?? null,
+    toolCalls: msg.toolCalls,
+    toolName: (msg.metadata as Record<string, unknown> | null)?.toolName as
+      | string
+      | undefined,
+    createdAt: (msg.createdAt as string) ?? new Date().toISOString(),
+  }));
+
+  const effectiveMessages: ChatMessageData[] = effectiveRawMessages.map(
+    (msg) => ({
       id: msg.id as string,
       role: msg.role as string,
       content: (msg.content as string) ?? null,
@@ -578,10 +722,18 @@ export function ChatPanel({
           {/* Selectors row */}
           <div className="flex items-center gap-2">
             {/* Agent mode selector */}
-            <AgentModeSelector value={agentMode} onChange={setAgentMode} />
+            <AgentModeSelector
+              value={agentMode}
+              onChange={handleAgentModeChange}
+            />
 
             {/* Model selector */}
             <ModelSelector value={selectedModel} onChange={handleModelChange} />
+
+            {/* Context window usage indicator — counts only effective (post-compaction) messages */}
+            {selectedThreadId && effectiveMessages.length > 0 && (
+              <ContextWindowIndicator messages={effectiveMessages} />
+            )}
           </div>
         </div>
       </div>

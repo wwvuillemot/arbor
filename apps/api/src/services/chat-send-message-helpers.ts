@@ -139,11 +139,15 @@ export function sanitizeMessageHistory(
 
 export function estimateMessageCharacters(messages: LLMChatMessage[]): number {
   return messages.reduce((totalCharacters, message) => {
-    if (typeof message.content !== "string") {
-      return totalCharacters;
-    }
-
-    return totalCharacters + message.content.length;
+    // Count string content
+    const contentChars =
+      typeof message.content === "string" ? message.content.length : 0;
+    // Also count serialised tool calls (assistant messages may have null content
+    // but carry large tool-call payloads that consume context tokens)
+    const toolCallChars = message.toolCalls
+      ? JSON.stringify(message.toolCalls).length
+      : 0;
+    return totalCharacters + contentChars + toolCallChars;
   }, 0);
 }
 

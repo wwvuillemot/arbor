@@ -29,6 +29,8 @@ export async function seedAgentModes() {
       isBuiltIn: true,
     }));
 
+    // onConflictDoNothing: existing modes are left untouched, preserving
+    // any user edits made via Settings. New built-in modes are inserted.
     const result = await db
       .insert(schema.agentModes)
       .values(rows)

@@ -103,8 +103,15 @@ export function buildMcpToolDefinitions(): ToolDefinition[] {
       ),
     ),
     createFunctionTool(
+      "get_node",
+      "Get metadata for a single node by ID (id, name, type, parentId, position, metadata). Does NOT return content — use get_node_content to read the full text.",
+      createObjectSchema({ nodeId: createStringProperty("UUID of the node") }, [
+        "nodeId",
+      ]),
+    ),
+    createFunctionTool(
       "list_nodes",
-      "List child nodes of a parent, optionally filtered by type. Omit parentId (or pass null) to list all top-level nodes (projects).",
+      "List child nodes of a parent, optionally filtered by type. Returns metadata only (no content). Omit parentId (or pass null) to list all top-level nodes (projects).",
       createObjectSchema(
         {
           parentId: createStringProperty(
@@ -119,7 +126,7 @@ export function buildMcpToolDefinitions(): ToolDefinition[] {
     ),
     createFunctionTool(
       "search_nodes",
-      "Search for nodes by name and/or type",
+      "Search for nodes by name and/or type. Returns metadata only (no content) — call get_node_content with the returned id to read full text.",
       createObjectSchema(
         {
           query: createStringProperty("Search query for node names (optional)"),
@@ -132,7 +139,7 @@ export function buildMcpToolDefinitions(): ToolDefinition[] {
     ),
     createFunctionTool(
       "search_semantic",
-      "Search nodes using keyword matching across names and content",
+      "Search nodes using keyword matching across names and content. Returns metadata only (no content) — call get_node_content with the returned id to read full text.",
       createObjectSchema(
         {
           query: createStringProperty("Search query"),

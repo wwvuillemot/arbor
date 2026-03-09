@@ -44,7 +44,25 @@ export class ChatSendMessageService {
       throw new Error("Thread not found");
     }
 
-    const history = await this.dependencies.chatService.getMessages(threadId);
+    const fullHistory =
+      await this.dependencies.chatService.getMessages(threadId);
+
+    // If a previous compaction saved a summary message, use only that summary
+    // and everything after it — the messages before it were already summarized
+    // and should not be re-sent to the LLM.
+    let lastSummaryIdx = -1;
+    for (let i = fullHistory.length - 1; i >= 0; i--) {
+      if (
+        (fullHistory[i]!.metadata as Record<string, unknown> | null)
+          ?.isSummary === true
+      ) {
+        lastSummaryIdx = i;
+        break;
+      }
+    }
+    const history =
+      lastSummaryIdx >= 0 ? fullHistory.slice(lastSummaryIdx) : fullHistory;
+
     const agentModeConfig = await this.dependencies.getAgentModeConfig(
       thread.agentMode,
     );
@@ -60,6 +78,13 @@ export class ChatSendMessageService {
       projectId,
       contextNodeIds,
     });
+    // Persist user message immediately so it appears in the UI before the LLM responds.
+    const userMessage = await this.dependencies.chatService.addMessage({
+      threadId,
+      role: "user",
+      content,
+    });
+
     const rawMessages = history.map((message) => toLlmMessage(message));
     let llmMessages = sanitizeMessageHistory(rawMessages);
     llmMessages.push({ role: "user", content });
@@ -120,12 +145,6 @@ export class ChatSendMessageService {
       throw error;
     }
 
-    const userMessage = await this.dependencies.chatService.addMessage({
-      threadId,
-      role: "user",
-      content,
-    });
-
     const finalResponse = await runChatToolLoop({
       initialResponse: response,
       llmMessages,
@@ -178,10 +197,24 @@ export class ChatSendMessageService {
       (message) => message.role !== "system",
     );
 
+    // If the first non-system message is a prior summary, measure only the
+    // messages that have accumulated SINCE that summary (not the summary
+    // itself). This prevents re-compacting immediately after a compaction
+    // because the summary text alone pushes us over the threshold.
+    const firstMessage = nonSystemMessages[0];
+    const hasPriorSummary =
+      firstMessage?.role === "assistant" &&
+      typeof firstMessage.content === "string" &&
+      firstMessage.content.startsWith("[Context summary");
+
+    const messagesToMeasure = hasPriorSummary
+      ? nonSystemMessages.slice(1)
+      : nonSystemMessages;
+
     const shouldCompactContext =
-      estimateMessageCharacters(llmMessages) >
+      estimateMessageCharacters(messagesToMeasure) >
         CONTEXT_COMPACTION_CHAR_THRESHOLD &&
-      nonSystemMessages.length > CONTEXT_COMPACTION_KEEP_RECENT_MESSAGES + 2;
+      messagesToMeasure.length > CONTEXT_COMPACTION_KEEP_RECENT_MESSAGES + 2;
 
     if (!shouldCompactContext) {
       return llmMessages;
@@ -207,6 +240,9 @@ export class ChatSendMessageService {
         .map((message) => `${message.role}: ${message.content}`)
         .join("\n\n");
 
+      // Use no specific model for summarization so the provider picks its default
+      // (typically a non-reasoning, lower-cost model). This avoids doubling latency
+      // when the thread model is a slow reasoning model.
       const summaryResponse = await llmService.chat(
         [
           {
@@ -214,7 +250,7 @@ export class ChatSendMessageService {
             content: `Summarize this conversation concisely, preserving key facts, decisions, and context:\n\n${summarySourceText}`,
           },
         ],
-        { model: thread.model ?? undefined },
+        {},
       );
 
       const summaryMessage: LLMChatMessage = {

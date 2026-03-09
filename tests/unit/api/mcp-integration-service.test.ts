@@ -35,6 +35,7 @@ describe("mcp-integration-service", () => {
       "update_node",
       "delete_node",
       "move_node",
+      "get_node",
       "list_nodes",
       "search_nodes",
       "search_semantic",

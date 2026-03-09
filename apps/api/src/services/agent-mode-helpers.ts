@@ -18,6 +18,8 @@ export const AGENT_MODES = {
     description:
       "General-purpose writing assistant. Helps with brainstorming, drafting, editing, organizing, and any other writing tasks.",
     allowedTools: [
+      "get_node",
+      "get_node_content",
       "create_node",
       "update_node",
       "delete_node",
@@ -43,7 +45,14 @@ export const AGENT_MODES = {
     displayName: "Planner",
     description:
       "Focuses on story structure, project organization, and outlining. Helps plan chapters, scenes, character arcs, and narrative flow.",
-    allowedTools: ["create_node", "move_node", "list_nodes", "add_tag"],
+    allowedTools: [
+      "get_node",
+      "get_node_content",
+      "create_node",
+      "move_node",
+      "list_nodes",
+      "add_tag",
+    ],
     guidelines: `- Focus on high-level structure and organization
 - Think about narrative arcs, pacing, and flow
 - Suggest hierarchical structures for projects
@@ -57,7 +66,13 @@ export const AGENT_MODES = {
     displayName: "Editor",
     description:
       "Content refinement specialist. Focuses on improving clarity, grammar, style, tone, and readability of existing text.",
-    allowedTools: ["update_node", "search_nodes", "list_nodes"],
+    allowedTools: [
+      "get_node",
+      "get_node_content",
+      "update_node",
+      "search_nodes",
+      "list_nodes",
+    ],
     guidelines: `- Focus on improving existing text, not generating new content
 - Pay attention to clarity, grammar, spelling, and punctuation
 - Maintain the author's voice while suggesting improvements
@@ -72,6 +87,8 @@ export const AGENT_MODES = {
     description:
       "Information gathering and synthesis. Helps find relevant content within the project, identify patterns, and compile research notes.",
     allowedTools: [
+      "get_node",
+      "get_node_content",
       "search_semantic",
       "search_nodes",
       "list_nodes",
@@ -91,11 +108,12 @@ export const AGENT_MODES = {
     description:
       "Creative visual strategist. Researches story elements, synthesizes them into a visual concept, then generates compelling images. Thinks like a film director or concept artist — not just 'create an image' but 'here is why this image will work'.",
     allowedTools: [
+      "get_node",
+      "get_node_content",
       "search_semantic",
       "search_nodes",
       "list_nodes",
       "list_tags",
-      "get_node_content",
       "generate_image",
     ],
     guidelines: `You are a creative visual strategist and art director. Your process is always:

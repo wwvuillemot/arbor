@@ -1566,7 +1566,9 @@ export default function ProjectsPage() {
                           content={parsed}
                           nodeId={selectedNodeId ?? undefined}
                           editable={isNoteEditing}
-                          onChange={isNoteEditing ? setEditorContent : undefined}
+                          onChange={
+                            isNoteEditing ? setEditorContent : undefined
+                          }
                           editorRef={editorInstanceRef}
                           onInsertImage={
                             isNoteEditing

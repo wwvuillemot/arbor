@@ -26,10 +26,25 @@ export interface MarkdownEditorProps {
   minHeight?: string;
 }
 
+// Convert a plain-text string (with \n newlines) to TipTap's JSON doc format.
+// Each line becomes a paragraph node; empty lines become empty paragraphs.
+// This preserves newlines on round-trip since TipTap parses strings as HTML
+// where \n is treated as whitespace and collapsed.
+function plainTextToDoc(text: string) {
+  const lines = text.split("\n");
+  return {
+    type: "doc",
+    content: lines.map((line) => ({
+      type: "paragraph",
+      content: line.length > 0 ? [{ type: "text", text: line }] : [],
+    })),
+  };
+}
+
 /**
  * Reusable TipTap-based markdown editor with live formatting
  * - Shows formatted content as you type
- * - Persists as markdown text on the backend
+ * - Persists as plain text on the backend (newlines preserved)
  * - Includes toolbar for formatting
  */
 export function MarkdownEditor({
@@ -44,7 +59,6 @@ export function MarkdownEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
-        // Enable markdown shortcuts
         heading: {
           levels: [1, 2, 3],
         },
@@ -53,7 +67,7 @@ export function MarkdownEditor({
         placeholder,
       }),
     ],
-    content: value,
+    content: plainTextToDoc(value),
     editorProps: {
       attributes: {
         class: cn("prose prose-sm max-w-none focus:outline-none", "px-3 py-2"),
@@ -61,16 +75,15 @@ export function MarkdownEditor({
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
-      // Get plain text from editor (markdown format)
-      const markdown = currentEditor.getText();
-      onChange(markdown);
+      onChange(currentEditor.getText({ blockSeparator: "\n" }));
     },
   });
 
-  // Sync content when value changes externally
+  // Sync content when value changes externally (e.g. dialog reset)
   React.useEffect(() => {
-    if (editor && value !== editor.getText()) {
-      editor.commands.setContent(value);
+    if (!editor) return;
+    if (value !== editor.getText({ blockSeparator: "\n" })) {
+      editor.commands.setContent(plainTextToDoc(value), false);
     }
   }, [editor, value]);
 
