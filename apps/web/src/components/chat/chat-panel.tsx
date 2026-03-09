@@ -139,7 +139,6 @@ export function ChatPanel({
   const sendMessage = trpc.chat.sendMessage.useMutation({
     onSuccess: () => {
       messagesQuery.refetch();
-      setInputValue("");
       // Invalidate node cache so UI reflects any node changes made by LLM tools
       utils.nodes.getById.invalidate();
       utils.nodes.getChildren.invalidate();
@@ -252,9 +251,11 @@ export function ChatPanel({
       return;
     }
 
+    const content = inputValue.trim();
+    setInputValue(""); // Clear immediately so the input feels responsive
     sendMessage.mutate({
       threadId: selectedThreadId,
-      content: inputValue.trim(),
+      content,
       masterKey,
       projectId: projectId ?? null,
       contextNodeIds: contextNodes.map((n) => n.id),
@@ -462,6 +463,22 @@ export function ChatPanel({
             </div>
           ) : (
             messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
+          )}
+          {/* Optimistic user message — shown immediately on submit */}
+          {sendMessage.isPending && sendMessage.variables?.content && (
+            <ChatMessage
+              key="optimistic-user"
+              message={{
+                id: "optimistic-user",
+                role: "user",
+                content: sendMessage.variables.content,
+                model: null,
+                tokensUsed: null,
+                toolCalls: undefined,
+                toolName: undefined,
+                createdAt: new Date().toISOString(),
+              }}
+            />
           )}
           {sendMessage.isPending && (
             <div className="flex gap-3 p-3 rounded-lg bg-green-50/50 dark:bg-green-950/20 border border-green-100 dark:border-green-900">
