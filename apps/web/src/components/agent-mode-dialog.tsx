@@ -146,9 +146,9 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-hidden flex flex-col min-h-0">
             {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-6 mt-0">
+            <TabsContent value="overview" className="flex-1 overflow-y-auto p-6 space-y-6 mt-0">
               {/* Name (only for create) */}
               {!isEditing && (
                 <div>
@@ -334,30 +334,39 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
                   not support temperature control and will ignore this setting.
                 </p>
               </div>
+              {error && (
+                <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
             </TabsContent>
 
-            {/* Guidelines Tab */}
-            <TabsContent value="guidelines" className="space-y-4 mt-0">
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  {t("form.guidelines")}{" "}
-                  <span className="text-destructive">*</span>
-                </label>
-                <MarkdownEditor
-                  value={guidelines}
-                  onChange={setGuidelines}
-                  placeholder={t("form.guidelinesPlaceholder")}
-                  required
-                  minHeight="400px"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {t("form.guidelinesHint")}
-                </p>
-              </div>
+            {/* Guidelines Tab — fills height, editor scrolls internally */}
+            <TabsContent value="guidelines" className="flex-1 flex flex-col p-6 pt-4 gap-2 mt-0 min-h-0">
+              <label className="flex-shrink-0 block text-sm font-medium">
+                {t("form.guidelines")}{" "}
+                <span className="text-destructive">*</span>
+              </label>
+              <MarkdownEditor
+                value={guidelines}
+                onChange={setGuidelines}
+                placeholder={t("form.guidelinesPlaceholder")}
+                required
+                className="flex-1 min-h-0"
+                minHeight="0px"
+              />
+              <p className="flex-shrink-0 text-xs text-muted-foreground">
+                {t("form.guidelinesHint")}
+              </p>
+              {error && (
+                <div className="flex-shrink-0 rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive">
+                  {error}
+                </div>
+              )}
             </TabsContent>
 
             {/* Tools Tab */}
-            <TabsContent value="tools" className="space-y-4 mt-0">
+            <TabsContent value="tools" className="flex-1 overflow-y-auto p-6 space-y-4 mt-0">
               <div>
                 <label className="block text-sm font-medium mb-2">
                   {t("form.allowedTools")}
@@ -367,14 +376,13 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
                   {t("form.allowedToolsHint")}
                 </p>
               </div>
+              {error && (
+                <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive mt-4">
+                  {error}
+                </div>
+              )}
             </TabsContent>
 
-            {/* Error Message */}
-            {error && (
-              <div className="rounded-md bg-destructive/10 border border-destructive/50 p-3 text-sm text-destructive mt-4">
-                {error}
-              </div>
-            )}
           </div>
         </Tabs>
       </form>
