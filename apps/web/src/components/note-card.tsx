@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import { Pencil, Star, FolderTree, Settings, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HeroGradient } from "@/components/hero-gradient";
-import { extractHeroImage, tiptapToMarkdown } from "@/lib/tiptap-utils";
+import { extractHeroImageData, tiptapToMarkdown } from "@/lib/tiptap-utils";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
 
 export interface NoteCardTag {
@@ -21,6 +21,9 @@ export interface NoteCardNode {
   metadata?: unknown;
   /** ID of the first image attachment — used as hero if provided */
   firstMediaId?: string | null;
+  /** Focal point for the hero image (0–100). Defaults to 50/50. */
+  heroFocalX?: number | null;
+  heroFocalY?: number | null;
 }
 
 export interface NoteCardProps {
@@ -45,6 +48,8 @@ export interface NoteCardProps {
   description?: string;
 }
 
+const MAX_TILT = 4; // degrees
+
 export function NoteCard({
   node,
   onClick,
@@ -56,13 +61,48 @@ export function NoteCard({
   isSelected,
   description,
 }: NoteCardProps) {
-  const heroImage = React.useMemo(
-    () =>
-      node.firstMediaId
-        ? getMediaAttachmentUrl(node.firstMediaId)
-        : extractHeroImage(node.content),
-    [node.firstMediaId, node.content],
-  );
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  const [tilt, setTilt] = React.useState({ x: 0, y: 0 });
+  const [sheenKey, setSheenKey] = React.useState(0);
+  const [isHovered, setIsHovered] = React.useState(false);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    setSheenKey((k) => k + 1); // restart animation each entry
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const card = cardRef.current;
+    if (!card) return;
+    const { left, top, width, height } = card.getBoundingClientRect();
+    const px = (e.clientX - left) / width; // 0–1
+    const py = (e.clientY - top) / height; // 0–1
+    setTilt({
+      x: (py - 0.5) * -MAX_TILT * 2, // tilt up when cursor is near top
+      y: (px - 0.5) * MAX_TILT * 2, // tilt right when cursor is near right
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+    setIsHovered(false);
+  };
+
+  const { heroImage, focalX, focalY } = React.useMemo(() => {
+    if (node.firstMediaId) {
+      return {
+        heroImage: getMediaAttachmentUrl(node.firstMediaId),
+        focalX: node.heroFocalX ?? 50,
+        focalY: node.heroFocalY ?? 50,
+      };
+    }
+    const data = extractHeroImageData(node.content);
+    return {
+      heroImage: data?.url ?? null,
+      focalX: data?.focalX ?? 50,
+      focalY: data?.focalY ?? 50,
+    };
+  }, [node.firstMediaId, node.heroFocalX, node.heroFocalY, node.content]);
 
   const preview = React.useMemo(
     () =>
@@ -79,20 +119,59 @@ export function NoteCard({
 
   return (
     <div
+      ref={cardRef}
       className={cn(
-        "group rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow",
+        "group rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden cursor-pointer",
+        "transition-[transform,box-shadow] duration-200 ease-out",
         isSelected && "ring-2 ring-green-500 border-green-500",
       )}
+      style={{
+        transform: `perspective(800px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${tilt.x || tilt.y ? 1.01 : 1})`,
+        boxShadow:
+          tilt.x || tilt.y
+            ? "0 8px 24px rgba(0,0,0,0.15)"
+            : "0 1px 3px rgba(0,0,0,0.08)",
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
       onClick={onClick}
     >
       {/* Hero */}
-      <div className={cn("w-full relative", heroHeight)}>
+      <div className={cn("w-full relative overflow-hidden", heroHeight)}>
         <HeroGradient
           seed={node.name}
           imageUrl={heroImage}
           imageAlt={node.name}
+          focalX={focalX}
+          focalY={focalY}
           className="w-full h-full"
         />
+
+        {/* Sheen sweep — one-shot diagonal highlight on hover entry.
+            sheenKey change forces remount of the animated element so the
+            keyframe restarts from scratch on each hover entry. */}
+        {isHovered ? (
+          <React.Fragment key={sheenKey}>
+            <div
+              className="absolute inset-0 pointer-events-none overflow-hidden"
+              aria-hidden
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  width: "70%",
+                  background:
+                    "linear-gradient(105deg, transparent 5%, rgba(255,255,255,0.32) 35%, rgba(255,255,255,0.48) 50%, rgba(255,255,255,0.32) 65%, transparent 95%)",
+                  animation: "card-sheen 0.55s ease-out forwards",
+                }}
+              />
+            </div>
+          </React.Fragment>
+        ) : null}
 
         {/* Settings cog — top-right, always shown on hover */}
         {onSettings && (
@@ -108,7 +187,7 @@ export function NoteCard({
           </button>
         )}
 
-        {/* Favorite star — top-right when no settings, top-left when settings present */}
+        {/* Favorite star */}
         {onToggleFavorite && (
           <button
             onClick={(e) => {

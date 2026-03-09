@@ -6,7 +6,7 @@ import { Mark, mergeAttributes } from "@tiptap/core";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
-import Image from "@tiptap/extension-image";
+import { ResizableImage } from "./resizable-image";
 import Link from "@tiptap/extension-link";
 import { trpc } from "@/lib/trpc";
 import { EditorToolbar } from "./editor-toolbar";
@@ -365,10 +365,7 @@ export function TiptapEditor({
       Placeholder.configure({
         placeholder: placeholderText,
       }),
-      Image.configure({
-        inline: false,
-        allowBase64: false,
-      }),
+      ResizableImage,
     ],
     content: renderedContent ?? undefined,
     editable,

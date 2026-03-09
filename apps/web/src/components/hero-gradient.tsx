@@ -11,6 +11,9 @@ interface HeroGradientProps {
   imageUrl?: string | null;
   /** Alt text for the image */
   imageAlt?: string;
+  /** Focal point for object-position (0–100). Defaults to 50/50 (center). */
+  focalX?: number;
+  focalY?: number;
   className?: string;
 }
 
@@ -27,6 +30,8 @@ export function HeroGradient({
   seed,
   imageUrl,
   imageAlt = "",
+  focalX = 50,
+  focalY = 50,
   className,
 }: HeroGradientProps) {
   if (imageUrl) {
@@ -36,6 +41,7 @@ export function HeroGradient({
         src={imageUrl}
         alt={imageAlt}
         className={cn("w-full h-full object-cover", className)}
+        style={{ objectPosition: `${focalX}% ${focalY}%` }}
       />
     );
   }

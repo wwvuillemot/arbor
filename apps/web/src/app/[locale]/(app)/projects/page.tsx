@@ -171,6 +171,21 @@ export default function ProjectsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeParam]);
 
+  // Update the URL when a node is selected so the page is deep-linkable and
+  // reloading restores the open node.
+  const navigateToNode = React.useCallback(
+    (nodeId: string | null) => {
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      if (nodeId) {
+        params.set("node", nodeId);
+      } else {
+        params.delete("node");
+      }
+      router.replace(`/projects?${params.toString()}`);
+    },
+    [router, searchParams],
+  );
+
   // Chat context nodes — files/folders the user has pinned to add to LLM context
   const [chatContextNodes, setChatContextNodes] = React.useState<
     { id: string; name: string; type: string }[]
@@ -526,7 +541,7 @@ export default function ProjectsPage() {
     onSuccess: (data) => {
       utils.nodes.getChildren.invalidate();
       // Auto-select the newly created node
-      setSelectedNodeId(data.id);
+      navigateToNode(data.id);
       // Expand the parent folder so the new node is visible
       if (data.parentId) {
         fileTreeRef.current?.expandNode(data.parentId);
@@ -563,7 +578,7 @@ export default function ProjectsPage() {
     onSuccess: (_, variables) => {
       utils.nodes.getChildren.invalidate();
       if (selectedNodeId === variables.id) {
-        setSelectedNodeId(null);
+        navigateToNode(null);
       }
       setNodeDeleteConfirm({ open: false, node: null });
       addToast(tFileTree("deleteSuccess"), "success");
@@ -1261,7 +1276,7 @@ export default function ProjectsPage() {
               ref={fileTreeRef}
               projectId={currentProjectId}
               selectedNodeId={selectedNodeId}
-              onSelectNode={setSelectedNodeId}
+              onSelectNode={navigateToNode}
               onContextMenu={(e, node) =>
                 setContextMenu({
                   open: true,
@@ -1468,7 +1483,7 @@ export default function ProjectsPage() {
                     <TagPicker
                       nodeId={selNode?.id}
                       projectId={currentProjectId}
-                      onNavigateToNode={(nodeId) => setSelectedNodeId(nodeId)}
+                      onNavigateToNode={navigateToNode}
                     />
                   </div>
                   {selNode?.type === "note" && (
@@ -1713,7 +1728,7 @@ export default function ProjectsPage() {
                         metadata: unknown;
                       }[]) ?? []
                     }
-                    onOpenNode={(nodeId) => setSelectedNodeId(nodeId)}
+                    onOpenNode={navigateToNode}
                     onToggleFavorite={handleToggleFavorite}
                   />
                 ) : (
@@ -1998,6 +2013,8 @@ export default function ProjectsPage() {
                       | string
                       | null
                       | undefined,
+                    heroFocalX: meta.heroFocalX as number | null | undefined,
+                    heroFocalY: meta.heroFocalY as number | null | undefined,
                   }}
                   variant="compact"
                   description={

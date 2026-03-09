@@ -47,6 +47,85 @@ export function parseStylePresets(sp: Record<string, unknown> | undefined): {
   return { presets: [], activePresetId: undefined };
 }
 
+// ── Focal Point Picker ────────────────────────────────────────────────────────
+
+function FocalPointPicker({
+  imageUrl,
+  focalX,
+  focalY,
+  onChange,
+  onClear,
+  clearLabel,
+  hint,
+}: {
+  imageUrl: string;
+  focalX: number;
+  focalY: number;
+  onChange: (x: number, y: number) => void;
+  onClear: () => void;
+  clearLabel: string;
+  hint: string;
+}) {
+  const imgRef = React.useRef<HTMLDivElement>(null);
+
+  const handlePointer = (e: React.MouseEvent) => {
+    const rect = imgRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = Math.round(
+      Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100)),
+    );
+    const y = Math.round(
+      Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100)),
+    );
+    onChange(x, y);
+  };
+
+  const handleDrag = (e: React.MouseEvent) => {
+    if (e.buttons !== 1) return;
+    handlePointer(e);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-muted-foreground">{hint}</p>
+      <div
+        ref={imgRef}
+        className="relative w-full h-48 rounded-md border overflow-hidden cursor-crosshair select-none"
+        onClick={handlePointer}
+        onMouseMove={handleDrag}
+      >
+        <img
+          src={imageUrl}
+          alt="Hero"
+          className="w-full h-full object-cover"
+          style={{ objectPosition: `${focalX}% ${focalY}%` }}
+          draggable={false}
+        />
+        {/* Focal point crosshair */}
+        <div
+          className="absolute w-5 h-5 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ left: `${focalX}%`, top: `${focalY}%` }}
+        >
+          <div className="absolute top-1/2 left-0 right-0 h-px bg-white shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
+          <div className="absolute left-1/2 top-0 bottom-0 w-px bg-white shadow-[0_0_2px_rgba(0,0,0,0.8)]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-[0_0_4px_rgba(0,0,0,0.6)]" />
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>
+          {focalX}% / {focalY}%
+        </span>
+        <button
+          onClick={onClear}
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          <X className="w-3 h-3" /> {clearLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Danger Zone ───────────────────────────────────────────────────────────────
 
 function DangerZone({
@@ -178,6 +257,12 @@ export function ProjectSettingsDialog({
   const currentHeroId =
     (project.metadata.heroAttachmentId as string | null) ?? null;
   const [heroId, setHeroId] = React.useState<string | null>(currentHeroId);
+  const [focalX, setFocalX] = React.useState<number>(
+    (project.metadata.heroFocalX as number | null) ?? 50,
+  );
+  const [focalY, setFocalY] = React.useState<number>(
+    (project.metadata.heroFocalY as number | null) ?? 50,
+  );
 
   const mediaQuery = trpc.media.getByNode.useQuery(
     { nodeId: project.id },
@@ -190,9 +275,30 @@ export function ProjectSettingsDialog({
     },
   });
 
+  const updateFocalMutation = trpc.nodes.update.useMutation({
+    onSuccess: () => {
+      utils.nodes.getAllProjects.invalidate();
+    },
+  });
+
   const handleSetHero = (attachmentId: string | null) => {
     setHeroId(attachmentId);
     setHeroMutation.mutate({ nodeId: project.id, attachmentId });
+  };
+
+  const handleFocalChange = (x: number, y: number) => {
+    setFocalX(x);
+    setFocalY(y);
+    updateFocalMutation.mutate({
+      id: project.id,
+      data: {
+        metadata: {
+          ...project.metadata,
+          heroFocalX: x,
+          heroFocalY: y,
+        },
+      },
+    });
   };
 
   // ── Style presets tab state ─────────────────────────────────────────────────
@@ -404,21 +510,18 @@ export function ProjectSettingsDialog({
                   {t("heroImageHint")}
                 </p>
 
-                {/* Current hero */}
+                {/* Current hero + focal point picker */}
                 {heroId && (
-                  <div className="relative inline-block mb-3">
-                    <img
-                      src={getMediaAttachmentUrl(heroId)}
-                      alt="Hero"
-                      className="h-32 w-64 object-cover rounded-md border"
+                  <div className="mb-4">
+                    <FocalPointPicker
+                      imageUrl={getMediaAttachmentUrl(heroId)}
+                      focalX={focalX}
+                      focalY={focalY}
+                      onChange={handleFocalChange}
+                      onClear={() => handleSetHero(null)}
+                      clearLabel={t("clearHero")}
+                      hint={t("focalPointHint")}
                     />
-                    <button
-                      onClick={() => handleSetHero(null)}
-                      className="absolute -top-2 -right-2 bg-background border rounded-full p-0.5 hover:bg-muted transition-colors"
-                      title={t("clearHero")}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
                   </div>
                 )}
 

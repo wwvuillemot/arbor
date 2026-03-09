@@ -49,6 +49,25 @@
   }
 }
 
+/* ── Card sheen sweep ───────────────────────────────────────────────────────
+   One-shot diagonal highlight that races across the hero on hover entry.
+   The overlay is translated from off-screen left to off-screen right while
+   clipped by the parent's overflow-hidden.
+   ────────────────────────────────────────────────────────────────────────── */
+@keyframes card-sheen {
+  0% {
+    transform: translateX(-150%) skewX(-20deg);
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(250%) skewX(-20deg);
+    opacity: 0;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

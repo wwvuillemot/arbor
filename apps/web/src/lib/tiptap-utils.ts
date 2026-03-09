@@ -2,17 +2,36 @@
  * Shared utilities for working with TipTap JSON documents on the client.
  */
 
-/** Recursively find the first image node's src in a TipTap doc. */
-export function extractHeroImage(content: unknown): string | null {
+export interface HeroImageData {
+  url: string;
+  focalX: number;
+  focalY: number;
+}
+
+/** Recursively find the first image node in a TipTap doc and return its src + focal point. */
+export function extractHeroImageData(content: unknown): HeroImageData | null {
   if (!content || typeof content !== "object") return null;
   const node = content as Record<string, unknown>;
-  if (node.type === "image")
-    return (node.attrs as Record<string, string>)?.src ?? null;
+  if (node.type === "image") {
+    const attrs = (node.attrs as Record<string, unknown>) ?? {};
+    const url = (attrs.src as string) ?? null;
+    if (!url) return null;
+    return {
+      url,
+      focalX: typeof attrs.focalX === "number" ? attrs.focalX : 50,
+      focalY: typeof attrs.focalY === "number" ? attrs.focalY : 50,
+    };
+  }
   for (const child of (node.content as unknown[]) ?? []) {
-    const found = extractHeroImage(child);
+    const found = extractHeroImageData(child);
     if (found) return found;
   }
   return null;
+}
+
+/** Recursively find the first image node's src in a TipTap doc. */
+export function extractHeroImage(content: unknown): string | null {
+  return extractHeroImageData(content)?.url ?? null;
 }
 
 /** Convert a TipTap inline node to markdown text. */

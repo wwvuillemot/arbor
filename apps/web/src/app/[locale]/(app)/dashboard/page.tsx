@@ -155,6 +155,8 @@ export default function DashboardPage() {
                       | string
                       | null
                       | undefined,
+                    heroFocalX: meta.heroFocalX as number | null | undefined,
+                    heroFocalY: meta.heroFocalY as number | null | undefined,
                   }}
                   variant="compact"
                   description={
