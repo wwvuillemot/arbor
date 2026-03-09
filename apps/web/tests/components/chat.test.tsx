@@ -105,6 +105,13 @@ vi.mock("@/lib/trpc", () => {
 
   const mockTrpc = {
     chat: {
+      listAgentModes: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          error: null,
+        })),
+      },
       listThreads: {
         useQuery: vi.fn(() => ({
           data: mockThreads,

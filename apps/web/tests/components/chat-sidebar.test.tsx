@@ -16,6 +16,9 @@ vi.mock("@/contexts/toast-context", () => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     chat: {
+      listAgentModes: {
+        useQuery: vi.fn(() => ({ data: [], isLoading: false, error: null })),
+      },
       listThreads: {
         useQuery: vi.fn(() => ({
           data: [

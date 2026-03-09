@@ -489,6 +489,8 @@ describe("ProjectsPage Export", () => {
 
     render(<ProjectsPage />, { wrapper: TestWrapper });
 
+    // Switch to edit mode first so onInsertImage is wired up
+    fireEvent.click(screen.getByTestId("note-edit-toggle"));
     fireEvent.click(screen.getByTestId("tiptap-editor-insert-image"));
     expect(screen.getByTestId("image-upload-modal")).toBeInTheDocument();
 

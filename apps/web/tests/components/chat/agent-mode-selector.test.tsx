@@ -6,6 +6,17 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { AgentModeSelector } from "@/components/chat/agent-mode-selector";
 
+// Mock trpc — AgentModeSelector fetches agent modes dynamically
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    chat: {
+      listAgentModes: {
+        useQuery: vi.fn(() => ({ data: [], isLoading: false, error: null })),
+      },
+    },
+  },
+}));
+
 // Mock next-intl
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => {

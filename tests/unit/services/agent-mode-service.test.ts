@@ -33,9 +33,11 @@ describe("AGENT_MODES", () => {
     ]);
   });
 
-  it("assistant mode should allow all 12 tools", () => {
+  it("assistant mode should allow all tools", () => {
     const assistantTools = AGENT_MODES.assistant.allowedTools;
-    expect(assistantTools).toHaveLength(12);
+    expect(assistantTools).toHaveLength(14);
+    expect(assistantTools).toContain("get_node");
+    expect(assistantTools).toContain("get_node_content");
     expect(assistantTools).toContain("create_node");
     expect(assistantTools).toContain("update_node");
     expect(assistantTools).toContain("delete_node");
@@ -53,6 +55,8 @@ describe("AGENT_MODES", () => {
   it("planner mode should only allow structural tools", () => {
     const plannerTools = AGENT_MODES.planner.allowedTools;
     expect(plannerTools).toEqual([
+      "get_node",
+      "get_node_content",
       "create_node",
       "move_node",
       "list_nodes",
@@ -62,12 +66,20 @@ describe("AGENT_MODES", () => {
 
   it("editor mode should only allow content refinement tools", () => {
     const editorTools = AGENT_MODES.editor.allowedTools;
-    expect(editorTools).toEqual(["update_node", "search_nodes", "list_nodes"]);
+    expect(editorTools).toEqual([
+      "get_node",
+      "get_node_content",
+      "update_node",
+      "search_nodes",
+      "list_nodes",
+    ]);
   });
 
   it("researcher mode should only allow research tools", () => {
     const researcherTools = AGENT_MODES.researcher.allowedTools;
     expect(researcherTools).toEqual([
+      "get_node",
+      "get_node_content",
       "search_semantic",
       "search_nodes",
       "list_nodes",
