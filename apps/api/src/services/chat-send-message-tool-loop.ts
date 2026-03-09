@@ -25,6 +25,7 @@ interface RunChatToolLoopParams {
   tools: ToolDefinition[];
   chatService: ChatPersistenceService;
   executeMcpTool: ChatSendMessageDependencies["executeMcpTool"];
+  masterKey?: string;
 }
 
 function buildToolErrorResult(toolName: string, error: unknown): string {
@@ -46,6 +47,7 @@ export async function runChatToolLoop({
   tools,
   chatService,
   executeMcpTool,
+  masterKey,
 }: RunChatToolLoopParams): Promise<ChatResponse & { totalIterations: number }> {
   let iteration = 0;
   let finalResponse = initialResponse;
@@ -90,6 +92,7 @@ export async function runChatToolLoop({
         const toolResult = await executeMcpTool(
           toolCall.function.name,
           toolArguments,
+          masterKey,
         );
 
         console.log(`✅ Tool ${toolCall.function.name} executed successfully`);

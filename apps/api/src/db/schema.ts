@@ -115,6 +115,9 @@ export const nodes = pgTable(
       .default("human")
       .$type<AuthorType | null>(),
 
+    // Short project logline / description shown on the projects card grid
+    summary: text("summary"),
+
     // Vector embedding for semantic search (pgvector)
     // Dimensions: 1536 (OpenAI text-embedding-3-small default)
     // Nullable: not all nodes need embeddings (e.g., folders, projects)

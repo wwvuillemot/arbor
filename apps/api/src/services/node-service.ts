@@ -1,7 +1,7 @@
 import { db } from "../db/index";
-import { nodes } from "../db/schema";
+import { mediaAttachments, nodes } from "../db/schema";
 import type { NodeType, AuthorType, Node } from "../db/schema";
-import { eq, isNull, and, sql } from "drizzle-orm";
+import { eq, isNull, and, inArray, sql } from "drizzle-orm";
 import { ProvenanceService } from "./provenance-service";
 import {
   recordNodeCreated,
@@ -33,6 +33,7 @@ export interface CreateNodeParams {
   slug?: string;
   content?: any; // JSONB content (can be object, string, or null)
   metadata?: Record<string, any>;
+  summary?: string | null;
   authorType?: AuthorType; // DEPRECATED: Use createdBy/updatedBy instead
   position?: number; // Position for ordering siblings
   createdBy?: string; // Provenance: "user:{id}" or "llm:{model}"
@@ -44,6 +45,7 @@ export interface UpdateNodeParams {
   slug?: string;
   content?: any; // JSONB content (can be object, string, or null)
   metadata?: Record<string, any>;
+  summary?: string | null;
   authorType?: AuthorType; // DEPRECATED: Use updatedBy instead
   position?: number; // Position for ordering siblings
   updatedBy?: string; // Provenance: "user:{id}" or "llm:{model}"
@@ -133,6 +135,8 @@ export class NodeService {
 
   /**
    * Delete a node (cascade delete handled by database).
+   * Preserves media attachments that are still referenced elsewhere in the
+   * same project so stable /media/:id URLs do not break.
    * Optionally accepts deletedBy for provenance tracking.
    */
   async deleteNode(id: string, deletedBy?: string) {
@@ -144,9 +148,88 @@ export class NodeService {
         node: existing,
         deletedBy,
       });
+
+      await this.preserveReferencedAttachmentsBeforeDelete(existing);
     }
 
     await db.delete(nodes).where(eq(nodes.id, id));
+  }
+
+  private async preserveReferencedAttachmentsBeforeDelete(
+    nodeToDelete: Node,
+  ): Promise<void> {
+    if (nodeToDelete.type === "project") {
+      return;
+    }
+
+    const descendantNodes = await this.getDescendants(nodeToDelete.id);
+    const subtreeNodes = [nodeToDelete, ...descendantNodes];
+    const subtreeNodeIds = subtreeNodes.map((subtreeNode) => subtreeNode.id);
+
+    const attachmentsInSubtree = await db
+      .select()
+      .from(mediaAttachments)
+      .where(inArray(mediaAttachments.nodeId, subtreeNodeIds));
+
+    if (attachmentsInSubtree.length === 0) {
+      return;
+    }
+
+    const projectId = await this.getProjectIdForNode(nodeToDelete.id);
+    const projectNode = await this.getNodeById(projectId);
+
+    if (!projectNode) {
+      throw new Error("Project node not found");
+    }
+
+    const subtreeNodeIdSet = new Set(subtreeNodeIds);
+    const projectDescendants = await this.getDescendants(projectId);
+    const externalNodes = [projectNode, ...projectDescendants].filter(
+      (projectScopedNode) => !subtreeNodeIdSet.has(projectScopedNode.id),
+    );
+
+    if (externalNodes.length === 0) {
+      return;
+    }
+
+    const attachmentIdsToPreserve = this.collectReferencedAttachmentIds({
+      attachmentsInSubtree,
+      externalNodes,
+    });
+
+    if (attachmentIdsToPreserve.length === 0) {
+      return;
+    }
+
+    await db
+      .update(mediaAttachments)
+      .set({ nodeId: projectId })
+      .where(inArray(mediaAttachments.id, attachmentIdsToPreserve));
+  }
+
+  private collectReferencedAttachmentIds({
+    attachmentsInSubtree,
+    externalNodes,
+  }: {
+    attachmentsInSubtree: Array<{ id: string }>;
+    externalNodes: Node[];
+  }): string[] {
+    const externallyReferencedAttachmentIds = new Set<string>();
+
+    for (const externalNode of externalNodes) {
+      if (externalNode.content == null) {
+        continue;
+      }
+
+      const serializedContent = JSON.stringify(externalNode.content);
+      for (const attachment of attachmentsInSubtree) {
+        if (serializedContent.includes(`/media/${attachment.id}`)) {
+          externallyReferencedAttachmentIds.add(attachment.id);
+        }
+      }
+    }
+
+    return [...externallyReferencedAttachmentIds];
   }
 
   /**
@@ -208,6 +291,137 @@ export class NodeService {
     }
 
     return getNodeDescendants(this, nodeId, maxDepth);
+  }
+
+  /**
+   * Set or clear the hero image attachment for a node.
+   * Stores the attachment ID in metadata.heroAttachmentId.
+   */
+  async setHeroImage(
+    nodeId: string,
+    attachmentId: string | null,
+  ): Promise<Node> {
+    const node = await this.getNodeById(nodeId);
+    if (!node) {
+      throw new Error("Node not found");
+    }
+
+    const meta = (node.metadata as Record<string, unknown>) ?? {};
+
+    return this.updateNode(nodeId, {
+      metadata: { ...meta, heroAttachmentId: attachmentId },
+    });
+  }
+
+  /**
+   * Toggle the isFavorite flag in a node's metadata.
+   * Returns the updated node.
+   */
+  async toggleFavorite(nodeId: string): Promise<Node> {
+    const node = await this.getNodeById(nodeId);
+    if (!node) {
+      throw new Error("Node not found");
+    }
+
+    const meta = (node.metadata as Record<string, unknown>) ?? {};
+    const isFavorite = meta.isFavorite === true;
+
+    return this.updateNode(nodeId, {
+      metadata: { ...meta, isFavorite: !isFavorite },
+    });
+  }
+
+  /**
+   * Get all favorited nodes (metadata.isFavorite === true) that are
+   * descendants of the given project node.
+   */
+  async getFavoriteNodes(projectId: string): Promise<Node[]> {
+    const descendants = await this.getDescendants(projectId);
+    return descendants.filter(
+      (node) =>
+        (node.metadata as Record<string, unknown> | null)?.isFavorite === true,
+    );
+  }
+
+  /**
+   * Get all favorited nodes across all projects, each annotated with its
+   * top-level project ID (resolved via a single recursive CTE query).
+   */
+  async getAllFavoriteNodes(): Promise<
+    {
+      id: string;
+      name: string;
+      type: string;
+      content: unknown;
+      metadata: unknown;
+      updatedAt: Date;
+      projectId: string;
+      projectName: string;
+      firstMediaId: string | null;
+      tags: { id: string; name: string; color: string | null }[];
+    }[]
+  > {
+    const result = await db.execute(sql`
+      WITH RECURSIVE ancestor_chain AS (
+        SELECT id, parent_id, type, id AS favorite_id
+        FROM nodes
+        WHERE metadata->>'isFavorite' = 'true'
+
+        UNION ALL
+
+        SELECT n.id, n.parent_id, n.type, ac.favorite_id
+        FROM nodes n
+        JOIN ancestor_chain ac ON n.id = ac.parent_id
+        WHERE ac.type <> 'project'
+      ),
+      project_roots AS (
+        SELECT DISTINCT ON (favorite_id) favorite_id, id AS project_id
+        FROM ancestor_chain
+        WHERE type = 'project'
+      ),
+      first_media AS (
+        SELECT DISTINCT ON (node_id) node_id, id AS media_id
+        FROM media_attachments
+        WHERE mime_type LIKE 'image/%'
+        ORDER BY node_id, created_at ASC
+      )
+      SELECT
+        n.id, n.name, n.type, n.content, n.metadata, n.updated_at,
+        pr.project_id,
+        pn.name AS project_name,
+        fm.media_id AS first_media_id,
+        COALESCE(
+          json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color))
+            FILTER (WHERE t.id IS NOT NULL),
+          '[]'
+        ) AS tags
+      FROM nodes n
+      JOIN project_roots pr ON pr.favorite_id = n.id
+      JOIN nodes pn ON pn.id = pr.project_id
+      LEFT JOIN first_media fm ON fm.node_id = n.id
+      LEFT JOIN node_tags nt ON nt.node_id = n.id
+      LEFT JOIN tags t ON t.id = nt.tag_id
+      GROUP BY n.id, pr.project_id, pn.name, fm.media_id
+      ORDER BY n.updated_at DESC
+    `);
+
+    return Array.from(result).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        type: row.type as string,
+        content: row.content,
+        metadata: row.metadata,
+        updatedAt: row.updated_at as Date,
+        projectId: row.project_id as string,
+        projectName: row.project_name as string,
+        firstMediaId: (row.first_media_id as string) ?? null,
+        tags:
+          (row.tags as { id: string; name: string; color: string | null }[]) ??
+          [],
+      };
+    });
   }
 
   /**

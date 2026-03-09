@@ -1,5 +1,6 @@
 import { router, publicProcedure } from "../trpc";
 import { TagService } from "../../services/tag-service";
+import { z } from "zod";
 import {
   createEntityNodeInputSchema,
   createSuccessResponse,
@@ -157,5 +158,35 @@ export const tagsRouter = router({
     .input(createEntityNodeInputSchema)
     .mutation(async ({ input }) => {
       return await tagService.createEntityNode(input.tagId, input.parentId);
+    }),
+
+  /**
+   * Add a tag to multiple nodes in one call
+   */
+  bulkAddToNodes: publicProcedure
+    .input(
+      z.object({
+        nodeIds: z.array(z.string().uuid()),
+        tagId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await tagService.bulkAddToNodes(input.nodeIds, input.tagId);
+      return createSuccessResponse();
+    }),
+
+  /**
+   * Remove a tag from multiple nodes in one call
+   */
+  bulkRemoveFromNodes: publicProcedure
+    .input(
+      z.object({
+        nodeIds: z.array(z.string().uuid()),
+        tagId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await tagService.bulkRemoveFromNodes(input.nodeIds, input.tagId);
+      return createSuccessResponse();
     }),
 });

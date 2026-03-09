@@ -12,6 +12,7 @@ import {
   Mic,
   MessageSquarePlus,
   Image,
+  Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -61,12 +62,15 @@ export interface FileTreeNodeProps {
   onRename?: (nodeId: string, newName: string) => void;
   onAddToContext?: (node: TreeNode) => void;
   isInContext?: boolean;
+  onToggleFavorite?: (nodeId: string) => void;
   onDrop?: (
     draggedNodeId: string,
     targetNodeId: string,
     position: DropPosition,
   ) => void;
   renderChildren?: (parentId: string, depth: number) => React.ReactNode;
+  isChecked?: boolean;
+  onToggleChecked?: (nodeId: string) => void;
 }
 
 const nodeTypeIcons: Record<
@@ -110,9 +114,14 @@ export function FileTreeNode({
   onRename,
   onAddToContext,
   isInContext,
+  onToggleFavorite,
   onDrop,
   renderChildren,
+  isChecked,
+  onToggleChecked,
 }: FileTreeNodeProps) {
+  const isFavorite =
+    (node.metadata as Record<string, unknown> | null)?.isFavorite === true;
   const isExpandable = expandableTypes.has(node.type);
   const Icon = getNodeIcon(node.type, isExpanded, node.content);
 
@@ -168,6 +177,10 @@ export function FileTreeNode({
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isEditing) return; // Don't toggle/select while editing
+    if (e.shiftKey && onToggleChecked) {
+      onToggleChecked(node.id);
+      return;
+    }
     if (isExpandable) {
       onToggle(node.id);
     }
@@ -298,6 +311,7 @@ export function FileTreeNode({
           "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
           "transition-colors",
           isSelected && "text-accent-foreground font-medium",
+          isChecked && "bg-primary/10 ring-1 ring-inset ring-primary/30",
           dropIndicator === "inside" && "bg-primary/10 ring-1 ring-primary/40",
         )}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
@@ -363,6 +377,31 @@ export function FileTreeNode({
             }
           >
             <MessageSquarePlus className="w-3 h-3" />
+          </button>
+        )}
+
+        {/* Favorite star */}
+        {onToggleFavorite && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(node.id);
+            }}
+            className={cn(
+              "flex-shrink-0 p-0.5 rounded transition-colors",
+              isFavorite
+                ? "text-amber-400 opacity-100"
+                : "opacity-0 group-hover/node:opacity-100 text-muted-foreground hover:text-amber-400",
+            )}
+            title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            aria-label={
+              isFavorite ? "Remove from favorites" : "Add to favorites"
+            }
+          >
+            <Star
+              className="w-3 h-3"
+              fill={isFavorite ? "currentColor" : "none"}
+            />
           </button>
         )}
 

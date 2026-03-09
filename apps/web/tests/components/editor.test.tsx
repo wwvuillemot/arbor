@@ -55,10 +55,18 @@ const mockEditor = {
 
 let capturedOnUpdate: ((args: { editor: typeof mockEditor }) => void) | null =
   null;
+let capturedUseEditorConfig: {
+  content?: unknown;
+  onUpdate?: (args: { editor: typeof mockEditor }) => void;
+} | null = null;
 
 vi.mock("@tiptap/react", () => ({
   useEditor: vi.fn(
-    (config: { onUpdate?: (args: { editor: typeof mockEditor }) => void }) => {
+    (config: {
+      content?: unknown;
+      onUpdate?: (args: { editor: typeof mockEditor }) => void;
+    }) => {
+      capturedUseEditorConfig = config;
       if (config?.onUpdate) {
         capturedOnUpdate = config.onUpdate;
       }
@@ -108,9 +116,29 @@ vi.mock("@tiptap/extension-link", () => ({
 }));
 
 // mergeAttributes is used by SafeLink.renderHTML — provide a real-enough shim
+// Mark is used by AiAttributionMark.create() at module load time
 vi.mock("@tiptap/core", () => ({
   mergeAttributes: (...args: Record<string, unknown>[]) =>
     Object.assign({}, ...args),
+  Mark: {
+    create: vi.fn().mockReturnValue({ name: "aiAttribution" }),
+  },
+}));
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    provenance: {
+      getHistory: {
+        useQuery: vi.fn(() => ({
+          data: [],
+          isLoading: false,
+          error: null,
+          refetch: vi.fn(),
+        })),
+      },
+    },
+  },
+  getTRPCClient: vi.fn(),
 }));
 
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
@@ -121,8 +149,19 @@ import {
   MAX_FILE_SIZE,
 } from "@/components/editor/image-upload";
 import { useAutoSave } from "@/hooks/use-auto-save";
+import { trpc } from "@/lib/trpc";
 
 const testEditor = mockEditor as unknown as Editor;
+
+function createHistoryQueryResult(data: unknown) {
+  return {
+    data,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+    trpc: { path: "provenance.getHistory" },
+  } as unknown as ReturnType<typeof trpc.provenance.getHistory.useQuery>;
+}
 
 describe("EditorToolbar", () => {
   beforeEach(() => {
@@ -143,8 +182,8 @@ describe("EditorToolbar", () => {
     render(<EditorToolbar editor={testEditor} />);
     const toolbar = screen.getByRole("toolbar");
     const buttons = toolbar.querySelectorAll("button");
-    // undo, redo, h1, h2, h3, bold, italic, strike, code, link, bullet, ordered, quote, hr, clear = 15
-    expect(buttons.length).toBe(15);
+    // undo, redo, h1, h2, h3, bold, italic, strike, code, link, bullet, ordered, quote, hr, clear, aiAttribution = 16
+    expect(buttons.length).toBe(16);
   });
 
   it("should call bold toggle when bold button clicked", () => {
@@ -257,12 +296,46 @@ describe("EditorToolbar", () => {
     fireEvent.click(screen.getByTitle("insertImage"));
     expect(onInsertImage).toHaveBeenCalledOnce();
   });
+
+  it("should render attribution toggle button", () => {
+    render(<EditorToolbar editor={testEditor} />);
+    expect(screen.getByTitle("aiAttribution")).toBeInTheDocument();
+  });
+
+  it("should call onToggleAttribution when attribution button is clicked", () => {
+    const onToggle = vi.fn();
+    render(
+      <EditorToolbar
+        editor={testEditor}
+        onToggleAttribution={onToggle}
+        showAiAttribution={false}
+      />,
+    );
+    fireEvent.click(screen.getByTitle("aiAttribution"));
+    expect(onToggle).toHaveBeenCalledOnce();
+  });
+
+  it("should show attribution button as active when showAiAttribution is true", () => {
+    render(
+      <EditorToolbar
+        editor={testEditor}
+        onToggleAttribution={vi.fn()}
+        showAiAttribution={true}
+      />,
+    );
+    expect(screen.getByTitle("aiAttribution")).toHaveClass("bg-accent");
+  });
 });
 
 describe("TiptapEditor", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     capturedOnUpdate = null;
+    capturedUseEditorConfig = null;
+    mockEditor.getJSON.mockReturnValue({ type: "doc", content: [] });
+    vi.mocked(trpc.provenance.getHistory.useQuery).mockReturnValue(
+      createHistoryQueryResult([]),
+    );
   });
 
   it("should render the editor container", () => {
@@ -299,6 +372,39 @@ describe("TiptapEditor", () => {
     }
   });
 
+  it("should fetch provenance history when nodeId is provided", () => {
+    render(
+      <TiptapEditor
+        content={null}
+        nodeId="11111111-1111-1111-1111-111111111111"
+      />,
+    );
+
+    expect(trpc.provenance.getHistory.useQuery).toHaveBeenCalledWith(
+      {
+        nodeId: "11111111-1111-1111-1111-111111111111",
+        limit: 50,
+      },
+      expect.objectContaining({
+        enabled: true,
+        refetchOnWindowFocus: false,
+        staleTime: 60_000,
+      }),
+    );
+  });
+
+  it("should disable provenance history when nodeId is not provided", () => {
+    render(<TiptapEditor content={null} />);
+
+    expect(trpc.provenance.getHistory.useQuery).toHaveBeenCalledWith(
+      {
+        nodeId: "00000000-0000-0000-0000-000000000000",
+        limit: 50,
+      },
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
   it("should render with content", () => {
     const content = {
       type: "doc",
@@ -308,6 +414,82 @@ describe("TiptapEditor", () => {
     };
     render(<TiptapEditor content={content} />);
     expect(screen.getByTestId("tiptap-editor")).toBeInTheDocument();
+  });
+
+  it("should pass AI-attributed content to TipTap when llm history matches the current block", () => {
+    vi.mocked(trpc.provenance.getHistory.useQuery).mockReturnValue(
+      createHistoryQueryResult([
+        {
+          id: "history-1",
+          nodeId: "11111111-1111-1111-1111-111111111111",
+          version: 2,
+          actorType: "llm",
+          actorId: "llm:gpt-4o",
+          action: "update",
+          contentBefore: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "Human draft" }],
+              },
+            ],
+          },
+          contentAfter: {
+            type: "doc",
+            content: [
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "AI polished text" }],
+              },
+            ],
+          },
+          diff: null,
+          metadata: { model: "gpt-4o" },
+          createdAt: "2024-06-15T11:00:00Z",
+        },
+      ]),
+    );
+
+    render(
+      <TiptapEditor
+        nodeId="11111111-1111-1111-1111-111111111111"
+        content={{
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "AI polished text" }],
+            },
+          ],
+        }}
+      />,
+    );
+
+    expect(capturedUseEditorConfig?.content).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "AI polished text",
+              marks: [
+                {
+                  type: "aiAttribution",
+                  attrs: {
+                    modelName: "gpt-4o",
+                    timestamp: "2024-06-15T11:00:00Z",
+                    tooltipText: "gpt-4o • 2024-06-15T11:00:00.000Z",
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
   });
 
   it("should expose the editor instance through editorRef", () => {
@@ -325,6 +507,63 @@ describe("TiptapEditor", () => {
     if (capturedOnUpdate) {
       expect(() => capturedOnUpdate!({ editor: mockEditor })).not.toThrow();
     }
+  });
+
+  it("should strip AI attribution marks before calling onChange", () => {
+    const handleChange = vi.fn();
+    render(
+      <TiptapEditor
+        content={null}
+        nodeId="11111111-1111-1111-1111-111111111111"
+        onChange={handleChange}
+      />,
+    );
+
+    if (capturedOnUpdate) {
+      mockEditor.getJSON.mockReturnValueOnce({
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              {
+                type: "text",
+                text: "AI polished text",
+                marks: [
+                  {
+                    type: "aiAttribution",
+                    attrs: {
+                      modelName: "gpt-4o",
+                      timestamp: "2024-06-15T11:00:00Z",
+                      tooltipText: "gpt-4o • 2024-06-15T11:00:00.000Z",
+                    },
+                  },
+                  { type: "bold" },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      capturedOnUpdate({ editor: mockEditor });
+    }
+
+    expect(handleChange).toHaveBeenCalledWith({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "AI polished text",
+              marks: [{ type: "bold" }],
+            },
+          ],
+        },
+      ],
+    });
   });
 
   it("should not call onLinkClick when a link is clicked while editing", () => {
@@ -531,6 +770,31 @@ describe("TiptapEditor", () => {
     const editorContent = screen.getByTestId("editor-content");
     fireEvent.click(editorContent);
     expect(onLinkClick).not.toHaveBeenCalled();
+  });
+
+  it("should not have ai-attribution-visible class by default", () => {
+    render(<TiptapEditor content={null} />);
+    expect(screen.getByTestId("tiptap-editor")).not.toHaveClass(
+      "ai-attribution-visible",
+    );
+  });
+
+  it("should add ai-attribution-visible class when attribution toggle is activated", () => {
+    render(<TiptapEditor content={null} />);
+    fireEvent.click(screen.getByTitle("aiAttribution"));
+    expect(screen.getByTestId("tiptap-editor")).toHaveClass(
+      "ai-attribution-visible",
+    );
+  });
+
+  it("should toggle ai-attribution-visible class off when clicked again", () => {
+    render(<TiptapEditor content={null} />);
+    const attributionBtn = screen.getByTitle("aiAttribution");
+    fireEvent.click(attributionBtn);
+    fireEvent.click(attributionBtn);
+    expect(screen.getByTestId("tiptap-editor")).not.toHaveClass(
+      "ai-attribution-visible",
+    );
   });
 });
 

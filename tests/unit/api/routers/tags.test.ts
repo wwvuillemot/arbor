@@ -425,4 +425,86 @@ describe("Tags Router", () => {
       expect(result.node.name).toBe("NewEntity");
     });
   });
+
+  describe("bulkAddToNodes", () => {
+    it("should add a tag to all specified nodes", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("BulkAddProject");
+      const note1 = await createTestNote(project.id, "Note1");
+      const note2 = await createTestNote(project.id, "Note2");
+      const tag = await caller.tags.create({ name: "BulkTag" });
+
+      const result = await caller.tags.bulkAddToNodes({
+        nodeIds: [note1.id, note2.id],
+        tagId: tag.id,
+      });
+
+      expect(result.success).toBe(true);
+
+      const tags1 = await caller.tags.getNodeTags({ nodeId: note1.id });
+      const tags2 = await caller.tags.getNodeTags({ nodeId: note2.id });
+      expect(tags1.map((t) => t.id)).toContain(tag.id);
+      expect(tags2.map((t) => t.id)).toContain(tag.id);
+    });
+
+    it("should be idempotent when tag already applied to a node", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("IdempotentProject");
+      const note = await createTestNote(project.id, "Note");
+      const tag = await caller.tags.create({ name: "IdempotentTag" });
+
+      await caller.tags.addToNode({ nodeId: note.id, tagId: tag.id });
+      await caller.tags.bulkAddToNodes({ nodeIds: [note.id], tagId: tag.id });
+
+      const tags = await caller.tags.getNodeTags({ nodeId: note.id });
+      const matching = tags.filter((t) => t.id === tag.id);
+      expect(matching).toHaveLength(1);
+    });
+
+    it("should handle an empty nodeIds array without error", async () => {
+      const caller = createCaller();
+      const tag = await caller.tags.create({ name: "EmptyBulkTag" });
+      const result = await caller.tags.bulkAddToNodes({
+        nodeIds: [],
+        tagId: tag.id,
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("bulkRemoveFromNodes", () => {
+    it("should remove a tag from all specified nodes", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("BulkRemoveProject");
+      const note1 = await createTestNote(project.id, "NoteA");
+      const note2 = await createTestNote(project.id, "NoteB");
+      const tag = await caller.tags.create({ name: "RemovableTag" });
+
+      await caller.tags.addToNode({ nodeId: note1.id, tagId: tag.id });
+      await caller.tags.addToNode({ nodeId: note2.id, tagId: tag.id });
+
+      const result = await caller.tags.bulkRemoveFromNodes({
+        nodeIds: [note1.id, note2.id],
+        tagId: tag.id,
+      });
+
+      expect(result.success).toBe(true);
+
+      const tags1 = await caller.tags.getNodeTags({ nodeId: note1.id });
+      const tags2 = await caller.tags.getNodeTags({ nodeId: note2.id });
+      expect(tags1.map((t) => t.id)).not.toContain(tag.id);
+      expect(tags2.map((t) => t.id)).not.toContain(tag.id);
+    });
+
+    it("should handle removing a tag not applied to a node without error", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("NoTagProject");
+      const note = await createTestNote(project.id, "NoteC");
+      const tag = await caller.tags.create({ name: "NotAppliedTag" });
+
+      await expect(
+        caller.tags.bulkRemoveFromNodes({ nodeIds: [note.id], tagId: tag.id }),
+      ).resolves.toEqual({ success: true });
+    });
+  });
 });

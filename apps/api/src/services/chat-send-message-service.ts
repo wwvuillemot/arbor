@@ -7,6 +7,7 @@ import {
   toLlmMessage,
 } from "./chat-send-message-helpers";
 import { runChatToolLoop } from "./chat-send-message-tool-loop";
+import { filterToolsForConfig } from "./agent-mode-helpers";
 import type {
   ChatCompletionService,
   ChatSendMessageDependencies,
@@ -78,9 +79,12 @@ export class ChatSendMessageService {
     const supportsTemperature = thread.model
       ? await llmService.supportsTemperature(thread.model)
       : true;
-    const tools = await this.dependencies.getMcpTools();
+    const allTools = await this.dependencies.getMcpTools();
+    const tools = filterToolsForConfig(agentModeConfig, allTools);
 
-    console.log(`🔧 Loaded ${tools.length} MCP tools for agent`);
+    console.log(
+      `🔧 Loaded ${tools.length}/${allTools.length} MCP tools for agent mode "${agentModeConfig.name}"`,
+    );
 
     let response: ChatResponse;
     try {
@@ -134,6 +138,7 @@ export class ChatSendMessageService {
       tools,
       chatService: this.dependencies.chatService,
       executeMcpTool: this.dependencies.executeMcpTool,
+      masterKey,
     });
 
     const assistantMessage = await this.dependencies.chatService.addMessage({

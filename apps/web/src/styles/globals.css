@@ -131,3 +131,14 @@
   margin-top: 0.75em;
   margin-bottom: 0.4em;
 }
+
+/* AI attribution marks — hidden by default, visible when .ai-attribution-visible is active */
+.ai-attributed {
+  border-radius: 2px;
+}
+
+.ai-attribution-visible .ai-attributed {
+  border-left: 2px solid hsl(142 76% 36% / 0.6);
+  background-color: hsl(142 76% 36% / 0.06);
+  padding-left: 2px;
+}

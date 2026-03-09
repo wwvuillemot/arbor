@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
+import { mediaAttachments } from "@server/db/schema";
 import { NodeService } from "@server/services/node-service";
+import { getTestDb } from "@tests/helpers/db";
 import {
+  createTestMediaAttachment,
   createTestProject,
   createTestFolder,
   createTestNote,
@@ -203,6 +207,50 @@ describe("NodeService", () => {
       expect(retrievedProject).toBeNull();
       expect(retrievedFolder).toBeNull();
       expect(retrievedNote).toBeNull();
+    });
+
+    it("should preserve attachments still referenced outside the deleted subtree", async () => {
+      const project = await createTestProject("My Novel");
+      const imageOwnerNote = await createTestNote("Image Owner", project.id);
+
+      const attachment = await createTestMediaAttachment({
+        nodeId: imageOwnerNote.id,
+        objectKey: `${project.id}/${imageOwnerNote.id}/image.png`,
+        filename: "image.png",
+        mimeType: "image/png",
+        size: 128,
+      });
+
+      const sharedImageUrl = `http://api.arbor.local/media/${attachment.id}`;
+      const referencingNote = await nodeService.createNode({
+        type: "note",
+        name: "Referencing Note",
+        parentId: project.id,
+        content: {
+          type: "doc",
+          content: [
+            {
+              type: "image",
+              attrs: {
+                src: sharedImageUrl,
+              },
+            },
+          ],
+        },
+      });
+
+      await nodeService.deleteNode(imageOwnerNote.id);
+
+      const db = getTestDb();
+      const [preservedAttachment] = await db
+        .select()
+        .from(mediaAttachments)
+        .where(eq(mediaAttachments.id, attachment.id));
+
+      expect(preservedAttachment).toBeDefined();
+      expect(preservedAttachment.nodeId).toBe(project.id);
+      expect(await nodeService.getNodeById(imageOwnerNote.id)).toBeNull();
+      expect(await nodeService.getNodeById(referencingNote.id)).not.toBeNull();
     });
   });
 

@@ -9,3 +9,4 @@ export {
   AgentModeSelector,
   type AgentModeSelectorProps,
 } from "./agent-mode-selector";
+export { McpToolsPanel } from "./mcp-tools-panel";

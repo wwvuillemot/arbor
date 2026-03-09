@@ -1,8 +1,13 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { MediaAttachmentService } from "../../services/media-attachment-service";
+import { ImageGenerationService } from "../../services/image-generation-service";
+import { NodeService } from "../../services/node-service";
+import { SettingsService } from "../../services/settings-service";
 
 const mediaService = new MediaAttachmentService();
+const nodeService = new NodeService();
+const settingsService = new SettingsService();
 
 /**
  * Media Router
@@ -56,6 +61,16 @@ export const mediaRouter = router({
     }),
 
   /**
+   * Get the first image attachment ID for each of a batch of node IDs.
+   * Returns a map of nodeId → attachmentId.
+   */
+  getFirstImageByNodes: publicProcedure
+    .input(z.object({ nodeIds: z.array(z.string().uuid()) }))
+    .query(async ({ input }) => {
+      return await mediaService.getFirstImageByNodes(input.nodeIds);
+    }),
+
+  /**
    * Get all attachments for a node.
    */
   getByNode: publicProcedure
@@ -81,6 +96,34 @@ export const mediaRouter = router({
     .mutation(async ({ input }) => {
       await mediaService.deleteAttachment(input.id);
       return { success: true };
+    }),
+
+  /**
+   * Generate an image with DALL-E and store it as an attachment on a project node.
+   * The project's metadata.styleProfile is prepended to the prompt if set.
+   */
+  generateImage: publicProcedure
+    .input(
+      z.object({
+        prompt: z.string().min(1),
+        projectId: z.string().uuid(),
+        masterKey: z.string(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const apiKey = await settingsService.getSetting(
+        "openai_api_key",
+        input.masterKey,
+      );
+      if (!apiKey) {
+        throw new Error("OpenAI API key not configured");
+      }
+      const imageService = new ImageGenerationService(
+        apiKey,
+        mediaService,
+        nodeService,
+      );
+      return await imageService.generateImage(input.prompt, input.projectId);
     }),
 
   /**

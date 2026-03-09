@@ -32,6 +32,7 @@ const createNodeSchema = z.object({
   slug: z.string().optional(),
   content: z.any().optional(), // JSONB content (can be object, string, or null)
   metadata: z.record(z.any()).optional(),
+  summary: z.string().nullable().optional(),
   authorType: authorTypeSchema.optional(), // DEPRECATED: Use createdBy/updatedBy instead
   position: z.number().int().optional(), // Position for ordering siblings
   createdBy: provenanceSchema.optional(), // Defaults to "user:system"
@@ -43,6 +44,7 @@ const updateNodeSchema = z.object({
   slug: z.string().optional(),
   content: z.any().optional(), // JSONB content (can be object, string, or null)
   metadata: z.record(z.any()).optional(),
+  summary: z.string().nullable().optional(),
   authorType: authorTypeSchema.optional(), // DEPRECATED: Use updatedBy instead
   position: z.number().int().optional(), // Position for ordering siblings
   updatedBy: provenanceSchema.optional(), // Who last updated this node
@@ -95,6 +97,7 @@ export const nodesRouter = router({
         slug: input.slug,
         content: input.content,
         metadata: input.metadata,
+        summary: input.summary,
         authorType: input.authorType, // DEPRECATED
         position: input.position,
         createdBy: input.createdBy,
@@ -195,6 +198,37 @@ export const nodesRouter = router({
       }
       return { content: await exportService.exportNodeAsHtml(input.id) };
     }),
+
+  // Set or clear the hero image for a node (stores attachmentId in metadata)
+  setHeroImage: publicProcedure
+    .input(
+      z.object({
+        nodeId: z.string().uuid(),
+        attachmentId: z.string().uuid().nullable(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await nodeService.setHeroImage(input.nodeId, input.attachmentId);
+    }),
+
+  // Toggle isFavorite on a node's metadata
+  toggleFavorite: publicProcedure
+    .input(z.object({ nodeId: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      return await nodeService.toggleFavorite(input.nodeId);
+    }),
+
+  // Get all favorited nodes for a project
+  getFavorites: publicProcedure
+    .input(z.object({ projectId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      return await nodeService.getFavoriteNodes(input.projectId);
+    }),
+
+  // Get all favorited nodes across all projects (for dashboard)
+  getAllFavorites: publicProcedure.query(async () => {
+    return await nodeService.getAllFavoriteNodes();
+  }),
 
   /**
    * Import a directory of markdown/text files as a node hierarchy.

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { FolderPlus, FilePlus } from "lucide-react";
+import { FolderPlus, FilePlus, Star } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import {
   FileTreeNode,
@@ -58,6 +58,11 @@ export interface FileTreeProps {
   onAddToContext?: (node: TreeNode) => void;
   /** IDs of nodes currently in chat context (to show them as active) */
   contextNodeIds?: Set<string>;
+  /** When provided, show star toggle on each node */
+  onToggleFavorite?: (nodeId: string) => void;
+  /** When provided, show checkboxes and track selection for bulk ops */
+  selectedNodeIds?: Set<string>;
+  onToggleNodeSelected?: (nodeId: string) => void;
   className?: string;
 }
 
@@ -82,6 +87,9 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
       attributionFilter,
       onAddToContext,
       contextNodeIds,
+      onToggleFavorite,
+      selectedNodeIds,
+      onToggleNodeSelected,
       className,
     },
     ref,
@@ -89,6 +97,16 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
     const t = useTranslations("fileTree");
     const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(
       () => new Set([projectId]),
+    );
+    const [favoritesExpanded, setFavoritesExpanded] = React.useState(true);
+
+    const favoritesQuery = trpc.nodes.getFavorites.useQuery(
+      { projectId },
+      {
+        enabled: !!onToggleFavorite,
+        refetchOnWindowFocus: false,
+        staleTime: 15_000,
+      },
     );
 
     // Expose imperative methods to parent
@@ -174,6 +192,49 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
           role="tree"
           aria-label="File tree"
         >
+          {/* Favorites pinned section */}
+          {onToggleFavorite && (
+            <div className="mb-1">
+              <button
+                onClick={() => setFavoritesExpanded((v) => !v)}
+                className="w-full flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Star className="w-3 h-3" />
+                {t("favorites.section")}
+              </button>
+              {favoritesExpanded && (
+                <div>
+                  {!favoritesQuery.data || favoritesQuery.data.length === 0 ? (
+                    <p className="px-4 py-1 text-xs text-muted-foreground/60 italic">
+                      {t("favorites.empty")}
+                    </p>
+                  ) : (
+                    favoritesQuery.data.map((favNode) => (
+                      <FileTreeNode
+                        key={favNode.id}
+                        node={favNode as TreeNode}
+                        depth={0}
+                        isExpanded={false}
+                        isSelected={selectedNodeId === favNode.id}
+                        isLoading={false}
+                        onToggle={() => {}}
+                        onSelect={onSelectNode}
+                        onContextMenu={onContextMenu}
+                        onRename={onRenameNode}
+                        onToggleFavorite={onToggleFavorite}
+                        onAddToContext={onAddToContext}
+                        isInContext={contextNodeIds?.has(favNode.id)}
+                        isChecked={selectedNodeIds?.has(favNode.id)}
+                        onToggleChecked={onToggleNodeSelected}
+                      />
+                    ))
+                  )}
+                  <div className="h-px bg-border mx-2 mt-1 mb-1" />
+                </div>
+              )}
+            </div>
+          )}
+
           <ChildrenList
             parentId={projectId}
             depth={0}
@@ -188,6 +249,9 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
             attributionFilter={attributionFilter}
             onAddToContext={onAddToContext}
             contextNodeIds={contextNodeIds}
+            onToggleFavorite={onToggleFavorite}
+            selectedNodeIds={selectedNodeIds}
+            onToggleNodeSelected={onToggleNodeSelected}
             emptyMessage={t("emptyProject")}
           />
         </div>
@@ -259,6 +323,9 @@ function ChildrenList({
   attributionFilter,
   onAddToContext,
   contextNodeIds,
+  onToggleFavorite,
+  selectedNodeIds,
+  onToggleNodeSelected,
   emptyMessage,
 }: {
   parentId: string;
@@ -278,6 +345,9 @@ function ChildrenList({
   attributionFilter?: AttributionFilter;
   onAddToContext?: (node: TreeNode) => void;
   contextNodeIds?: Set<string>;
+  onToggleFavorite?: (nodeId: string) => void;
+  selectedNodeIds?: Set<string>;
+  onToggleNodeSelected?: (nodeId: string) => void;
   emptyMessage?: string;
 }) {
   const childrenQuery = trpc.nodes.getChildren.useQuery(
@@ -415,6 +485,9 @@ function ChildrenList({
           onDrop={onDrop}
           onAddToContext={onAddToContext}
           isInContext={contextNodeIds?.has(child.id)}
+          onToggleFavorite={onToggleFavorite}
+          isChecked={selectedNodeIds?.has(child.id)}
+          onToggleChecked={onToggleNodeSelected}
           renderChildren={(childParentId, childDepth) => (
             <ChildrenList
               parentId={childParentId}
@@ -430,6 +503,9 @@ function ChildrenList({
               attributionFilter={attributionFilter}
               onAddToContext={onAddToContext}
               contextNodeIds={contextNodeIds}
+              onToggleFavorite={onToggleFavorite}
+              selectedNodeIds={selectedNodeIds}
+              onToggleNodeSelected={onToggleNodeSelected}
             />
           )}
         />

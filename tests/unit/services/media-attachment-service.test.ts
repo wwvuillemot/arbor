@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MediaAttachmentService } from "@/services/media-attachment-service";
 import { MinioService } from "@/services/minio";
 import { resetTestDb } from "@tests/helpers/db";
@@ -21,14 +21,17 @@ describe("MediaAttachmentService", () => {
     });
 
     await minioService.ensureBucket("arbor-test");
-    await minioService.ensureBucket("arbor-media");
     mediaService = new MediaAttachmentService(minioService);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   beforeEach(async () => {
     await resetTestDb();
     // Clean up test bucket objects
-    for (const bucket of ["arbor-test", "arbor-media"]) {
+    for (const bucket of ["arbor-test"]) {
       try {
         const objects = await minioService.listObjects(bucket);
         for (const obj of objects) {
@@ -81,6 +84,10 @@ describe("MediaAttachmentService", () => {
       const project = await createTestProject("Default Project");
       const note = await createTestNote("Note", project.id);
       const buffer = Buffer.from("content");
+      const mockObjectKey = `${project.id}/${note.id}/default.txt`;
+      const uploadFileSpy = vi
+        .spyOn(minioService, "uploadFile")
+        .mockResolvedValue(mockObjectKey);
 
       const attachment = await mediaService.createAttachment({
         nodeId: note.id,
@@ -90,7 +97,16 @@ describe("MediaAttachmentService", () => {
         mimeType: "text/plain",
       });
 
+      expect(uploadFileSpy).toHaveBeenCalledWith(
+        "arbor-media",
+        buffer,
+        "default.txt",
+        project.id,
+        note.id,
+        "text/plain",
+      );
       expect(attachment.bucket).toBe("arbor-media");
+      expect(attachment.objectKey).toBe(mockObjectKey);
       expect(attachment.createdBy).toBe("user:system");
     });
 

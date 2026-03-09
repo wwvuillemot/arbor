@@ -212,5 +212,18 @@ export function buildMcpToolDefinitions(): ToolDefinition[] {
         ["projectId"],
       ),
     ),
+    createFunctionTool(
+      "generate_image",
+      "Generate an image using DALL-E based on a text prompt and attach it to a project. The project's style profile (art style, color palette) is automatically prepended to the prompt.",
+      createObjectSchema(
+        {
+          prompt: createStringProperty("Description of the image to generate"),
+          projectId: createStringProperty(
+            "UUID of the project to attach the generated image to",
+          ),
+        },
+        ["prompt", "projectId"],
+      ),
+    ),
   ];
 }

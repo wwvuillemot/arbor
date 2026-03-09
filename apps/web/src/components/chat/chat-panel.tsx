@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { ChatMessage, type ChatMessageData } from "./chat-message";
 import { ModelSelector } from "./model-selector";
 import { AgentModeSelector } from "./agent-mode-selector";
+import { McpToolsPanel } from "./mcp-tools-panel";
 
 export interface ChatPanelProps {
   className?: string;
@@ -59,6 +60,9 @@ export function ChatPanel({
     },
   );
 
+  const [sidebarTab, setSidebarTab] = React.useState<"threads" | "tools">(
+    "threads",
+  );
   const [inputValue, setInputValue] = React.useState("");
   const [agentMode, setAgentMode] = React.useState<string>("assistant");
   const [selectedModel, setSelectedModel] = React.useState<string | null>(null);
@@ -296,68 +300,101 @@ export function ChatPanel({
           data-testid="thread-sidebar"
           className="w-64 border-r flex flex-col bg-muted/30"
         >
-          <div className="p-3 border-b flex items-center justify-between">
-            <span className="text-sm font-semibold">{t("threads")}</span>
+          {/* Tab bar */}
+          <div className="flex border-b">
             <button
-              data-testid="new-thread-btn"
-              onClick={handleNewThread}
-              className="p-1 rounded hover:bg-muted transition-colors"
-              title={t("newThread")}
+              onClick={() => setSidebarTab("threads")}
+              className={cn(
+                "flex-1 px-3 py-2 text-xs font-medium transition-colors",
+                sidebarTab === "threads"
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
             >
-              <Plus className="w-4 h-4" />
+              {t("threads")}
+            </button>
+            <button
+              onClick={() => setSidebarTab("tools")}
+              className={cn(
+                "flex-1 px-3 py-2 text-xs font-medium transition-colors",
+                sidebarTab === "tools"
+                  ? "border-b-2 border-primary text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Tools
             </button>
           </div>
 
-          {/* Thread list */}
-          <div className="flex-1 overflow-y-auto">
-            {threads.length === 0 ? (
-              <div
-                data-testid="no-threads"
-                className="p-4 text-center text-sm text-muted-foreground"
-              >
-                {t("noThreads")}
+          {sidebarTab === "tools" ? (
+            <div className="flex-1 overflow-y-auto p-3">
+              <McpToolsPanel />
+            </div>
+          ) : (
+            <>
+              <div className="px-3 py-1.5 border-b flex items-center justify-end">
+                <button
+                  data-testid="new-thread-btn"
+                  onClick={handleNewThread}
+                  className="p-1 rounded hover:bg-muted transition-colors"
+                  title={t("newThread")}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
               </div>
-            ) : (
-              threads.map(
-                (thread: {
-                  id: string;
-                  name: string;
-                  agentMode: string;
-                  updatedAt: string;
-                }) => (
+
+              {/* Thread list */}
+              <div className="flex-1 overflow-y-auto">
+                {threads.length === 0 ? (
                   <div
-                    key={thread.id}
-                    data-testid="thread-item"
-                    onClick={() => setSelectedThreadId(thread.id)}
-                    className={cn(
-                      "p-3 cursor-pointer border-b hover:bg-muted/50 transition-colors flex items-center gap-2",
-                      selectedThreadId === thread.id && "bg-muted",
-                    )}
+                    data-testid="no-threads"
+                    className="p-4 text-center text-sm text-muted-foreground"
                   >
-                    <MessageSquare className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">
-                        {thread.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {thread.agentMode}
-                      </div>
-                    </div>
-                    <button
-                      data-testid="delete-thread-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteThread(thread.id);
-                      }}
-                      className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                    {t("noThreads")}
                   </div>
-                ),
-              )
-            )}
-          </div>
+                ) : (
+                  threads.map(
+                    (thread: {
+                      id: string;
+                      name: string;
+                      agentMode: string;
+                      updatedAt: string;
+                    }) => (
+                      <div
+                        key={thread.id}
+                        data-testid="thread-item"
+                        onClick={() => setSelectedThreadId(thread.id)}
+                        className={cn(
+                          "p-3 cursor-pointer border-b hover:bg-muted/50 transition-colors flex items-center gap-2",
+                          selectedThreadId === thread.id && "bg-muted",
+                        )}
+                      >
+                        <MessageSquare className="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium truncate">
+                            {thread.name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {thread.agentMode}
+                          </div>
+                        </div>
+                        <button
+                          data-testid="delete-thread-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteThread(thread.id);
+                          }}
+                          className="p-1 rounded hover:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ),
+                  )
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
 

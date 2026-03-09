@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import ReactMarkdown from "react-markdown";
 import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -15,6 +14,7 @@ import {
   FolderOpen,
   Loader2,
   GripHorizontal,
+  Settings,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ import {
   CreateNodeDialog,
   RenameDialog,
   NodeContextMenu,
+  BulkTagBar,
   type TreeNode,
   type ContextMenuAction,
   type DropPosition,
@@ -44,8 +45,8 @@ import { ChatSidebar } from "@/components/chat";
 import { Dialog } from "@/components/dialog";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
 import { downloadTextFile, openHtmlPrintWindow } from "@/lib/browser-export";
-import { extractHeroImage, tiptapToMarkdown } from "@/lib/tiptap-utils";
 import { HeroGradient } from "@/components/hero-gradient";
+import { NoteCard } from "@/components/note-card";
 import {
   buildFlatLinkPickerTreeNodes,
   deriveEditorLinkNavigationTarget,
@@ -72,74 +73,32 @@ import {
   uploadImportedImagesAndPatchNodes,
 } from "./projects-import-side-effects";
 import { runProjectImportWorkflow } from "./projects-import-workflow";
+import { ProjectSettingsDialog } from "./project-settings-dialog";
 import type { Editor } from "@tiptap/react";
-
-function NoteCard({
-  node,
-  onClick,
-}: {
-  node: { name: string; content: unknown };
-  onClick: () => void;
-}) {
-  const heroImage = React.useMemo(
-    () => extractHeroImage(node.content),
-    [node.content],
-  );
-  const preview = React.useMemo(
-    () => tiptapToMarkdown(node.content),
-    [node.content],
-  );
-
-  return (
-    <div
-      className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-      onClick={onClick}
-    >
-      <div className="w-full h-40">
-        <HeroGradient
-          seed={node.name}
-          imageUrl={heroImage}
-          imageAlt={node.name}
-          className="w-full h-full"
-        />
-      </div>
-      <div className="p-4 space-y-2">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick();
-            }}
-            className="p-1 rounded hover:bg-accent hover:text-accent-foreground transition-colors shrink-0"
-            title="Edit"
-          >
-            <Pencil className="w-3 h-3 text-muted-foreground" />
-          </button>
-          <span className="font-medium text-sm truncate">{node.name}</span>
-        </div>
-        {preview && (
-          <div className="relative max-h-[200px] overflow-hidden">
-            <div className="text-xs text-muted-foreground prose prose-xs dark:prose-invert max-w-none [&_*]:text-xs [&_h1,&_h2,&_h3,&_h4]:font-semibold [&_h1,&_h2,&_h3,&_h4]:mt-1 [&_p]:mt-0 [&_ul]:mt-0 [&_ol]:mt-0 [&_li]:my-0">
-              <ReactMarkdown>{preview}</ReactMarkdown>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function FolderCardView({
   nodes,
   onOpenNode,
+  onToggleFavorite,
 }: {
-  nodes: { id: string; name: string; type: string; content: unknown }[];
+  nodes: {
+    id: string;
+    name: string;
+    type: string;
+    content: unknown;
+    metadata: unknown;
+  }[];
   onOpenNode: (nodeId: string) => void;
+  onToggleFavorite?: (nodeId: string) => void;
 }) {
-  const children = nodes;
+  const nodeIds = React.useMemo(() => nodes.map((n) => n.id), [nodes]);
+  const firstMediaQuery = trpc.media.getFirstImageByNodes.useQuery(
+    { nodeIds },
+    { enabled: nodeIds.length > 0, staleTime: 30_000 },
+  );
+  const firstMediaMap = firstMediaQuery.data ?? {};
 
-  if (children.length === 0) {
+  if (nodes.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
         This folder is empty.
@@ -153,11 +112,12 @@ function FolderCardView({
         className="mx-auto grid w-full max-w-[calc(18rem*4+3rem)] gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))]"
         data-testid="folder-card-grid"
       >
-        {children.map((node) => (
+        {nodes.map((node) => (
           <NoteCard
             key={node.id}
-            node={node}
+            node={{ ...node, firstMediaId: firstMediaMap[node.id] ?? null }}
             onClick={() => onOpenNode(node.id)}
+            onToggleFavorite={onToggleFavorite}
           />
         ))}
       </div>
@@ -183,6 +143,12 @@ export default function ProjectsPage() {
     name: string;
   } | null>(null);
   const [projectName, setProjectName] = React.useState("");
+  const [listSettingsProject, setListSettingsProject] = React.useState<{
+    id: string;
+    name: string;
+    summary?: string | null;
+    metadata: Record<string, unknown>;
+  } | null>(null);
 
   const router = useRouter();
 
@@ -259,8 +225,9 @@ export default function ProjectsPage() {
   );
   const [showImageUpload, setShowImageUpload] = React.useState(false);
   const [imagePickerTab, setImagePickerTab] = React.useState<
-    "upload" | "existing"
+    "upload" | "existing" | "generate"
   >("upload");
+  const [aiImagePrompt, setAiImagePrompt] = React.useState("");
   const [showLinkPicker, setShowLinkPicker] = React.useState(false);
   const [linkPickerSearch, setLinkPickerSearch] = React.useState("");
   const [showExportMenu, setShowExportMenu] = React.useState(false);
@@ -461,7 +428,6 @@ export default function ProjectsPage() {
   }, [
     selectedTagIds,
     searchQuery,
-    selectedTagIds.length,
     filteredNodesQuery.data,
     searchResultsQuery.data,
   ]);
@@ -628,8 +594,8 @@ export default function ProjectsPage() {
         | undefined;
       const siblingNodes = targetNode?.parentId
         ? (utils.nodes.getChildren.getData({
-            parentId: targetNode.parentId,
-          }) ?? [])
+          parentId: targetNode.parentId,
+        }) ?? [])
         : [];
       const moveInput = deriveNodeMoveMutationInput(
         draggedNodeId,
@@ -646,8 +612,73 @@ export default function ProjectsPage() {
     [nodeMoveMutation, utils.nodes.getById, utils.nodes.getChildren],
   );
 
+  // Bulk node selection & tag modal
+  const [selectedBulkNodeIds, setSelectedBulkNodeIds] = React.useState<
+    Set<string>
+  >(new Set());
+  const [showBulkTagModal, setShowBulkTagModal] = React.useState(false);
+  const toggleFavoriteMutation = trpc.nodes.toggleFavorite.useMutation({
+    onSuccess: (updatedNode) => {
+      const nowFavorite =
+        (updatedNode.metadata as Record<string, unknown> | null)?.isFavorite ===
+        true;
+      addToast(
+        nowFavorite
+          ? tFileTree("favorites.added")
+          : tFileTree("favorites.removed"),
+        "success",
+      );
+      utils.nodes.getFavorites.invalidate();
+      utils.nodes.getChildren.invalidate();
+    },
+    onError: (err) => {
+      addToast(err.message || tCommon("error"), "error");
+    },
+  });
+  const handleToggleFavorite = React.useCallback(
+    (nodeId: string) => {
+      toggleFavoriteMutation.mutate({ nodeId });
+    },
+    [toggleFavoriteMutation],
+  );
+
+  const handleToggleBulkNode = React.useCallback((nodeId: string) => {
+    setSelectedBulkNodeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  }, []);
+
+  const projectMeta =
+    (currentProject?.metadata as Record<string, unknown> | null) ?? {};
+
+  // Project settings dialog
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+
   // Media upload mutation
   const mediaUploadMutation = trpc.media.upload.useMutation();
+
+  const masterKeyQuery = trpc.preferences.getMasterKey.useQuery(undefined, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  const generateImageMutation = trpc.media.generateImage.useMutation({
+    onSuccess: (attachment) => {
+      editorInstanceRef.current
+        ?.chain()
+        .focus()
+        .setImage({ src: getMediaAttachmentUrl(attachment.id) })
+        .run();
+      setShowImageUpload(false);
+      setAiImagePrompt("");
+    },
+    onError: (err) => {
+      addToast(err.message ?? tEditor("imageUpload.generateError"), "error");
+    },
+  });
 
   // ─── Import from directory ───────────────────────────────────────────
   const mediaUploadForImport = trpc.media.upload.useMutation();
@@ -785,8 +816,8 @@ export default function ProjectsPage() {
         currentProject?.id,
         forceList,
         selectedNodeQuery.data as
-          | { id: string; type: string; parentId: string | null }
-          | undefined,
+        | { id: string; type: string; parentId: string | null }
+        | undefined,
       );
     },
     [currentProject?.id, forceList, selectedNodeQuery.data],
@@ -1163,6 +1194,13 @@ export default function ProjectsPage() {
       case "delete":
         setNodeDeleteConfirm({ open: true, node: action.node });
         break;
+      case "tagSelection":
+        // If nothing is shift-selected, tag just the right-clicked node
+        if (selectedBulkNodeIds.size === 0) {
+          setSelectedBulkNodeIds(new Set([action.node.id]));
+        }
+        setShowBulkTagModal(true);
+        break;
     }
   };
 
@@ -1201,16 +1239,11 @@ export default function ProjectsPage() {
                 )}
               </button>
               <button
-                onClick={() =>
-                  openEditDialog({
-                    id: currentProject.id,
-                    name: currentProject.name,
-                  })
-                }
+                onClick={() => setSettingsOpen(true)}
                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                title={tCommon("edit")}
+                title="Project settings"
               >
-                <Pencil className="w-3 h-3" />
+                <Settings className="w-3 h-3" />
               </button>
             </div>
             {/* Unified filter panel */}
@@ -1248,8 +1281,20 @@ export default function ProjectsPage() {
               attributionFilter={attributionFilter}
               onAddToContext={chatSidebarOpen ? handleAddToContext : undefined}
               contextNodeIds={chatSidebarOpen ? chatContextNodeIds : undefined}
+              onToggleFavorite={handleToggleFavorite}
+              selectedNodeIds={selectedBulkNodeIds}
+              onToggleNodeSelected={handleToggleBulkNode}
               className="flex-1 min-h-0"
             />
+            {currentProjectId && (
+              <BulkTagBar
+                open={showBulkTagModal}
+                onClose={() => setShowBulkTagModal(false)}
+                selectedNodeIds={selectedBulkNodeIds}
+                projectId={currentProjectId}
+                onClearSelection={() => setSelectedBulkNodeIds(new Set())}
+              />
+            )}
             <div className="border-t flex flex-col flex-shrink-0">
               {tagPanelCollapsed ? (
                 /* Collapsed — slim bar with icon button to reopen, same pattern as ChatSidebar */
@@ -1293,6 +1338,7 @@ export default function ProjectsPage() {
                 </>
               )}
             </div>
+
           </div>
 
           {/* Right panel: Content — flex column so header is pinned, editor scrolls internally */}
@@ -1339,11 +1385,11 @@ export default function ProjectsPage() {
                           className={cn(
                             "text-xs px-2 py-1 rounded",
                             autoSaveStatus === "saving" &&
-                              "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
+                            "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
                             autoSaveStatus === "saved" &&
-                              "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
+                            "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
                             autoSaveStatus === "error" &&
-                              "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
+                            "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
                             autoSaveStatus === "idle" && "hidden",
                           )}
                           data-testid="auto-save-status"
@@ -1474,6 +1520,7 @@ export default function ProjectsPage() {
                       <div className="flex-1 min-h-0">
                         <TiptapEditor
                           content={parsed}
+                          nodeId={selectedNodeId ?? undefined}
                           onChange={setEditorContent}
                           editorRef={editorInstanceRef}
                           onInsertImage={() =>
@@ -1505,18 +1552,19 @@ export default function ProjectsPage() {
                                 </button>
                               </div>
                               <div className="flex border-b">
-                                <button
-                                  onClick={() => setImagePickerTab("upload")}
-                                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${imagePickerTab === "upload" ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                                >
-                                  Upload new
-                                </button>
-                                <button
-                                  onClick={() => setImagePickerTab("existing")}
-                                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${imagePickerTab === "existing" ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                                >
-                                  Select existing
-                                </button>
+                                {(
+                                  ["upload", "existing", "generate"] as const
+                                ).map((tab) => (
+                                  <button
+                                    key={tab}
+                                    onClick={() => setImagePickerTab(tab)}
+                                    className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${imagePickerTab === tab ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                                  >
+                                    {tEditor(
+                                      `imageUpload.tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`,
+                                    )}
+                                  </button>
+                                ))}
                               </div>
                               <div className="flex-1 overflow-y-auto p-4">
                                 {imagePickerTab === "upload" ? (
@@ -1528,17 +1576,17 @@ export default function ProjectsPage() {
                                     onUploadError={handleImageUploadError}
                                     isUploading={mediaUploadMutation.isPending}
                                   />
-                                ) : (
+                                ) : imagePickerTab === "existing" ? (
                                   <div>
                                     {projectImagesQuery.isLoading ? (
                                       <p className="text-sm text-muted-foreground text-center py-4">
                                         Loading images...
                                       </p>
                                     ) : (projectImagesQuery.data ?? []).filter(
-                                        (a) => a.mimeType.startsWith("image/"),
-                                      ).length === 0 ? (
+                                      (a) => a.mimeType.startsWith("image/"),
+                                    ).length === 0 ? (
                                       <p className="text-sm text-muted-foreground text-center py-4">
-                                        No images uploaded to this project yet.
+                                        {tEditor("imageUpload.noImagesYet")}
                                       </p>
                                     ) : (
                                       <div className="grid grid-cols-3 gap-3">
@@ -1549,6 +1597,7 @@ export default function ProjectsPage() {
                                           .map((attachment) => (
                                             <button
                                               key={attachment.id}
+                                              type="button"
                                               onClick={() => {
                                                 editorInstanceRef.current
                                                   ?.chain()
@@ -1561,15 +1610,89 @@ export default function ProjectsPage() {
                                                   .run();
                                                 setShowImageUpload(false);
                                               }}
-                                              className="aspect-square rounded border hover:border-primary overflow-hidden bg-muted/30 flex items-center justify-center transition-colors"
+                                              className="group aspect-square rounded border hover:border-primary overflow-hidden bg-muted/30 transition-colors"
                                               title={attachment.filename}
                                             >
-                                              <span className="text-xs text-muted-foreground truncate px-1">
-                                                {attachment.filename}
-                                              </span>
+                                              <div className="relative h-full w-full">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                  src={getMediaAttachmentUrl(
+                                                    attachment.id,
+                                                  )}
+                                                  alt={attachment.filename}
+                                                  loading="lazy"
+                                                  className="h-full w-full object-cover"
+                                                />
+                                                <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1">
+                                                  <span className="block truncate text-xs text-white">
+                                                    {attachment.filename}
+                                                  </span>
+                                                </div>
+                                              </div>
                                             </button>
                                           ))}
                                       </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-3">
+                                    {!masterKeyQuery.data?.masterKey ? (
+                                      <p className="text-sm text-muted-foreground text-center py-4">
+                                        {tEditor("imageUpload.noApiKey")}
+                                      </p>
+                                    ) : (
+                                      <>
+                                        <label className="text-sm font-medium">
+                                          {tEditor(
+                                            "imageUpload.generatePromptLabel",
+                                          )}
+                                        </label>
+                                        <textarea
+                                          value={aiImagePrompt}
+                                          onChange={(e) =>
+                                            setAiImagePrompt(e.target.value)
+                                          }
+                                          rows={3}
+                                          className="w-full rounded border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                                          placeholder="A serene forest at dawn with soft golden light..."
+                                          disabled={
+                                            generateImageMutation.isPending
+                                          }
+                                        />
+                                        <button
+                                          onClick={() => {
+                                            if (
+                                              !aiImagePrompt.trim() ||
+                                              !currentProjectId
+                                            )
+                                              return;
+                                            generateImageMutation.mutate({
+                                              prompt: aiImagePrompt.trim(),
+                                              projectId: currentProjectId,
+                                              masterKey:
+                                                masterKeyQuery.data!.masterKey!,
+                                            });
+                                          }}
+                                          disabled={
+                                            !aiImagePrompt.trim() ||
+                                            generateImageMutation.isPending
+                                          }
+                                          className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-40 transition-colors"
+                                        >
+                                          {generateImageMutation.isPending ? (
+                                            <>
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                              {tEditor(
+                                                "imageUpload.generating",
+                                              )}
+                                            </>
+                                          ) : (
+                                            tEditor(
+                                              "imageUpload.generateButton",
+                                            )
+                                          )}
+                                        </button>
+                                      </>
                                     )}
                                   </div>
                                 )}
@@ -1588,9 +1711,11 @@ export default function ProjectsPage() {
                         name: string;
                         type: string;
                         content: unknown;
+                        metadata: unknown;
                       }[]) ?? []
                     }
                     onOpenNode={(nodeId) => setSelectedNodeId(nodeId)}
+                    onToggleFavorite={handleToggleFavorite}
                   />
                 ) : (
                   <div className="flex-1 overflow-y-auto p-6">
@@ -1622,6 +1747,25 @@ export default function ProjectsPage() {
             }
             onCreate={handleNodeCreate}
           />
+          {settingsOpen && currentProject && (
+            <ProjectSettingsDialog
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              project={{
+                id: currentProject.id,
+                name: currentProject.name,
+                summary: (currentProject as { summary?: string | null }).summary ?? null,
+                metadata: projectMeta,
+              }}
+            />
+          )}
+          {listSettingsProject && (
+            <ProjectSettingsDialog
+              open
+              onClose={() => setListSettingsProject(null)}
+              project={listSettingsProject}
+            />
+          )}
           <RenameDialog
             open={renameDialog.open}
             currentName={renameDialog.currentName}
@@ -1636,6 +1780,7 @@ export default function ProjectsPage() {
             open={contextMenu.open}
             position={contextMenu.position}
             node={contextMenu.node}
+            selectedCount={selectedBulkNodeIds.size}
             onClose={() =>
               setContextMenu({
                 open: false,
@@ -1811,7 +1956,7 @@ export default function ProjectsPage() {
         data-import-mode="new-project"
         data-testid="import-directory-input"
       />
-      <div className="p-8">
+      <div className="p-8 max-w-5xl mx-auto space-y-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -1847,81 +1992,48 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projectsQuery.data.map((project) => {
               const isSelected = currentProjectId === project.id;
+              const meta = (project.metadata as Record<string, unknown> | null) ?? {};
               return (
-                <div
-                  key={project.id}
-                  onClick={async () => {
-                    await setCurrentProject(project.id);
-                    navigateToProjects();
-                  }}
-                  className={cn(
-                    "group relative flex flex-col rounded-lg border bg-card overflow-hidden hover:shadow-md transition-shadow cursor-pointer",
-                    isSelected &&
-                      "border-green-500 bg-green-50 dark:bg-green-950",
-                  )}
-                >
-                  {/* Hero gradient banner */}
-                  <HeroGradient seed={project.name} className="w-full h-24" />
-
-                  <div className="p-6 pt-4">
-                    {/* Checkmark in upper-right corner */}
-                    {isSelected && (
-                      <div className="absolute top-3 right-3">
-                        <div className="rounded-full bg-green-500 p-1">
-                          <Check className="h-4 w-4 text-white" />
-                        </div>
-                      </div>
+                <div key={project.id} className="group relative">
+                  <NoteCard
+                    node={{
+                      id: project.id,
+                      name: project.name,
+                      firstMediaId: meta.heroAttachmentId as string | null | undefined,
+                    }}
+                    variant="compact"
+                    description={(project as { summary?: string | null }).summary ?? undefined}
+                    isSelected={isSelected}
+                    onClick={async () => {
+                      await setCurrentProject(project.id);
+                      navigateToProjects();
+                    }}
+                    onSettings={() =>
+                      setListSettingsProject({
+                        id: project.id,
+                        name: project.name,
+                        summary: (project as { summary?: string | null }).summary ?? null,
+                        metadata: meta,
+                      })
+                    }
+                  />
+                  {/* Delete button — bottom-left on hover */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDeleteDialog({ id: project.id, name: project.name });
+                    }}
+                    className={cn(
+                      "absolute bottom-3 left-3 z-10",
+                      "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium",
+                      "border border-input bg-background/90 backdrop-blur-sm",
+                      "hover:bg-destructive hover:text-destructive-foreground hover:border-destructive",
+                      "opacity-0 group-hover:opacity-100 transition-all",
                     )}
-
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <FolderTree className="h-8 w-8 text-primary flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-lg truncate">
-                            {project.name}
-                          </h3>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditDialog({
-                            id: project.id,
-                            name: project.name,
-                          });
-                        }}
-                        className={cn(
-                          "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
-                          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          "transition-colors",
-                        )}
-                      >
-                        <Pencil className="h-3 w-3" />
-                        {tCommon("edit")}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDeleteDialog({
-                            id: project.id,
-                            name: project.name,
-                          });
-                        }}
-                        className={cn(
-                          "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
-                          "border border-input bg-background hover:bg-destructive hover:text-destructive-foreground",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          "transition-colors",
-                        )}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                        {tCommon("delete")}
-                      </button>
-                    </div>
-                  </div>
+                  >
+                    <Trash2 className="h-3 w-3" />
+                    {tCommon("delete")}
+                  </button>
                 </div>
               );
             })}

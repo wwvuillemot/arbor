@@ -43,6 +43,7 @@ describe("mcp-integration-service", () => {
       "list_tags",
       "export_node",
       "export_project",
+      "generate_image",
     ]);
     expect(tools.every((tool) => tool.type === "function")).toBe(true);
     expect(createNodeTool?.function.parameters).toMatchObject({

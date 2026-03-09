@@ -3,8 +3,11 @@ import { db } from "../db/index";
 import { nodes } from "../db/schema";
 import { LocalEmbeddingProvider } from "./embedding-service";
 import { ExportService } from "./export-service";
+import { ImageGenerationService } from "./image-generation-service";
+import { MediaAttachmentService } from "./media-attachment-service";
 import { NodeService, type UpdateNodeParams } from "./node-service";
 import { SearchService } from "./search-service";
+import { SettingsService } from "./settings-service";
 import { TagService } from "./tag-service";
 import {
   getListParentId,
@@ -32,6 +35,8 @@ const nodeService = new NodeService();
 const tagService = new TagService();
 const exportService = new ExportService();
 const searchService = new SearchService(new LocalEmbeddingProvider());
+const mediaService = new MediaAttachmentService();
+const settingsService = new SettingsService();
 
 async function executeCreateNode(args: ToolArgs): Promise<unknown> {
   const content = getOptionalContentArg(args, "content");
@@ -212,6 +217,29 @@ async function executeExportNode(args: ToolArgs): Promise<unknown> {
   return { content, format };
 }
 
+async function executeGenerateImage(
+  args: ToolArgs,
+  masterKey?: string,
+): Promise<unknown> {
+  if (!masterKey) {
+    throw new Error(
+      "generate_image requires a masterKey for API key decryption",
+    );
+  }
+  const prompt = getRequiredStringArg(args, "prompt");
+  const projectId = getRequiredStringArg(args, "projectId");
+  const apiKey = await settingsService.getSetting("openai_api_key", masterKey);
+  if (!apiKey) {
+    throw new Error("OpenAI API key not configured");
+  }
+  const imageService = new ImageGenerationService(
+    apiKey,
+    mediaService,
+    nodeService,
+  );
+  return await imageService.generateImage(prompt, projectId);
+}
+
 async function executeExportProject(args: ToolArgs): Promise<unknown> {
   const projectId = getRequiredStringArg(args, "projectId");
   const format = getOptionalExportFormatArg(args, "format") ?? "markdown";
@@ -223,7 +251,11 @@ async function executeExportProject(args: ToolArgs): Promise<unknown> {
   return { content, format };
 }
 
-async function executeTool(toolName: string, args: ToolArgs): Promise<unknown> {
+async function executeTool(
+  toolName: string,
+  args: ToolArgs,
+  masterKey?: string,
+): Promise<unknown> {
   switch (toolName) {
     case "create_node":
       return await executeCreateNode(args);
@@ -249,6 +281,8 @@ async function executeTool(toolName: string, args: ToolArgs): Promise<unknown> {
       return await executeExportNode(args);
     case "export_project":
       return await executeExportProject(args);
+    case "generate_image":
+      return await executeGenerateImage(args, masterKey);
     default:
       throw new Error(`Unknown tool: ${toolName}`);
   }
@@ -257,9 +291,10 @@ async function executeTool(toolName: string, args: ToolArgs): Promise<unknown> {
 export async function executeMCPTool(
   toolName: string,
   args: ToolArgs,
+  masterKey?: string,
 ): Promise<string> {
   try {
-    const result = await executeTool(toolName, args);
+    const result = await executeTool(toolName, args, masterKey);
     return JSON.stringify(result, null, 2);
   } catch (error) {
     return JSON.stringify({

@@ -13,6 +13,7 @@ import type {
   ToolCall,
   ToolDefinition,
 } from "@/services/llm-service";
+import type { AgentModeConfig } from "@/services/agent-mode-types";
 
 type ContextNodeRecord = NonNullable<
   Awaited<ReturnType<ChatContextNodeService["getNodeById"]>>
@@ -107,6 +108,35 @@ function createContextNodeRecord(
   };
 }
 
+function createAgentModeConfig(
+  overrides: Partial<AgentModeConfig> = {},
+): AgentModeConfig {
+  return {
+    id: "assistant",
+    name: "assistant",
+    displayName: "Assistant",
+    description: "General-purpose assistant",
+    allowedTools: [],
+    guidelines: "",
+    temperature: 0.7,
+    isBuiltIn: true,
+    createdAt: new Date("2024-01-01"),
+    updatedAt: new Date("2024-01-01"),
+    ...overrides,
+  };
+}
+
+function createToolDefinition(name: string): ToolDefinition {
+  return {
+    type: "function",
+    function: {
+      name,
+      description: `Tool: ${name}`,
+      parameters: { type: "object", properties: {} },
+    },
+  };
+}
+
 function createServiceHarness(options?: {
   thread?: ChatThread;
   history?: StoredChatMessage[];
@@ -116,6 +146,7 @@ function createServiceHarness(options?: {
   descendantsByNodeId?: Record<string, ContextNodeRecord[]>;
   tools?: ToolDefinition[];
   toolResultsByName?: Record<string, string>;
+  agentModeConfig?: Partial<AgentModeConfig>;
 }) {
   const thread = options?.thread ?? createThreadRecord();
   const storedMessages = [...(options?.history ?? [])];
@@ -184,10 +215,17 @@ function createServiceHarness(options?: {
     },
   );
 
+  const toolNames = (options?.tools ?? []).map((t) => t.function.name);
+  const resolvedAgentModeConfig = createAgentModeConfig({
+    // Default: allow all provided tools so existing tests are unaffected
+    allowedTools: toolNames,
+    ...options?.agentModeConfig,
+  });
+
   const dependencies: ChatSendMessageDependencies = {
     chatService,
     nodeService,
-    getAgentModeConfig: vi.fn(async () => ({ temperature: 0.3 })),
+    getAgentModeConfig: vi.fn(async () => resolvedAgentModeConfig),
     buildSystemPrompt: vi.fn(async (mode: string) => `Base prompt for ${mode}`),
     initializeLLMService: vi.fn(async () => llmService),
     getMcpTools: vi.fn(async () => options?.tools ?? []),
@@ -383,9 +421,11 @@ describe("ChatSendMessageService", () => {
       masterKey: "test-master-key",
     });
 
-    expect(harness.executeMcpTool).toHaveBeenCalledWith("search_nodes", {
-      query: "hero",
-    });
+    expect(harness.executeMcpTool).toHaveBeenCalledWith(
+      "search_nodes",
+      { query: "hero" },
+      "test-master-key",
+    );
     expect(harness.llmChatCalls).toHaveLength(2);
     expect(harness.storedMessages.map((message) => message.role)).toEqual([
       "user",
@@ -403,6 +443,96 @@ describe("ChatSendMessageService", () => {
     expect(result.assistantMessage.metadata).toEqual(
       expect.objectContaining({ totalIterations: 1 }),
     );
+  });
+
+  describe("agent mode tool filtering", () => {
+    const allToolNames = [
+      "create_node",
+      "update_node",
+      "delete_node",
+      "move_node",
+      "list_nodes",
+      "search_nodes",
+      "search_semantic",
+      "add_tag",
+    ];
+    const allTools = allToolNames.map(createToolDefinition);
+
+    it("planner mode only receives its 4 allowed tools", async () => {
+      const harness = createServiceHarness({
+        tools: allTools,
+        agentModeConfig: {
+          name: "planner",
+          allowedTools: ["create_node", "move_node", "list_nodes", "add_tag"],
+        },
+      });
+
+      await harness.service.sendMessage({
+        threadId: harness.thread.id,
+        content: "Plan my story",
+        masterKey: "test-master-key",
+      });
+
+      const sentToolNames =
+        harness.llmChatCalls[0]?.options?.tools?.map((t) => t.function.name) ??
+        [];
+      expect(sentToolNames).toHaveLength(4);
+      expect(sentToolNames).toContain("create_node");
+      expect(sentToolNames).toContain("move_node");
+      expect(sentToolNames).toContain("list_nodes");
+      expect(sentToolNames).toContain("add_tag");
+      expect(sentToolNames).not.toContain("update_node");
+      expect(sentToolNames).not.toContain("search_semantic");
+      expect(sentToolNames).not.toContain("delete_node");
+    });
+
+    it("editor mode only receives its 3 allowed tools", async () => {
+      const harness = createServiceHarness({
+        tools: allTools,
+        agentModeConfig: {
+          name: "editor",
+          allowedTools: ["update_node", "search_nodes", "list_nodes"],
+        },
+      });
+
+      await harness.service.sendMessage({
+        threadId: harness.thread.id,
+        content: "Edit my chapter",
+        masterKey: "test-master-key",
+      });
+
+      const sentToolNames =
+        harness.llmChatCalls[0]?.options?.tools?.map((t) => t.function.name) ??
+        [];
+      expect(sentToolNames).toHaveLength(3);
+      expect(sentToolNames).toContain("update_node");
+      expect(sentToolNames).toContain("search_nodes");
+      expect(sentToolNames).toContain("list_nodes");
+      expect(sentToolNames).not.toContain("create_node");
+      expect(sentToolNames).not.toContain("search_semantic");
+      expect(sentToolNames).not.toContain("delete_node");
+    });
+
+    it("assistant mode with all tools receives all tools", async () => {
+      const harness = createServiceHarness({
+        tools: allTools,
+        agentModeConfig: {
+          name: "assistant",
+          allowedTools: allToolNames,
+        },
+      });
+
+      await harness.service.sendMessage({
+        threadId: harness.thread.id,
+        content: "Help me write",
+        masterKey: "test-master-key",
+      });
+
+      const sentToolNames =
+        harness.llmChatCalls[0]?.options?.tools?.map((t) => t.function.name) ??
+        [];
+      expect(sentToolNames).toHaveLength(allToolNames.length);
+    });
   });
 
   it("compacts long histories into a summary before the main LLM call", async () => {

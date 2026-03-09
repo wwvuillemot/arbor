@@ -44,6 +44,7 @@ const {
   mockInvalidateGetChildren,
   mockInvalidateGetDescendants,
   folderChildrenData,
+  projectImagesData,
   selectedNodeData,
 } = vi.hoisted(() => ({
   currentProjectState: { value: "proj-1" as string | null },
@@ -69,6 +70,11 @@ const {
   mockInvalidateGetChildren: vi.fn(),
   mockInvalidateGetDescendants: vi.fn(),
   folderChildrenData: [] as Array<Record<string, unknown>>,
+  projectImagesData: [] as Array<{
+    id: string;
+    filename: string;
+    mimeType: string;
+  }>,
   selectedNodeData: {
     id: "node-1",
     name: "Test Note",
@@ -131,7 +137,19 @@ vi.mock("@/hooks/use-auto-save", () => ({
 vi.mock("@/components/editor", () => ({
   TiptapEditor: (props: MockTiptapEditorProps) => {
     mockTiptapEditor(props);
-    return <div data-testid="tiptap-editor" />;
+    const { onInsertImage } = props as { onInsertImage?: () => void };
+    return (
+      <>
+        <div data-testid="tiptap-editor" />
+        <button
+          type="button"
+          data-testid="tiptap-editor-insert-image"
+          onClick={() => onInsertImage?.()}
+        >
+          Open image dialog
+        </button>
+      </>
+    );
   },
   ImageUpload: () => null,
   LinkPickerDialog: () => null,
@@ -195,6 +213,7 @@ vi.mock("@/components/file-tree", () => ({
   NodeContextMenu: function MockNodeContextMenu({ open }: { open: boolean }) {
     return open ? <div data-testid="context-menu" /> : null;
   },
+  BulkTagBar: () => null,
 }));
 
 // Mock tRPC
@@ -271,6 +290,10 @@ vi.mock("@/lib/trpc", () => {
           makeMutation({ mutateAsync: mockImportDirectoryMutateAsync }),
         ),
       },
+      toggleFavorite: { useMutation: vi.fn(() => makeMutation()) },
+      getFavorites: {
+        useQuery: vi.fn(() => ({ data: [], isLoading: false, error: null })),
+      },
     },
     tags: {
       getNodesByTags: {
@@ -280,6 +303,8 @@ vi.mock("@/lib/trpc", () => {
           error: null,
         })),
       },
+      bulkAddToNodes: { useMutation: vi.fn(() => makeMutation()) },
+      bulkRemoveFromNodes: { useMutation: vi.fn(() => makeMutation()) },
     },
     search: {
       keywordSearch: {
@@ -293,7 +318,7 @@ vi.mock("@/lib/trpc", () => {
     media: {
       getByProject: {
         useQuery: vi.fn(() => ({
-          data: [],
+          data: projectImagesData,
           isLoading: false,
           error: null,
         })),
@@ -302,6 +327,10 @@ vi.mock("@/lib/trpc", () => {
         useMutation: vi.fn(() =>
           makeMutation({ mutateAsync: mockMediaUploadMutateAsync }),
         ),
+      },
+      generateImage: { useMutation: vi.fn(() => makeMutation()) },
+      getFirstImageByNodes: {
+        useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
       },
     },
     preferences: {
@@ -322,6 +351,13 @@ vi.mock("@/lib/trpc", () => {
       setAppPreference: { useMutation: vi.fn(() => makeMutation()) },
       setAppPreferences: { useMutation: vi.fn(() => makeMutation()) },
       deleteAppPreference: { useMutation: vi.fn(() => makeMutation()) },
+      getMasterKey: {
+        useQuery: vi.fn(() => ({
+          data: { masterKey: null },
+          isLoading: false,
+          error: null,
+        })),
+      },
     },
     useUtils: vi.fn(() => ({
       nodes: {
@@ -334,6 +370,7 @@ vi.mock("@/lib/trpc", () => {
           fetch: mockGetByIdFetch,
         },
         getChildren: { invalidate: mockInvalidateGetChildren },
+        getFavorites: { invalidate: vi.fn() },
         getDescendants: {
           fetch: mockGetDescendantsFetch,
           invalidate: mockInvalidateGetDescendants,
@@ -347,6 +384,9 @@ vi.mock("@/lib/trpc", () => {
             .fn()
             .mockResolvedValue({ url: "https://minio.test/img.png" }),
         },
+      },
+      tags: {
+        getNodeTags: { invalidate: vi.fn() },
       },
       preferences: {
         getAllAppPreferences: {
@@ -390,6 +430,7 @@ describe("ProjectsPage Export", () => {
     selectedNodeData.parentId = "proj-1";
     selectedNodeData.content = null;
     folderChildrenData.length = 0;
+    projectImagesData.length = 0;
     mockImportDirectoryMutateAsync.mockReset();
     mockImportDirectoryMutateAsync.mockResolvedValue({});
     mockUpdateNodeMutateAsync.mockReset();
@@ -437,6 +478,30 @@ describe("ProjectsPage Export", () => {
     );
     expect(screen.getByText("Scene One")).toBeInTheDocument();
     expect(screen.getByText("Scene Two")).toBeInTheDocument();
+  });
+
+  it("should render image thumbnails in the existing image picker tab", async () => {
+    projectImagesData.push({
+      id: "media-existing-1",
+      filename: "castle-map.png",
+      mimeType: "image/png",
+    });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    fireEvent.click(screen.getByTestId("tiptap-editor-insert-image"));
+    expect(screen.getByTestId("image-upload-modal")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("imageUpload.tabExisting"));
+
+    const existingImageThumbnail = await screen.findByRole("img", {
+      name: "castle-map.png",
+    });
+
+    expect(existingImageThumbnail).toHaveAttribute(
+      "src",
+      getMediaAttachmentUrl("media-existing-1"),
+    );
   });
 
   it("should render export button when a node is selected", async () => {

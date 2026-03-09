@@ -233,6 +233,7 @@
     "cancel": "キャンセル",
     "delete": "削除",
     "edit": "編集",
+    "settings": "設定",
     "create": "作成",
     "close": "閉じる"
   },
@@ -352,6 +353,26 @@
     "deleteError": "プロジェクトの削除に失敗しました"
   },
   "editor": {
+    "projectSettings": {
+      "title": "{name} の設定",
+      "tabGeneral": "一般",
+      "tabAppearance": "外観",
+      "tabStyle": "スタイルプリセット",
+      "name": "プロジェクト名",
+      "namePlaceholder": "マイプロジェクト",
+      "description": "説明",
+      "descriptionPlaceholder": "このプロジェクトの簡単な概要...",
+      "descriptionHint": "プロジェクトカードに表示され、AI機能のコンテキストとして使用されます。",
+      "save": "変更を保存",
+      "saved": "保存済み",
+      "delete": "削除",
+      "heroImage": "ヒーロー画像",
+      "heroImageHint": "プロジェクトのメディアから画像をクリックしてヒーロー画像として使用します。プロジェクトカードとダッシュボードに表示されます。",
+      "clearHero": "ヒーロー画像をクリア",
+      "loadingImages": "画像を読み込み中...",
+      "noImages": "このプロジェクトにはまだ画像がありません。",
+      "styleHint": "スタイルプリセットはこのプロジェクトで画像を生成する際に自動的に適用されます。アクティブなプリセット（✓）が生成に使用されます。"
+    },
     "toolbar": "エディターツールバー",
     "undo": "元に戻す",
     "redo": "やり直し",
@@ -374,13 +395,43 @@
     "insertLink": "リンクを挿入",
     "removeLink": "リンクを削除",
     "insertImage": "画像を挿入",
+    "aiAttribution": "AI帰属表示",
     "imageUpload": {
       "uploading": "画像をアップロード中...",
       "dropOrClick": "画像をドロップするかクリックして選択",
       "supportedFormats": "PNG、JPG、GIF、WebP、SVG（最大10MB）",
       "invalidType": "無効なファイル形式です。画像をアップロードしてください。",
       "fileTooLarge": "ファイルが大きすぎます。最大サイズは10MBです。",
-      "uploadFailed": "画像のアップロードに失敗しました"
+      "uploadFailed": "画像のアップロードに失敗しました",
+      "tabUpload": "新規アップロード",
+      "tabExisting": "既存から選択",
+      "tabGenerate": "AIで生成",
+      "generatePromptLabel": "画像の説明",
+      "generatePromptPlaceholder": "ファンタジー王国の水彩マップ...",
+      "generateButton": "生成",
+      "generating": "生成中...",
+      "generateError": "画像の生成に失敗しました",
+      "noApiKey": "OpenAI APIキーが設定されていません",
+      "noImagesYet": "このプロジェクトにはまだ画像がありません。"
+    },
+    "heroImage": {
+      "setHero": "ヒーロー画像に設定",
+      "clearHero": "ヒーロー画像をクリア"
+    },
+    "styleProfile": {
+      "title": "スタイルプリセット",
+      "addPreset": "新規",
+      "presetName": "プリセット名",
+      "presetNamePlaceholder": "例：水彩",
+      "artStyle": "アートスタイル",
+      "artStylePlaceholder": "例：水彩イラスト、繊細な線画",
+      "colorPalette": "カラーパレット",
+      "colorPalettePlaceholder": "例：落ち着いたアースカラー、温かみのあるアイボリー",
+      "moodKeywords": "ムードキーワード",
+      "moodKeywordsPlaceholder": "例：劇的、幻想的",
+      "saveAndActivate": "保存してアクティブ化",
+      "saved": "保存済み",
+      "emptyDescription": "プリセットを追加してイラストのスタイルを統一しましょう。"
     }
   },
   "fileTree": {
@@ -449,6 +500,28 @@
       "aiAssisted": "AIアシスト",
       "aigenerated": "AI生成",
       "aiassisted": "AIアシスト"
+    },
+    "favorites": {
+      "section": "お気に入り",
+      "empty": "お気に入りはまだありません",
+      "add": "お気に入りに追加",
+      "remove": "お気に入りから削除",
+      "added": "お気に入りに追加しました",
+      "removed": "お気に入りから削除しました"
+    },
+    "tagNode": "タグを追加…",
+    "tagSelection": "{count}件選択中にタグ付け…",
+    "bulkTagBar": {
+      "title": "{count}件のノードにタグ付け",
+      "hint": "タグをクリックして切り替えます。選択したタグは全ノードに適用されます。",
+      "tagOnAll": "選択した全ノードに適用済み",
+      "tagOnSome": "一部のノードに適用済み（破線）",
+      "apply": "適用",
+      "cancel": "キャンセル",
+      "added": "{count}件のノードにタグを追加しました",
+      "removed": "{count}件のノードからタグを削除しました",
+      "error": "一括タグ変更に失敗しました",
+      "noTags": "このプロジェクトにタグはまだありません"
     }
   },
   "tags": {

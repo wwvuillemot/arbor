@@ -112,6 +112,7 @@ function buildCreateNodeValues(params: CreateNodeParams) {
     slug,
     content: params.content,
     metadata: params.metadata || {},
+    summary: params.summary ?? null,
     authorType: params.authorType || "human",
     position: params.position ?? 0,
     createdBy: params.createdBy || "user:system",

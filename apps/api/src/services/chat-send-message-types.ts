@@ -23,6 +23,8 @@ export interface SendMessageResult {
 }
 
 export interface AgentModeConfiguration {
+  name: string;
+  allowedTools: string[];
   temperature: number;
 }
 
@@ -72,5 +74,6 @@ export interface ChatSendMessageDependencies {
   executeMcpTool(
     toolName: string,
     args: Record<string, unknown>,
+    masterKey?: string,
   ): Promise<string>;
 }

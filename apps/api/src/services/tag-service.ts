@@ -137,6 +137,24 @@ export class TagService {
   }
 
   /**
+   * Add a tag to multiple nodes in one call
+   */
+  async bulkAddToNodes(nodeIds: string[], tagId: string): Promise<void> {
+    await Promise.all(
+      nodeIds.map((nodeId) => this.addTagToNode(nodeId, tagId)),
+    );
+  }
+
+  /**
+   * Remove a tag from multiple nodes in one call
+   */
+  async bulkRemoveFromNodes(nodeIds: string[], tagId: string): Promise<void> {
+    await Promise.all(
+      nodeIds.map((nodeId) => this.removeTagFromNode(nodeId, tagId)),
+    );
+  }
+
+  /**
    * Get all tags for a node
    */
   async getNodeTags(nodeId: string): Promise<Tag[]> {
