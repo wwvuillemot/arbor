@@ -259,7 +259,8 @@
       "assistant": "Assistant",
       "planner": "Planner",
       "editor": "Editor",
-      "researcher": "Researcher"
+      "researcher": "Researcher",
+      "art_director": "Art Director"
     },
     "role": {
       "user": "You",

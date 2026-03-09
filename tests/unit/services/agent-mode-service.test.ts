@@ -23,12 +23,13 @@ beforeEach(async () => {
 // ─── AGENT_MODES Configuration ──────────────────────────────────────────────────
 
 describe("AGENT_MODES", () => {
-  it("should define all four modes", () => {
+  it("should define all built-in modes", () => {
     expect(Object.keys(AGENT_MODES)).toEqual([
       "assistant",
       "planner",
       "editor",
       "researcher",
+      "art_director",
     ]);
   });
 
@@ -286,8 +287,14 @@ describe("getAgentModeConfig", () => {
     expect(config).toBeNull();
   });
 
-  it("should return all four modes when queried individually", async () => {
-    for (const modeName of ["assistant", "planner", "editor", "researcher"]) {
+  it("should return all built-in modes when queried individually", async () => {
+    for (const modeName of [
+      "assistant",
+      "planner",
+      "editor",
+      "researcher",
+      "art_director",
+    ]) {
       const config = await getAgentModeConfig(modeName);
       expect(config).not.toBeNull();
       expect(config!.name).toBe(modeName);
@@ -298,14 +305,15 @@ describe("getAgentModeConfig", () => {
 // ─── getAllAgentModes ────────────────────────────────────────────────────────────
 
 describe("getAllAgentModes", () => {
-  it("should return all four modes as array", async () => {
+  it("should return all built-in modes as array", async () => {
     const modes = await getAllAgentModes();
-    expect(modes).toHaveLength(4);
+    expect(modes).toHaveLength(5);
     const names = modes.map((m) => m.name);
     expect(names).toContain("assistant");
     expect(names).toContain("planner");
     expect(names).toContain("editor");
     expect(names).toContain("researcher");
+    expect(names).toContain("art_director");
   });
 
   it("should return AgentModeConfig objects", async () => {

@@ -1,11 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { ChevronDown, Bot, Lightbulb, Pencil, Search } from "lucide-react";
+import {
+  ChevronDown,
+  Bot,
+  Lightbulb,
+  Pencil,
+  Search,
+  Palette,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
-const AGENT_MODES = ["assistant", "planner", "editor", "researcher"] as const;
+const AGENT_MODES = [
+  "assistant",
+  "planner",
+  "editor",
+  "researcher",
+  "art_director",
+] as const;
 type AgentMode = (typeof AGENT_MODES)[number];
 
 const MODE_ICONS: Record<
@@ -16,6 +29,7 @@ const MODE_ICONS: Record<
   planner: Lightbulb,
   editor: Pencil,
   researcher: Search,
+  art_director: Palette,
 };
 
 export interface AgentModeSelectorProps {

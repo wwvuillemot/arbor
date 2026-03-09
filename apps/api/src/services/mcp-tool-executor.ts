@@ -217,6 +217,21 @@ async function executeExportNode(args: ToolArgs): Promise<unknown> {
   return { content, format };
 }
 
+async function executeGetNodeContent(args: ToolArgs): Promise<unknown> {
+  const nodeId = getRequiredStringArg(args, "nodeId");
+  const node = await nodeService.getNodeById(nodeId);
+  if (!node) {
+    return { error: `Node ${nodeId} not found` };
+  }
+  const markdown = await exportService.exportNodeAsMarkdown(nodeId);
+  return {
+    id: node.id,
+    name: node.name,
+    type: node.type,
+    content: markdown,
+  };
+}
+
 async function executeGenerateImage(
   args: ToolArgs,
   masterKey?: string,
@@ -281,6 +296,8 @@ async function executeTool(
       return await executeExportNode(args);
     case "export_project":
       return await executeExportProject(args);
+    case "get_node_content":
+      return await executeGetNodeContent(args);
     case "generate_image":
       return await executeGenerateImage(args, masterKey);
     default:

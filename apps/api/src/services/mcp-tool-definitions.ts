@@ -213,8 +213,18 @@ export function buildMcpToolDefinitions(): ToolDefinition[] {
       ),
     ),
     createFunctionTool(
+      "get_node_content",
+      "Read the full markdown content of a specific node by ID. Use this after search_semantic or search_nodes to get the complete text of a character sheet, scene, or any note.",
+      createObjectSchema(
+        {
+          nodeId: createStringProperty("UUID of the node to read"),
+        },
+        ["nodeId"],
+      ),
+    ),
+    createFunctionTool(
       "generate_image",
-      "Generate an image using DALL-E based on a text prompt and attach it to a project. The project's style profile (art style, color palette) is automatically prepended to the prompt.",
+      "Generate an image using DALL-E based on a text prompt and attach it to a project. The project's style profile (art style, color palette) is automatically prepended to the prompt. Use this only after researching and proposing a visual concept.",
       createObjectSchema(
         {
           prompt: createStringProperty("Description of the image to generate"),

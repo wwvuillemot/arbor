@@ -43,6 +43,7 @@ describe("mcp-integration-service", () => {
       "list_tags",
       "export_node",
       "export_project",
+      "get_node_content",
       "generate_image",
     ]);
     expect(tools.every((tool) => tool.type === "function")).toBe(true);

@@ -212,7 +212,12 @@ export function ChatPanel({
   const handleNewThread = React.useCallback(() => {
     createThread.mutate({
       name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
-      agentMode: agentMode as "assistant" | "planner" | "editor" | "researcher",
+      agentMode: agentMode as
+        | "assistant"
+        | "planner"
+        | "editor"
+        | "researcher"
+        | "art_director",
       model: selectedModel,
       projectId: projectId ?? null,
     });
@@ -238,7 +243,8 @@ export function ChatPanel({
           | "assistant"
           | "planner"
           | "editor"
-          | "researcher",
+          | "researcher"
+          | "art_director",
         model: selectedModel,
         projectId: projectId ?? null,
       });
@@ -375,7 +381,7 @@ export function ChatPanel({
                             {thread.name}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {thread.agentMode}
+                            {t(`mode.${thread.agentMode}`)}
                           </div>
                         </div>
                         <button

@@ -259,7 +259,8 @@
       "assistant": "アシスタント",
       "planner": "プランナー",
       "editor": "エディター",
-      "researcher": "リサーチャー"
+      "researcher": "リサーチャー",
+      "art_director": "アートディレクター"
     },
     "role": {
       "user": "あなた",

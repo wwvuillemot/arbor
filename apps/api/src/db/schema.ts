@@ -411,6 +411,7 @@ export const agentModeEnum = [
   "planner",
   "editor",
   "researcher",
+  "art_director",
 ] as const;
 
 // AgentMode is now a string to support custom modes
