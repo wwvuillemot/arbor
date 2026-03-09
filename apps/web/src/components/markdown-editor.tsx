@@ -4,6 +4,7 @@ import * as React from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
+import { Markdown } from "tiptap-markdown";
 import { cn } from "@/lib/utils";
 import {
   Bold,
@@ -26,26 +27,10 @@ export interface MarkdownEditorProps {
   minHeight?: string;
 }
 
-// Convert a plain-text string (with \n newlines) to TipTap's JSON doc format.
-// Each line becomes a paragraph node; empty lines become empty paragraphs.
-// This preserves newlines on round-trip since TipTap parses strings as HTML
-// where \n is treated as whitespace and collapsed.
-function plainTextToDoc(text: string) {
-  const lines = text.split("\n");
-  return {
-    type: "doc",
-    content: lines.map((line) => ({
-      type: "paragraph",
-      content: line.length > 0 ? [{ type: "text", text: line }] : [],
-    })),
-  };
-}
-
 /**
- * Reusable TipTap-based markdown editor with live formatting
- * - Shows formatted content as you type
- * - Persists as plain text on the backend (newlines preserved)
- * - Includes toolbar for formatting
+ * TipTap-based markdown editor.
+ * Uses tiptap-markdown for proper round-trip: markdown string → rich editor
+ * display → markdown string. Bold, headings, lists, etc. are preserved verbatim.
  */
 export function MarkdownEditor({
   value,
@@ -59,15 +44,16 @@ export function MarkdownEditor({
     immediatelyRender: false,
     extensions: [
       StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3],
-        },
+        heading: { levels: [1, 2, 3] },
       }),
-      Placeholder.configure({
-        placeholder,
+      Placeholder.configure({ placeholder }),
+      Markdown.configure({
+        html: false,
+        transformCopiedText: true,
+        transformPastedText: true,
       }),
     ],
-    content: plainTextToDoc(value),
+    content: value,
     editorProps: {
       attributes: {
         class: cn("prose prose-sm max-w-none focus:outline-none", "px-3 py-2"),
@@ -75,16 +61,20 @@ export function MarkdownEditor({
       },
     },
     onUpdate: ({ editor: currentEditor }) => {
-      onChange(currentEditor.getText({ blockSeparator: "\n" }));
+      // tiptap-markdown adds .storage.markdown.getMarkdown()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const md = (currentEditor as any).storage?.markdown?.getMarkdown?.();
+      onChange(typeof md === "string" ? md : currentEditor.getText());
     },
   });
 
-  // Sync content when value changes externally (e.g. dialog reset)
+  // Sync when value changes externally (e.g. dialog reset to a different mode)
   React.useEffect(() => {
     if (!editor) return;
-    if (value !== editor.getText({ blockSeparator: "\n" })) {
-      editor.commands.setContent(plainTextToDoc(value), false);
-    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const current = (editor as any).storage?.markdown?.getMarkdown?.();
+    if (typeof current === "string" && current === value) return;
+    editor.commands.setContent(value, false);
   }, [editor, value]);
 
   if (!editor) {
