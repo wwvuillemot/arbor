@@ -42,8 +42,8 @@ describe("NodeService - Extended Operations (Phase 1.1)", () => {
     it("should move a note to a specific position", async () => {
       const project = await createTestProject("Project");
       const folder = await createTestFolder("Folder", project.id);
-      const noteA = await createTestNote("Note A", folder.id);
-      const noteB = await createTestNote("Note B", folder.id);
+      await createTestNote("Note A", folder.id);
+      await createTestNote("Note B", folder.id);
       const noteC = await createTestNote("Note C", folder.id);
 
       // Move noteC to position 0 (first)

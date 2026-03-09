@@ -21,12 +21,15 @@ import {
   ImagePlus,
   Link2,
   Unlink,
+  Sparkles,
 } from "lucide-react";
 
 interface EditorToolbarProps {
   editor: Editor | null;
   onInsertImage?: () => void;
   onInsertLink?: () => void;
+  onToggleAttribution?: () => void;
+  showAiAttribution?: boolean;
 }
 
 interface ToolbarButtonProps {
@@ -73,6 +76,8 @@ export function EditorToolbar({
   editor,
   onInsertImage,
   onInsertLink,
+  onToggleAttribution,
+  showAiAttribution = false,
 }: EditorToolbarProps) {
   const t = useTranslations("editor");
 
@@ -218,6 +223,17 @@ export function EditorToolbar({
         title={t("clearFormatting")}
       >
         <RemoveFormatting size={iconSize} />
+      </ToolbarButton>
+
+      <ToolbarDivider />
+
+      {/* AI attribution toggle */}
+      <ToolbarButton
+        onClick={() => onToggleAttribution?.()}
+        isActive={showAiAttribution}
+        title={t("aiAttribution")}
+      >
+        <Sparkles size={iconSize} />
       </ToolbarButton>
 
       {onInsertImage && (

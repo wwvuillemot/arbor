@@ -1,17 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createServer } from "@server/api/index";
 import type { FastifyInstance } from "fastify";
-import type { ApolloServer } from "@apollo/server";
 import { createTestProject, createTestNote } from "@tests/helpers/fixtures";
 
 describe("GraphQL Endpoint Integration", () => {
   let server: FastifyInstance;
-  let apollo: ApolloServer;
 
   beforeAll(async () => {
     const result = await createServer();
     server = result.server;
-    apollo = result.apollo;
     await server.ready();
   });
 

@@ -1,8 +1,18 @@
-import { db } from "../db/index";
-import { userPreferences } from "../db/schema";
-import { eq } from "drizzle-orm";
-import { createClient } from "redis";
 import { randomBytes } from "crypto";
+
+import {
+  deleteStoredAppPreference,
+  getStoredAppPreference,
+  listStoredAppPreferences,
+  setStoredAppPreference,
+} from "./preferences-app-store";
+import {
+  createSessionPreferencesRedisClient,
+  deleteStoredSessionPreference,
+  getStoredSessionPreference,
+  setStoredSessionPreference,
+  type SessionPreferencesRedisClient,
+} from "./preferences-session-store";
 
 /**
  * PreferencesService
@@ -12,7 +22,7 @@ import { randomBytes } from "crypto";
  * - App-scope: Stored in PostgreSQL, persisted permanently
  */
 export class PreferencesService {
-  private redisClient: ReturnType<typeof createClient> | null = null;
+  private redisClient: SessionPreferencesRedisClient | null = null;
 
   constructor() {
     this.initRedis();
@@ -23,9 +33,9 @@ export class PreferencesService {
    */
   private async initRedis() {
     try {
-      this.redisClient = createClient({
-        url: process.env.REDIS_URL || "redis://redis.arbor.local:6379",
-      });
+      this.redisClient = createSessionPreferencesRedisClient(
+        process.env.REDIS_URL || "redis://redis.arbor.local:6379",
+      );
 
       this.redisClient.on("error", (err) => {
         console.error("Redis Client Error:", err);
@@ -43,57 +53,28 @@ export class PreferencesService {
    * Get app-scope preference (from PostgreSQL)
    */
   async getAppPreference(key: string): Promise<any | null> {
-    const [pref] = await db
-      .select()
-      .from(userPreferences)
-      .where(eq(userPreferences.key, key));
-
-    return pref ? pref.value : null;
+    return getStoredAppPreference(key);
   }
 
   /**
    * Set app-scope preference (to PostgreSQL)
    */
   async setAppPreference(key: string, value: any): Promise<void> {
-    const existing = await this.getAppPreference(key);
-
-    if (existing) {
-      // Update existing preference
-      await db
-        .update(userPreferences)
-        .set({
-          value,
-        })
-        .where(eq(userPreferences.key, key));
-    } else {
-      // Create new preference
-      await db.insert(userPreferences).values({
-        key,
-        value,
-      });
-    }
+    await setStoredAppPreference(key, value);
   }
 
   /**
    * Delete app-scope preference
    */
   async deleteAppPreference(key: string): Promise<void> {
-    await db.delete(userPreferences).where(eq(userPreferences.key, key));
+    await deleteStoredAppPreference(key);
   }
 
   /**
    * Get all app-scope preferences
    */
   async getAllAppPreferences(): Promise<Record<string, any>> {
-    const prefs = await db.select().from(userPreferences);
-
-    return prefs.reduce(
-      (acc, pref) => {
-        acc[pref.key] = pref.value;
-        return acc;
-      },
-      {} as Record<string, any>,
-    );
+    return listStoredAppPreferences();
   }
 
   /**
@@ -109,9 +90,7 @@ export class PreferencesService {
     }
 
     try {
-      const redisKey = `session:${sessionId}:pref:${key}`;
-      const value = await this.redisClient.get(redisKey);
-      return value ? JSON.parse(value.toString()) : null;
+      return await getStoredSessionPreference(this.redisClient, sessionId, key);
     } catch (error) {
       console.error("Error getting session preference:", error);
       return null;
@@ -133,15 +112,13 @@ export class PreferencesService {
     }
 
     try {
-      const redisKey = `session:${sessionId}:pref:${key}`;
-      const serialized = JSON.stringify(value);
-
-      if (ttl) {
-        await this.redisClient.setEx(redisKey, ttl, serialized);
-      } else {
-        // Default TTL: 24 hours
-        await this.redisClient.setEx(redisKey, 86400, serialized);
-      }
+      await setStoredSessionPreference(
+        this.redisClient,
+        sessionId,
+        key,
+        value,
+        ttl,
+      );
     } catch (error) {
       console.error("Error setting session preference:", error);
     }
@@ -156,8 +133,7 @@ export class PreferencesService {
     }
 
     try {
-      const redisKey = `session:${sessionId}:pref:${key}`;
-      await this.redisClient.del(redisKey);
+      await deleteStoredSessionPreference(this.redisClient, sessionId, key);
     } catch (error) {
       console.error("Error deleting session preference:", error);
     }

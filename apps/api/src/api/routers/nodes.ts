@@ -1,30 +1,11 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { NodeService } from "../../services/node-service";
+import { NodeDirectoryImportService } from "../../services/node-directory-import-service";
 import { ExportService } from "../../services/export-service";
 
-/** Convert a file/folder name to Title Case, replacing underscores and hyphens with spaces. */
-function toTitleCase(name: string): string {
-  return name
-    .replace(/[_-]/g, " ")
-    .replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
-}
-
-/** Return the text of the first heading in a TipTap doc, or null if it doesn't start with one. */
-function extractFirstHeading(doc: unknown): string | null {
-  if (!doc || typeof doc !== "object") return null;
-  const first = (doc as any).content?.[0];
-  if (!first || first.type !== "heading") return null;
-  return (
-    (first.content ?? [])
-      .filter((n: any) => n.type === "text")
-      .map((n: any) => n.text ?? "")
-      .join("")
-      .trim() || null
-  );
-}
-
 const nodeService = new NodeService();
+const nodeDirectoryImportService = new NodeDirectoryImportService(nodeService);
 const exportService = new ExportService();
 
 // Zod schemas for validation
@@ -51,6 +32,7 @@ const createNodeSchema = z.object({
   slug: z.string().optional(),
   content: z.any().optional(), // JSONB content (can be object, string, or null)
   metadata: z.record(z.any()).optional(),
+  summary: z.string().nullable().optional(),
   authorType: authorTypeSchema.optional(), // DEPRECATED: Use createdBy/updatedBy instead
   position: z.number().int().optional(), // Position for ordering siblings
   createdBy: provenanceSchema.optional(), // Defaults to "user:system"
@@ -62,6 +44,7 @@ const updateNodeSchema = z.object({
   slug: z.string().optional(),
   content: z.any().optional(), // JSONB content (can be object, string, or null)
   metadata: z.record(z.any()).optional(),
+  summary: z.string().nullable().optional(),
   authorType: authorTypeSchema.optional(), // DEPRECATED: Use updatedBy instead
   position: z.number().int().optional(), // Position for ordering siblings
   updatedBy: provenanceSchema.optional(), // Who last updated this node
@@ -114,6 +97,7 @@ export const nodesRouter = router({
         slug: input.slug,
         content: input.content,
         metadata: input.metadata,
+        summary: input.summary,
         authorType: input.authorType, // DEPRECATED
         position: input.position,
         createdBy: input.createdBy,
@@ -215,6 +199,37 @@ export const nodesRouter = router({
       return { content: await exportService.exportNodeAsHtml(input.id) };
     }),
 
+  // Set or clear the hero image for a node (stores attachmentId in metadata)
+  setHeroImage: publicProcedure
+    .input(
+      z.object({
+        nodeId: z.string().uuid(),
+        attachmentId: z.string().uuid().nullable(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await nodeService.setHeroImage(input.nodeId, input.attachmentId);
+    }),
+
+  // Toggle isFavorite on a node's metadata
+  toggleFavorite: publicProcedure
+    .input(z.object({ nodeId: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      return await nodeService.toggleFavorite(input.nodeId);
+    }),
+
+  // Get all favorited nodes for a project
+  getFavorites: publicProcedure
+    .input(z.object({ projectId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      return await nodeService.getFavoriteNodes(input.projectId);
+    }),
+
+  // Get all favorited nodes across all projects (for dashboard)
+  getAllFavorites: publicProcedure.query(async () => {
+    return await nodeService.getAllFavoriteNodes();
+  }),
+
   /**
    * Import a directory of markdown/text files as a node hierarchy.
    * If parentNodeId is provided, imports into that existing node (folder/project) instead
@@ -237,140 +252,7 @@ export const nodesRouter = router({
         ),
       }),
     )
-    .mutation(async ({ input }) => {
-      const { files, projectName, parentNodeId } = input;
-
-      // If parentNodeId is provided, import into that node; otherwise create a new project.
-      let importTargetNodeId: string;
-      let projectId: string;
-
-      if (parentNodeId) {
-        importTargetNodeId = parentNodeId;
-        projectId = await nodeService.getProjectIdForNode(parentNodeId);
-      } else {
-        const project = await nodeService.createNode({
-          type: "project",
-          name: projectName,
-          parentId: null,
-          createdBy: "user:import",
-          updatedBy: "user:import",
-        });
-        projectId = project.id;
-        importTargetNodeId = project.id;
-      }
-
-      const pathToId = new Map<string, string>();
-
-      // Collect all unique directory paths (excluding the root — it maps to the root node)
-      const dirPaths = new Set<string>();
-      for (const file of files) {
-        const parts = file.path.split("/");
-        for (let i = 2; i < parts.length; i++) {
-          dirPaths.add(parts.slice(0, i).join("/"));
-        }
-      }
-
-      const rootPrefix = files[0]?.path.split("/")[0] ?? "";
-      if (rootPrefix) pathToId.set(rootPrefix, importTargetNodeId);
-
-      const sortedDirs = [...dirPaths].sort(
-        (a, b) => a.split("/").length - b.split("/").length,
-      );
-
-      for (const dirPath of sortedDirs) {
-        const parts = dirPath.split("/");
-        const name = parts[parts.length - 1];
-        const parentPath = parts.slice(0, -1).join("/");
-        const parentId = pathToId.get(parentPath) ?? importTargetNodeId;
-        const node = await nodeService.createNode({
-          type: "folder",
-          name: toTitleCase(name),
-          parentId,
-          metadata: { importSourcePath: dirPath },
-          createdBy: "user:import",
-          updatedBy: "user:import",
-        });
-        pathToId.set(dirPath, node.id);
-      }
-
-      // Create note nodes; track path→nodeId for post-import image attachment
-      let imported = 0;
-      const nodeMap: Record<string, string> = {}; // filePath → nodeId
-      const positionCounters = new Map<string, number>(); // parentId → next position
-
-      // Sort files alphabetically so notes get ascending positions by name
-      const sortedFiles = [...files].sort((a, b) =>
-        a.path.localeCompare(b.path, undefined, { sensitivity: "base" }),
-      );
-
-      for (const file of sortedFiles) {
-        const parts = file.path.split("/");
-        const fileName = parts[parts.length - 1];
-        if (
-          !fileName.match(/\.(md|txt|markdown|mdown|mkd|mdx)$/i) ||
-          fileName.startsWith(".")
-        ) {
-          continue;
-        }
-
-        const parentPath = parts.slice(0, -1).join("/");
-        const parentId = pathToId.get(parentPath) ?? importTargetNodeId;
-
-        // Accept pre-parsed TipTap JSON (object) or raw string
-        let tiptapContent: unknown;
-        if (file.content && typeof file.content === "object") {
-          tiptapContent = file.content;
-        } else if (typeof file.content === "string") {
-          // Try JSON parse first, then wrap as plain text
-          try {
-            tiptapContent = JSON.parse(file.content as string);
-          } catch {
-            tiptapContent = {
-              type: "doc",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [{ type: "text", text: file.content as string }],
-                },
-              ],
-            };
-          }
-        } else {
-          tiptapContent = { type: "doc", content: [] };
-        }
-
-        const notePosition = positionCounters.get(parentId) ?? 0;
-        positionCounters.set(parentId, notePosition + 1);
-
-        try {
-          const node = await nodeService.createNode({
-            type: "note",
-            name:
-              extractFirstHeading(tiptapContent) ??
-              toTitleCase(
-                fileName.replace(/\.(md|txt|markdown|mdown|mkd|mdx)$/i, ""),
-              ),
-            parentId,
-            content: tiptapContent,
-            metadata: { importSourcePath: file.path },
-            position: notePosition,
-            createdBy: "user:import",
-            updatedBy: "user:import",
-          });
-          nodeMap[file.path] = node.id; // key by original path for nodeMap lookups
-          imported++;
-        } catch (err) {
-          console.error(`Failed to import file ${file.path}:`, err);
-          // Continue importing other files — one bad file shouldn't abort everything
-        }
-      }
-
-      return {
-        imported,
-        folders: sortedDirs.length,
-        projectId,
-        importTargetNodeId,
-        nodeMap,
-      };
-    }),
+    .mutation(async ({ input }) =>
+      nodeDirectoryImportService.importDirectory(input),
+    ),
 });

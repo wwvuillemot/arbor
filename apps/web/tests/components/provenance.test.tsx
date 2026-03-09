@@ -5,7 +5,7 @@
  */
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 // Mock next-intl
 vi.mock("next-intl", () => ({
@@ -23,6 +23,24 @@ vi.mock("@/contexts/toast-context", () => ({
     toasts: [],
   }),
 }));
+
+type MutationOptions = {
+  onSuccess?: (...successArgs: unknown[]) => void;
+};
+
+async function getMockTrpc() {
+  const trpcModule =
+    (await import("@/lib/trpc")) as typeof import("@/lib/trpc");
+  return trpcModule.trpc;
+}
+
+function mockProcedureQueryResult<
+  TProcedure extends { useQuery: (...queryArgs: never[]) => unknown },
+>(procedure: TProcedure, result: unknown) {
+  vi.mocked(procedure.useQuery).mockReturnValue(
+    result as ReturnType<TProcedure["useQuery"]>,
+  );
+}
 
 // Mock tRPC - data must be inside factory since vi.mock is hoisted
 vi.mock("@/lib/trpc", () => {
@@ -78,7 +96,7 @@ vi.mock("@/lib/trpc", () => {
     ],
   };
 
-  const makeQuery = (data: any, isLoading = false) => ({
+  const makeQuery = <T,>(data: T, isLoading = false) => ({
     useQuery: vi.fn(() => ({
       data,
       isLoading,
@@ -139,9 +157,9 @@ vi.mock("@/lib/trpc", () => {
       compareVersions: makeQuery(compareResult),
       checkout: makeQuery({ version: 1, content: { text: "v1 content" } }),
       rollback: {
-        useMutation: vi.fn(({ onSuccess }: any) => ({
-          mutate: vi.fn((...args: any[]) => {
-            if (onSuccess) onSuccess();
+        useMutation: vi.fn((options?: MutationOptions) => ({
+          mutate: vi.fn((..._mutationArgs: unknown[]) => {
+            options?.onSuccess?.();
           }),
           mutateAsync: vi.fn().mockResolvedValue({}),
           isPending: false,
@@ -172,10 +190,7 @@ vi.mock("@/lib/trpc", () => {
   return { trpc: mockTrpc, getTRPCClient: vi.fn() };
 });
 
-import {
-  AttributionBadge,
-  type ActorType,
-} from "@/components/provenance/attribution-badge";
+import { AttributionBadge } from "@/components/provenance/attribution-badge";
 import { VersionHistory } from "@/components/provenance/version-history";
 import { DiffViewer } from "@/components/provenance/diff-viewer";
 import { AuditLog } from "@/components/provenance/audit-log";
@@ -368,8 +383,8 @@ describe("VersionHistory", () => {
   });
 
   it("should show loading state", async () => {
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.provenance.getHistory.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.provenance.getHistory, {
       data: undefined,
       isLoading: true,
       error: null,
@@ -381,8 +396,8 @@ describe("VersionHistory", () => {
   });
 
   it("should show empty state", async () => {
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.provenance.getHistory.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.provenance.getHistory, {
       data: [],
       isLoading: false,
       error: null,
@@ -443,8 +458,8 @@ describe("DiffViewer", () => {
   });
 
   it("should show loading state", async () => {
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.provenance.compareVersions.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.provenance.compareVersions, {
       data: undefined,
       isLoading: true,
       error: null,
@@ -456,8 +471,8 @@ describe("DiffViewer", () => {
   });
 
   it("should show empty state when no data", async () => {
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.provenance.compareVersions.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.provenance.compareVersions, {
       data: null,
       isLoading: false,
       error: null,
@@ -565,8 +580,8 @@ describe("AuditLog", () => {
   });
 
   it("should show loading state", async () => {
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.provenance.getAuditLog.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.provenance.getAuditLog, {
       data: undefined,
       isLoading: true,
       error: null,
@@ -578,8 +593,8 @@ describe("AuditLog", () => {
   });
 
   it("should show empty state when no entries", async () => {
-    const { trpc } = (await import("@/lib/trpc")) as any;
-    trpc.provenance.getAuditLog.useQuery.mockReturnValue({
+    const trpc = await getMockTrpc();
+    mockProcedureQueryResult(trpc.provenance.getAuditLog, {
       data: [],
       isLoading: false,
       error: null,
@@ -590,19 +605,96 @@ describe("AuditLog", () => {
     expect(screen.getByText("timeline.empty")).toBeInTheDocument();
   });
 
-  it("should trigger CSV export on button click", () => {
+  it("should trigger CSV export on button click", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:audit-csv-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) => {
+        if (tagName === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+
+        return originalCreateElement(tagName);
+      });
+
     render(<AuditLog />);
     const csvButton = screen.getByTestId("audit-export-csv");
     fireEvent.click(csvButton);
-    // CSV export refetch should be called
-    expect(csvButton).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockClick).toHaveBeenCalled();
+      expect(mockRevokeObjectURL).toHaveBeenCalledWith("blob:audit-csv-url");
+    });
+
+    createElementSpy.mockRestore();
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
-  it("should trigger HTML/PDF export on button click", () => {
+  it("should trigger HTML/PDF export on button click", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:audit-html-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockPrint = vi.fn();
+    const mockFocus = vi.fn();
+    const mockAddEventListener = vi.fn(
+      (eventName: string, listener: EventListenerOrEventListenerObject) => {
+        if (eventName === "load") {
+          if (typeof listener === "function") {
+            listener(new Event("load"));
+          } else {
+            listener.handleEvent(new Event("load"));
+          }
+        }
+      },
+    );
+    const mockRemoveEventListener = vi.fn();
+    const originalOpen = window.open;
+    const mockOpen = vi.fn().mockReturnValue({
+      addEventListener: mockAddEventListener,
+      removeEventListener: mockRemoveEventListener,
+      focus: mockFocus,
+      print: mockPrint,
+    });
+    Object.defineProperty(window, "open", {
+      value: mockOpen,
+      writable: true,
+      configurable: true,
+    });
+
     render(<AuditLog />);
     const pdfButton = screen.getByTestId("audit-export-pdf");
     fireEvent.click(pdfButton);
-    expect(pdfButton).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockOpen).toHaveBeenCalledWith("blob:audit-html-url", "_blank");
+      expect(mockFocus).toHaveBeenCalled();
+      expect(mockPrint).toHaveBeenCalled();
+    });
+
+    Object.defineProperty(window, "open", {
+      value: originalOpen,
+      writable: true,
+      configurable: true,
+    });
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 });
 

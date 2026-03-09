@@ -94,6 +94,10 @@ const mockMessages = [
   },
 ];
 
+type MutationOptions = {
+  onSuccess?: (...successArgs: unknown[]) => void;
+};
+
 // Mock tRPC
 vi.mock("@/lib/trpc", () => {
   const mockRefetchThreads = vi.fn();
@@ -118,10 +122,10 @@ vi.mock("@/lib/trpc", () => {
         })),
       },
       createThread: {
-        useMutation: vi.fn((opts: any) => ({
-          mutate: (...args: any[]) => {
-            mockCreateThreadMutate(...args);
-            opts?.onSuccess?.({
+        useMutation: vi.fn((options?: MutationOptions) => ({
+          mutate: (...mutationArgs: unknown[]) => {
+            mockCreateThreadMutate(...mutationArgs);
+            options?.onSuccess?.({
               id: "new-thread",
               name: "New Thread",
               agentMode: "assistant",
@@ -131,36 +135,36 @@ vi.mock("@/lib/trpc", () => {
         })),
       },
       deleteThread: {
-        useMutation: vi.fn((opts: any) => ({
-          mutate: (...args: any[]) => {
-            mockDeleteThreadMutate(...args);
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => ({
+          mutate: (...mutationArgs: unknown[]) => {
+            mockDeleteThreadMutate(...mutationArgs);
+            options?.onSuccess?.();
           },
           isPending: false,
         })),
       },
       updateThread: {
-        useMutation: vi.fn((opts: any) => ({
-          mutate: (...args: any[]) => {
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => ({
+          mutate: (..._mutationArgs: unknown[]) => {
+            options?.onSuccess?.();
           },
           isPending: false,
         })),
       },
       addMessage: {
-        useMutation: vi.fn((opts: any) => ({
-          mutate: (...args: any[]) => {
-            mockAddMessageMutate(...args);
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => ({
+          mutate: (...mutationArgs: unknown[]) => {
+            mockAddMessageMutate(...mutationArgs);
+            options?.onSuccess?.();
           },
           isPending: false,
         })),
       },
       sendMessage: {
-        useMutation: vi.fn((opts: any) => ({
-          mutate: (...args: any[]) => {
-            mockSendMessageMutate(...args);
-            opts?.onSuccess?.();
+        useMutation: vi.fn((options?: MutationOptions) => ({
+          mutate: (...mutationArgs: unknown[]) => {
+            mockSendMessageMutate(...mutationArgs);
+            options?.onSuccess?.();
           },
           isPending: false,
         })),

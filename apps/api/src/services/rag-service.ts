@@ -1,52 +1,19 @@
-import { db } from "../db/index";
-import { nodes, nodeTags, tags } from "../db/schema";
-import type { Node, Tag } from "../db/schema";
-import { eq, and, isNull } from "drizzle-orm";
-import { SearchService, SearchFilters, SearchResult } from "./search-service";
-import { EmbeddingProvider } from "./embedding-service";
-
-/**
- * RAG pipeline options
- */
-export interface RAGOptions {
-  /** Maximum number of documents to retrieve (default: 10) */
-  topK?: number;
-  /** Maximum token budget for the context (default: 4000) */
-  maxTokens?: number;
-  /** Weight for recency in reranking (0-1, default: 0.2) */
-  recencyWeight?: number;
-  /** Search filters (project, tags, node types, etc.) */
-  filters?: SearchFilters;
-  /** Minimum relevance score threshold (0-1, default: 0.1) */
-  minScore?: number;
-}
-
-/**
- * A single document in the RAG context
- */
-export interface RAGDocument {
-  nodeId: string;
-  name: string;
-  path: string;
-  tags: string[];
-  content: string;
-  score: number;
-  updatedAt: Date;
-}
-
-/**
- * Output of the RAG context builder
- */
-export interface RAGContext {
-  /** Formatted context string for the LLM */
-  contextString: string;
-  /** Individual documents included in the context */
-  documents: RAGDocument[];
-  /** Estimated token count of the context string */
-  tokenCount: number;
-  /** Total documents retrieved before truncation */
-  totalRetrieved: number;
-}
+import type { EmbeddingProvider } from "./embedding-service";
+import {
+  buildAncestorPath as buildNodeAncestorPath,
+  buildRagDocuments,
+  getNodeTagNames as getNodeTagNameList,
+} from "./rag-enrichment";
+import {
+  estimateTokens as estimateRagTokens,
+  formatDocument as formatRagDocument,
+  formatWithTokenLimit as formatRagContextWithTokenLimit,
+  rerankSearchResults,
+} from "./rag-formatting";
+import type { RAGContext, RAGDocument, RAGOptions } from "./rag-types";
+export type { RAGContext, RAGDocument, RAGOptions } from "./rag-types";
+import { SearchService } from "./search-service";
+import type { SearchResult } from "./search-service";
 
 /**
  * RAGService
@@ -101,7 +68,7 @@ export class RAGService {
     const topResults = reranked.slice(0, topK);
 
     // Step 4: Build RAG documents (path, tags, content)
-    const documents = await this.buildDocuments(topResults);
+    const documents = await buildRagDocuments(topResults);
 
     // Step 5: Format and enforce token limit
     const { contextString, includedDocuments } = this.formatWithTokenLimit(
@@ -124,91 +91,21 @@ export class RAGService {
    * Formula: finalScore = (1 - recencyWeight) * relevanceScore + recencyWeight * recencyScore
    */
   rerank(results: SearchResult[], recencyWeight: number): SearchResult[] {
-    if (results.length === 0) return [];
-
-    // Find the time range for normalization
-    const timestamps = results.map((r) => r.node.updatedAt.getTime());
-    const minTime = Math.min(...timestamps);
-    const maxTime = Math.max(...timestamps);
-    const timeRange = maxTime - minTime || 1; // avoid division by zero
-
-    return results
-      .map((result) => {
-        const recencyScore =
-          (result.node.updatedAt.getTime() - minTime) / timeRange;
-        const finalScore =
-          (1 - recencyWeight) * result.score + recencyWeight * recencyScore;
-        return { ...result, score: finalScore };
-      })
-      .sort((a, b) => b.score - a.score);
+    return rerankSearchResults(results, recencyWeight);
   }
 
   /**
    * Build the ancestor path string for a node (e.g., "Project > Folder > Note").
    */
   async buildAncestorPath(nodeId: string): Promise<string> {
-    const pathParts: string[] = [];
-    let currentId: string | null = nodeId;
-
-    // Walk up the parent chain (max 20 levels to prevent infinite loops)
-    for (let depth = 0; depth < 20 && currentId; depth++) {
-      const [node] = await db
-        .select({ id: nodes.id, name: nodes.name, parentId: nodes.parentId })
-        .from(nodes)
-        .where(eq(nodes.id, currentId));
-
-      if (!node) break;
-      pathParts.unshift(node.name);
-      currentId = node.parentId;
-    }
-
-    return pathParts.join(" > ");
+    return buildNodeAncestorPath(nodeId);
   }
 
   /**
    * Get tag names for a node.
    */
   async getNodeTagNames(nodeId: string): Promise<string[]> {
-    const results = await db
-      .select({ name: tags.name })
-      .from(nodeTags)
-      .innerJoin(tags, eq(nodeTags.tagId, tags.id))
-      .where(eq(nodeTags.nodeId, nodeId));
-
-    return results.map((r) => r.name);
-  }
-
-  /**
-   * Build RAGDocuments from search results by enriching with path and tags.
-   */
-  private async buildDocuments(
-    results: SearchResult[],
-  ): Promise<RAGDocument[]> {
-    const documents: RAGDocument[] = [];
-
-    for (const result of results) {
-      const [path, tagNames] = await Promise.all([
-        this.buildAncestorPath(result.node.id),
-        this.getNodeTagNames(result.node.id),
-      ]);
-
-      const embeddingService = this.searchService.getEmbeddingService();
-      const contentText = embeddingService.extractTextFromContent(
-        result.node.content,
-      );
-
-      documents.push({
-        nodeId: result.node.id,
-        name: result.node.name,
-        path,
-        tags: tagNames,
-        content: contentText,
-        score: result.score,
-        updatedAt: result.node.updatedAt,
-      });
-    }
-
-    return documents;
+    return getNodeTagNameList(nodeId);
   }
 
   /**
@@ -219,48 +116,14 @@ export class RAGService {
     documents: RAGDocument[],
     maxTokens: number,
   ): { contextString: string; includedDocuments: RAGDocument[] } {
-    const header = "# Relevant Context\n\n";
-    let currentTokens = this.estimateTokens(header);
-    const includedDocuments: RAGDocument[] = [];
-    const sections: string[] = [header];
-
-    for (let i = 0; i < documents.length; i++) {
-      const doc = documents[i];
-      const section = this.formatDocument(doc, i + 1);
-      const sectionTokens = this.estimateTokens(section);
-
-      if (currentTokens + sectionTokens > maxTokens) break;
-
-      sections.push(section);
-      includedDocuments.push(doc);
-      currentTokens += sectionTokens;
-    }
-
-    return {
-      contextString: sections.join("").trimEnd(),
-      includedDocuments,
-    };
+    return formatRagContextWithTokenLimit(documents, maxTokens);
   }
 
   /**
    * Format a single document as a context section.
    */
   formatDocument(doc: RAGDocument, index: number): string {
-    const lines: string[] = [];
-    lines.push(`## Document ${index}: ${doc.name}`);
-    lines.push(`Path: ${doc.path}`);
-
-    if (doc.tags.length > 0) {
-      lines.push(`Tags: ${doc.tags.join(", ")}`);
-    }
-
-    lines.push(`Content:`);
-    lines.push(doc.content || "(empty)");
-    lines.push("");
-    lines.push("---");
-    lines.push("");
-
-    return lines.join("\n");
+    return formatRagDocument(doc, index);
   }
 
   /**
@@ -268,6 +131,6 @@ export class RAGService {
    * Approximation: ~4 characters per token (common for English text with GPT models).
    */
   estimateTokens(text: string): number {
-    return Math.ceil(text.length / 4);
+    return estimateRagTokens(text);
   }
 }

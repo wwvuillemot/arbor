@@ -5,8 +5,8 @@ import middleware from "@/middleware";
 // Mock next-intl middleware with localeDetection: false
 // It should just handle routing/rewrites, NOT locale detection
 vi.mock("next-intl/middleware", () => ({
-  default: vi.fn((config) => {
-    return (request: NextRequest) => {
+  default: vi.fn((_config) => {
+    return (_request: NextRequest) => {
       // With localeDetection: false, next-intl just passes through
       // It only handles the routing/rewriting, not detection
       return NextResponse.next();

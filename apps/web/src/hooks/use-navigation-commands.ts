@@ -6,7 +6,7 @@ import { useTranslations, useMessages } from "next-intl";
 import { Search, LayoutDashboard, FolderTree, Settings } from "lucide-react";
 import { commandRegistry } from "@/lib/command-registry";
 
-export function useNavigationCommands() {
+export function useNavigationCommands(onSearchOpen?: () => void) {
   const router = useRouter();
   const t = useTranslations("commands.navigation");
   const messages = useMessages() as Record<string, unknown>;
@@ -57,7 +57,7 @@ export function useNavigationCommands() {
         group: "navigation",
         keywords: getKeywords("search"),
         shortcut: ["g", "s"],
-        action: () => router.push("/search"),
+        action: () => onSearchOpen?.(),
       },
       {
         id: "nav-projects",
@@ -82,5 +82,5 @@ export function useNavigationCommands() {
     ]);
 
     return unregister;
-  }, [router, t, messages]);
+  }, [router, t, messages, onSearchOpen]);
 }

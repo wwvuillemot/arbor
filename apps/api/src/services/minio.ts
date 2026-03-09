@@ -1,3 +1,4 @@
+import type { Readable } from "node:stream";
 import * as Minio from "minio";
 
 export interface MinioConfig {
@@ -36,7 +37,7 @@ export class MinioService {
   async bucketExists(bucketName: string): Promise<boolean> {
     try {
       return await this.client.bucketExists(bucketName);
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -113,6 +114,16 @@ export class MinioService {
   }
 
   /**
+   * Get an object's content as a readable stream.
+   * @param bucket - Bucket name
+   * @param objectKey - Object key
+   * @returns Readable stream for the object contents
+   */
+  async getObject(bucket: string, objectKey: string): Promise<Readable> {
+    return await this.client.getObject(bucket, objectKey);
+  }
+
+  /**
    * Delete an object
    * @param bucket - Bucket name
    * @param objectKey - Object key
@@ -137,6 +148,10 @@ export class MinioService {
       const stream = this.client.listObjects(bucket, prefix, true);
 
       stream.on("data", (obj) => {
+        if (!obj.name || obj.size === undefined || !obj.lastModified) {
+          return;
+        }
+
         objects.push({
           name: obj.name,
           size: obj.size,

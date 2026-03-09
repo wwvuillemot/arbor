@@ -119,6 +119,43 @@ describe("TagService", () => {
       expect(locationTags).toHaveLength(1);
       expect(locationTags[0].name).toBe("Castle");
     });
+
+    it("should include global and matching project-scoped tags for a project", async () => {
+      const alphaProject = await createTestProject("Alpha Project");
+      const betaProject = await createTestProject("Beta Project");
+
+      await tagService.createTag({ name: "global-tag" });
+      await tagService.createTag({
+        name: "alpha-tag",
+        projectId: alphaProject.id,
+      });
+      await tagService.createTag({
+        name: "beta-tag",
+        projectId: betaProject.id,
+      });
+
+      const visibleTags = await tagService.getAllTags(
+        undefined,
+        alphaProject.id,
+      );
+      const visibleTagNames = visibleTags.map((tag) => tag.name).sort();
+
+      expect(visibleTagNames).toEqual(["alpha-tag", "global-tag"]);
+    });
+
+    it("should return only global tags when no project context is provided", async () => {
+      const project = await createTestProject("Scoped Project");
+
+      await tagService.createTag({ name: "global-tag" });
+      await tagService.createTag({
+        name: "scoped-tag",
+        projectId: project.id,
+      });
+
+      const visibleTags = await tagService.getAllTags();
+
+      expect(visibleTags.map((tag) => tag.name)).toEqual(["global-tag"]);
+    });
   });
 
   // ─── updateTag ────────────────────────────────────────────────────────

@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
-import ReactMarkdown from "react-markdown";
 import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -16,6 +14,7 @@ import {
   FolderOpen,
   Loader2,
   GripHorizontal,
+  Settings,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
@@ -29,6 +28,7 @@ import {
   CreateNodeDialog,
   RenameDialog,
   NodeContextMenu,
+  BulkTagBar,
   type TreeNode,
   type ContextMenuAction,
   type DropPosition,
@@ -38,200 +38,67 @@ import {
   TiptapEditor,
   ImageUpload,
   LinkPickerDialog,
-  type LinkPickerTreeNode,
 } from "@/components/editor";
 import { TagManager, TagPicker } from "@/components/tags";
 import { NodeAttribution } from "@/components/provenance";
 import { ChatSidebar } from "@/components/chat";
 import { Dialog } from "@/components/dialog";
-import { markdownToTipTap, extractImagePaths } from "@/lib/markdown-to-tiptap";
-import { rewriteImportedInternalHref } from "@/lib/import-link-rewrite";
-import { extractHeroImage, tiptapToMarkdown } from "@/lib/tiptap-utils";
+import { getMediaAttachmentUrl } from "@/lib/media-url";
+import { downloadTextFile, openHtmlPrintWindow } from "@/lib/browser-export";
+import { HeroGradient } from "@/components/hero-gradient";
+import { NoteCard } from "@/components/note-card";
+import {
+  buildFlatLinkPickerTreeNodes,
+  deriveEditorLinkNavigationTarget,
+  deriveFilteredNodeIds,
+  deriveImportTargetNodeId,
+  deriveNodeMoveMutationInput,
+  normalizeTiptapContent,
+  resolveArborEditorLinkTargetNodeId,
+  type LinkPickerSourceNode,
+} from "./projects-page-helpers";
+import {
+  runProjectMarkdownExport,
+  runProjectPdfExport,
+} from "./projects-export-workflow";
+import { CreateProjectDialog } from "./projects-create-dialog";
+import {
+  applyPreparedImportDirectoryOutcome,
+  prepareImportDirectoryWorkflow,
+  type PendingImportDirectoryRequest,
+} from "./projects-import-directory";
+import {
+  healImportedProjectInternalLinks,
+  patchImportedNodeInternalLinks,
+  uploadImportedImagesAndPatchNodes,
+} from "./projects-import-side-effects";
+import { runProjectImportWorkflow } from "./projects-import-workflow";
+import { ProjectSettingsDialog } from "./project-settings-dialog";
 import type { Editor } from "@tiptap/react";
-
-const NOTE_FILE_EXTENSION_REGEX = /\.(md|txt|markdown|mdown|mkd|mdx)$/i;
-
-type ImportHealingNode = {
-  id: string;
-  name: string;
-  type: string;
-  parentId: string | null;
-  content?: unknown;
-  metadata?: unknown;
-};
-
-function normalizeImportSourcePath(path: string): string {
-  return path
-    .replace(/\\/g, "/")
-    .split("/")
-    .map((segment) => segment.trim())
-    .filter(Boolean)
-    .join("/");
-}
-
-function joinImportSourcePath(parentPath: string, childPath: string): string {
-  const normalizedParentPath = normalizeImportSourcePath(parentPath);
-  const normalizedChildPath = normalizeImportSourcePath(childPath);
-
-  if (!normalizedParentPath) {
-    return normalizedChildPath;
-  }
-
-  if (!normalizedChildPath) {
-    return normalizedParentPath;
-  }
-
-  return `${normalizedParentPath}/${normalizedChildPath}`;
-}
-
-function stripTopLevelImportSegment(path: string): string | null {
-  const normalizedPath = normalizeImportSourcePath(path);
-  const pathSegments = normalizedPath.split("/");
-
-  if (pathSegments.length <= 1) {
-    return null;
-  }
-
-  const rootlessPath = pathSegments.slice(1).join("/");
-  return rootlessPath || null;
-}
-
-function getImportSourcePath(metadata: unknown): string | null {
-  if (!metadata || typeof metadata !== "object") {
-    return null;
-  }
-
-  const importSourcePath = (metadata as Record<string, unknown>)
-    .importSourcePath;
-  if (typeof importSourcePath !== "string" || !importSourcePath.trim()) {
-    return null;
-  }
-
-  return normalizeImportSourcePath(importSourcePath);
-}
-
-function getNoteFileNameCandidates(node: ImportHealingNode): string[] {
-  const fileNameCandidates = new Set<string>();
-  const importSourcePath = getImportSourcePath(node.metadata);
-  const importSourceBasename = importSourcePath?.split("/").pop();
-
-  if (importSourceBasename) {
-    fileNameCandidates.add(importSourceBasename);
-  }
-
-  const trimmedNodeName = node.name.trim();
-  if (trimmedNodeName) {
-    fileNameCandidates.add(
-      NOTE_FILE_EXTENSION_REGEX.test(trimmedNodeName)
-        ? trimmedNodeName
-        : `${trimmedNodeName}.md`,
-    );
-  }
-
-  return [...fileNameCandidates];
-}
-
-function normalizeTiptapContent(
-  rawContent: unknown,
-): Record<string, unknown> | null {
-  if (!rawContent) return null;
-
-  if (typeof rawContent === "string") {
-    try {
-      const parsedContent = JSON.parse(rawContent) as unknown;
-      return parsedContent && typeof parsedContent === "object"
-        ? (parsedContent as Record<string, unknown>)
-        : null;
-    } catch {
-      return null;
-    }
-  }
-
-  return typeof rawContent === "object"
-    ? (rawContent as Record<string, unknown>)
-    : null;
-}
-
-function transformTiptapContent(
-  rawContent: unknown,
-  transformValue: (key: string, value: unknown) => unknown,
-): Record<string, unknown> | null {
-  const normalizedContent = normalizeTiptapContent(rawContent);
-  if (!normalizedContent) return null;
-
-  return JSON.parse(
-    JSON.stringify(normalizedContent, transformValue),
-  ) as Record<string, unknown>;
-}
-
-function NoteCard({
-  node,
-  onClick,
-}: {
-  node: { name: string; content: unknown };
-  onClick: () => void;
-}) {
-  const heroImage = React.useMemo(
-    () => extractHeroImage(node.content),
-    [node.content],
-  );
-  const preview = React.useMemo(
-    () => tiptapToMarkdown(node.content),
-    [node.content],
-  );
-
-  return (
-    <div
-      className="rounded-lg border bg-card text-card-foreground shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-      onClick={onClick}
-    >
-      {heroImage && (
-        <Image
-          src={heroImage}
-          alt={node.name}
-          width={400}
-          height={160}
-          className="w-full h-40 object-cover"
-          unoptimized
-        />
-      )}
-      <div className="p-4 space-y-2">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClick();
-            }}
-            className="p-1 rounded hover:bg-accent hover:text-accent-foreground transition-colors shrink-0"
-            title="Edit"
-          >
-            <Pencil className="w-3 h-3 text-muted-foreground" />
-          </button>
-          <span className="font-medium text-sm truncate">{node.name}</span>
-        </div>
-        {preview && (
-          <div className="relative max-h-[200px] overflow-hidden">
-            <div className="text-xs text-muted-foreground prose prose-xs dark:prose-invert max-w-none [&_*]:text-xs [&_h1,&_h2,&_h3,&_h4]:font-semibold [&_h1,&_h2,&_h3,&_h4]:mt-1 [&_p]:mt-0 [&_ul]:mt-0 [&_ol]:mt-0 [&_li]:my-0">
-              <ReactMarkdown>{preview}</ReactMarkdown>
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function FolderCardView({
   nodes,
   onOpenNode,
+  onToggleFavorite,
 }: {
-  nodes: { id: string; name: string; type: string; content: unknown }[];
+  nodes: {
+    id: string;
+    name: string;
+    type: string;
+    content: unknown;
+    metadata: unknown;
+  }[];
   onOpenNode: (nodeId: string) => void;
+  onToggleFavorite?: (nodeId: string) => void;
 }) {
-  const children = nodes;
+  const nodeIds = React.useMemo(() => nodes.map((n) => n.id), [nodes]);
+  const firstMediaQuery = trpc.media.getFirstImageByNodes.useQuery(
+    { nodeIds },
+    { enabled: nodeIds.length > 0, staleTime: 30_000 },
+  );
+  const firstMediaMap = firstMediaQuery.data ?? {};
 
-  if (children.length === 0) {
+  if (nodes.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
         This folder is empty.
@@ -245,11 +112,12 @@ function FolderCardView({
         className="mx-auto grid w-full max-w-[calc(18rem*4+3rem)] gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))]"
         data-testid="folder-card-grid"
       >
-        {children.map((node) => (
+        {nodes.map((node) => (
           <NoteCard
             key={node.id}
-            node={node}
+            node={{ ...node, firstMediaId: firstMediaMap[node.id] ?? null }}
             onClick={() => onOpenNode(node.id)}
+            onToggleFavorite={onToggleFavorite}
           />
         ))}
       </div>
@@ -258,11 +126,6 @@ function FolderCardView({
 }
 
 // ── End folder card view ──────────────────────────────────────────────────────
-
-/** Chunk size for chunked btoa binary conversion (avoids call stack overflow) */
-const BASE64_CHUNK_SIZE = 8192;
-//** 7 days in seconds — MinIO max allowed presigned URL expiry */
-const SEVEN_DAYS_IN_SECONDS = 7 * 24 * 60 * 60;
 
 export default function ProjectsPage() {
   const utils = trpc.useUtils();
@@ -280,6 +143,12 @@ export default function ProjectsPage() {
     name: string;
   } | null>(null);
   const [projectName, setProjectName] = React.useState("");
+  const [listSettingsProject, setListSettingsProject] = React.useState<{
+    id: string;
+    name: string;
+    summary?: string | null;
+    metadata: Record<string, unknown>;
+  } | null>(null);
 
   const router = useRouter();
 
@@ -301,6 +170,23 @@ export default function ProjectsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeParam]);
+
+  // Update the URL when a node is selected so the page is deep-linkable and
+  // reloading restores the open node. Also update state directly so callers
+  // don't depend on the URL round-trip (which doesn't work in tests).
+  const navigateToNode = React.useCallback(
+    (nodeId: string | null) => {
+      setSelectedNodeId(nodeId);
+      const params = new URLSearchParams(searchParams?.toString() ?? "");
+      if (nodeId) {
+        params.set("node", nodeId);
+      } else {
+        params.delete("node");
+      }
+      router.replace(`/projects?${params.toString()}`);
+    },
+    [router, searchParams],
+  );
 
   // Chat context nodes — files/folders the user has pinned to add to LLM context
   const [chatContextNodes, setChatContextNodes] = React.useState<
@@ -356,8 +242,9 @@ export default function ProjectsPage() {
   );
   const [showImageUpload, setShowImageUpload] = React.useState(false);
   const [imagePickerTab, setImagePickerTab] = React.useState<
-    "upload" | "existing"
+    "upload" | "existing" | "generate"
   >("upload");
+  const [aiImagePrompt, setAiImagePrompt] = React.useState("");
   const [showLinkPicker, setShowLinkPicker] = React.useState(false);
   const [linkPickerSearch, setLinkPickerSearch] = React.useState("");
   const [showExportMenu, setShowExportMenu] = React.useState(false);
@@ -543,53 +430,22 @@ export default function ProjectsPage() {
 
   // Flat list of project nodes sorted into tree order with depth, for the link picker.
   const flatTreeNodes = React.useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allNodes = (projectDescendantsQuery.data ?? []) as any[];
-    const result: LinkPickerTreeNode[] = [];
-    const addChildren = (parentId: string, depth: number) => {
-      allNodes
-        .filter((n) => n.parentId === parentId)
-        .forEach((n) => {
-          result.push({ id: n.id, name: n.name, type: n.type, depth });
-          if (n.type === "folder") addChildren(n.id, depth + 1);
-        });
-    };
-    if (currentProjectId) addChildren(currentProjectId, 0);
-    return result;
+    const allNodes = (projectDescendantsQuery.data ??
+      []) as LinkPickerSourceNode[];
+    return buildFlatLinkPickerTreeNodes(currentProjectId, allNodes);
   }, [projectDescendantsQuery.data, currentProjectId]);
 
   const filterNodeIds = React.useMemo(() => {
-    const hasTagFilter = selectedTagIds.length > 0;
-    const hasSearchFilter = searchQuery.length > 0;
-
-    // No filters active
-    if (!hasTagFilter && !hasSearchFilter) return null;
-
-    // Combine tag and search results
-    const tagNodeIds =
-      hasTagFilter && filteredNodesQuery.data
-        ? new Set(filteredNodesQuery.data.map((n) => n.id))
-        : null;
-    const searchNodeIds =
-      hasSearchFilter && searchResultsQuery.data
-        ? new Set(searchResultsQuery.data.map((r) => r.node.id))
-        : null;
-
-    // If both filters are active, intersect the results
-    if (tagNodeIds && searchNodeIds) {
-      const intersection = new Set<string>();
-      for (const id of tagNodeIds) {
-        if (searchNodeIds.has(id)) intersection.add(id);
-      }
-      return intersection;
-    }
-
-    // Return whichever filter is active
-    return tagNodeIds || searchNodeIds || new Set<string>();
+    return deriveFilteredNodeIds(
+      selectedTagIds,
+      filteredNodesQuery.data?.map((node) => node.id),
+      searchQuery,
+      searchResultsQuery.data?.map((result) => result.node.id),
+    );
   }, [
-    selectedTagIds.length,
+    selectedTagIds,
+    searchQuery,
     filteredNodesQuery.data,
-    searchQuery.length,
     searchResultsQuery.data,
   ]);
 
@@ -649,14 +505,14 @@ export default function ProjectsPage() {
     },
   });
 
-  const handleCreate = () => {
+  const handleCreate = React.useCallback(() => {
     if (!projectName.trim()) return;
     createMutation.mutate({
       type: "project",
       name: projectName.trim(),
       parentId: null,
     });
-  };
+  }, [createMutation, projectName]);
 
   const handleEdit = () => {
     if (!selectedProject || !projectName.trim()) return;
@@ -687,7 +543,7 @@ export default function ProjectsPage() {
     onSuccess: (data) => {
       utils.nodes.getChildren.invalidate();
       // Auto-select the newly created node
-      setSelectedNodeId(data.id);
+      navigateToNode(data.id);
       // Expand the parent folder so the new node is visible
       if (data.parentId) {
         fileTreeRef.current?.expandNode(data.parentId);
@@ -724,7 +580,7 @@ export default function ProjectsPage() {
     onSuccess: (_, variables) => {
       utils.nodes.getChildren.invalidate();
       if (selectedNodeId === variables.id) {
-        setSelectedNodeId(null);
+        navigateToNode(null);
       }
       setNodeDeleteConfirm({ open: false, node: null });
       addToast(tFileTree("deleteSuccess"), "success");
@@ -750,40 +606,96 @@ export default function ProjectsPage() {
 
   const handleMoveNode = React.useCallback(
     (draggedNodeId: string, targetNodeId: string, position: DropPosition) => {
-      if (position === "inside") {
-        nodeMoveMutation.mutate({
-          id: draggedNodeId,
-          newParentId: targetNodeId,
-        });
-      } else {
-        const targetNode = utils.nodes.getById.getData({ id: targetNodeId });
-        if (targetNode && targetNode.parentId) {
-          const siblings =
-            utils.nodes.getChildren.getData({
-              parentId: targetNode.parentId,
-            }) ?? [];
-          const targetIndex = siblings.findIndex((s) => s.id === targetNodeId);
-          let insertPosition: number;
-          if (targetIndex === -1) {
-            insertPosition = position === "before" ? 0 : siblings.length;
-          } else if (position === "before") {
-            insertPosition = targetIndex;
-          } else {
-            insertPosition = targetIndex + 1;
-          }
-          nodeMoveMutation.mutate({
-            id: draggedNodeId,
-            newParentId: targetNode.parentId,
-            position: insertPosition,
-          });
-        }
+      const targetNode = utils.nodes.getById.getData({ id: targetNodeId }) as
+        | { id: string; parentId: string | null }
+        | undefined;
+      const siblingNodes = targetNode?.parentId
+        ? (utils.nodes.getChildren.getData({
+            parentId: targetNode.parentId,
+          }) ?? [])
+        : [];
+      const moveInput = deriveNodeMoveMutationInput(
+        draggedNodeId,
+        targetNodeId,
+        position,
+        targetNode,
+        siblingNodes,
+      );
+
+      if (moveInput) {
+        nodeMoveMutation.mutate(moveInput);
       }
     },
     [nodeMoveMutation, utils.nodes.getById, utils.nodes.getChildren],
   );
 
+  // Bulk node selection & tag modal
+  const [selectedBulkNodeIds, setSelectedBulkNodeIds] = React.useState<
+    Set<string>
+  >(new Set());
+  const [showBulkTagModal, setShowBulkTagModal] = React.useState(false);
+  const toggleFavoriteMutation = trpc.nodes.toggleFavorite.useMutation({
+    onSuccess: (updatedNode) => {
+      const nowFavorite =
+        (updatedNode.metadata as Record<string, unknown> | null)?.isFavorite ===
+        true;
+      addToast(
+        nowFavorite
+          ? tFileTree("favorites.added")
+          : tFileTree("favorites.removed"),
+        "success",
+      );
+      utils.nodes.getFavorites.invalidate();
+      utils.nodes.getChildren.invalidate();
+    },
+    onError: (err) => {
+      addToast(err.message || tCommon("error"), "error");
+    },
+  });
+  const handleToggleFavorite = React.useCallback(
+    (nodeId: string) => {
+      toggleFavoriteMutation.mutate({ nodeId });
+    },
+    [toggleFavoriteMutation],
+  );
+
+  const handleToggleBulkNode = React.useCallback((nodeId: string) => {
+    setSelectedBulkNodeIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(nodeId)) next.delete(nodeId);
+      else next.add(nodeId);
+      return next;
+    });
+  }, []);
+
+  const projectMeta =
+    (currentProject?.metadata as Record<string, unknown> | null) ?? {};
+
+  // Project settings dialog
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+
   // Media upload mutation
   const mediaUploadMutation = trpc.media.upload.useMutation();
+
+  const masterKeyQuery = trpc.preferences.getMasterKey.useQuery(undefined, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  const generateImageMutation = trpc.media.generateImage.useMutation({
+    onSuccess: (attachment) => {
+      editorInstanceRef.current
+        ?.chain()
+        .focus()
+        .setImage({ src: getMediaAttachmentUrl(attachment.id) })
+        .run();
+      setShowImageUpload(false);
+      setAiImagePrompt("");
+    },
+    onError: (err) => {
+      addToast(err.message ?? tEditor("imageUpload.generateError"), "error");
+    },
+  });
 
   // ─── Import from directory ───────────────────────────────────────────
   const mediaUploadForImport = trpc.media.upload.useMutation();
@@ -815,14 +727,9 @@ export default function ProjectsPage() {
   );
 
   // For the "ask for project name" case (loose files without a single root dir)
-  const [pendingImportEntries, setPendingImportEntries] = React.useState<
-    { path: string; content: unknown }[] | null
-  >(null);
-  const [pendingImagesByNotePath, setPendingImagesByNotePath] =
-    React.useState<Map<string, Map<string, File>> | null>(null);
+  const [pendingImportRequest, setPendingImportRequest] =
+    React.useState<PendingImportDirectoryRequest<File> | null>(null);
   const [importProjectName, setImportProjectName] = React.useState("");
-  const [pendingImportCreatesProject, setPendingImportCreatesProject] =
-    React.useState(false);
   const [queuedImportProjectName, setQueuedImportProjectName] =
     React.useState("");
 
@@ -831,13 +738,49 @@ export default function ProjectsPage() {
     setProjectName("");
   }, []);
 
+  const openCreateDialog = React.useCallback(() => {
+    setCreateDialogOpen(true);
+  }, []);
+
+  const handleCreateProjectNameChange = React.useCallback(
+    (nextProjectName: string) => {
+      setProjectName(nextProjectName);
+    },
+    [],
+  );
+
+  const handleCreateDialogImportFromFolder = React.useCallback(() => {
+    setQueuedImportProjectName(projectName.trim());
+    closeCreateDialog();
+    importInputRef.current?.click();
+  }, [closeCreateDialog, projectName]);
+
   const closeImportNameDialog = React.useCallback(() => {
-    setPendingImportEntries(null);
-    setPendingImagesByNotePath(null);
+    setPendingImportRequest(null);
     setImportProjectName("");
-    setPendingImportCreatesProject(false);
     setQueuedImportProjectName("");
   }, []);
+
+  const showImportNameDialog = React.useCallback(
+    (nextPendingImportRequest: PendingImportDirectoryRequest<File>) => {
+      setPendingImportRequest(nextPendingImportRequest);
+      setImportProjectName(nextPendingImportRequest.initialProjectName);
+    },
+    [],
+  );
+
+  const navigateToProjects = React.useCallback(() => {
+    router.push("/projects");
+  }, [router]);
+
+  const updateImportedNodeContent = React.useCallback(
+    async ({ id, content }: { id: string; content: Record<string, unknown> }) =>
+      updateNodeMutation.mutateAsync({
+        id,
+        data: { content },
+      }),
+    [updateNodeMutation],
+  );
 
   // After nodes are created, upload images and patch node content
   const uploadImagesAndPatch = React.useCallback(
@@ -845,81 +788,16 @@ export default function ProjectsPage() {
       nodeMap: Record<string, string>,
       projectId: string,
       imageFilesByNotePath: Map<string, Map<string, File>>,
-    ) => {
-      for (const [notePath, imageFiles] of imageFilesByNotePath.entries()) {
-        const nodeId = nodeMap[notePath];
-        if (!nodeId) continue;
-        const srcMap = new Map<string, string>();
-        for (const [localPath, file] of imageFiles.entries()) {
-          try {
-            const arrayBuffer = await file.arrayBuffer();
-            // Chunked btoa to avoid call stack overflow for large images
-            const bytes = new Uint8Array(arrayBuffer);
-            let binary = "";
-            for (let i = 0; i < bytes.length; i += BASE64_CHUNK_SIZE) {
-              binary += String.fromCharCode(
-                ...bytes.subarray(i, i + BASE64_CHUNK_SIZE),
-              );
-            }
-            const base64 = btoa(binary);
-            const attachment = await mediaUploadForImport.mutateAsync({
-              nodeId,
-              projectId,
-              filename: file.name,
-              mimeType: file.type || "application/octet-stream",
-              data: base64,
-              createdBy: "user:import",
-            });
-            // Get a pre-signed Minio URL for the uploaded image
-            const { url } = await utils.media.getDownloadUrl.fetch({
-              id: attachment.id,
-              expirySeconds: SEVEN_DAYS_IN_SECONDS,
-            });
-            srcMap.set(localPath, url);
-          } catch (err) {
-            console.error("Image upload failed for", file.name, err);
-          }
-        }
-        if (srcMap.size === 0) continue;
-        // Fetch current node content and replace placeholder srcs
-        // (the markdownToTipTap call already used the placeholder; patch in the real URLs)
-        // We stored the tiptap JSON with local path srcs — need to patch them
-        try {
-          const node = await utils.nodes.getById.fetch({ id: nodeId });
-          if (!node?.content) continue;
-
-          let changed = false;
-          const patchedContent = transformTiptapContent(
-            node.content,
-            (key, value) => {
-              if (key === "src" && typeof value === "string") {
-                const uploadedImageUrl = srcMap.get(value);
-                if (uploadedImageUrl && uploadedImageUrl !== value) {
-                  changed = true;
-                  return uploadedImageUrl;
-                }
-              }
-              return value;
-            },
-          );
-
-          if (!changed || !patchedContent) continue;
-
-          await updateNodeMutation.mutateAsync({
-            id: nodeId,
-            data: { content: patchedContent },
-          });
-        } catch {
-          // Non-fatal
-        }
-      }
-    },
-    [
-      mediaUploadForImport,
-      utils.media.getDownloadUrl,
-      updateNodeMutation,
-      utils.nodes.getById,
-    ],
+    ) =>
+      uploadImportedImagesAndPatchNodes({
+        nodeMap,
+        projectId,
+        imageFilesByNotePath,
+        uploadImportedMedia: mediaUploadForImport.mutateAsync,
+        fetchNodeById: utils.nodes.getById.fetch,
+        updateNodeContent: updateImportedNodeContent,
+      }),
+    [mediaUploadForImport, updateImportedNodeContent, utils.nodes.getById],
   );
 
   // Patch relative imported note links to resolve to internal node IDs
@@ -927,242 +805,39 @@ export default function ProjectsPage() {
     async (
       nodeMap: Record<string, string>,
       entries: { path: string; content: unknown }[],
-    ) => {
-      for (const { path } of entries) {
-        const nodeId = nodeMap[path];
-        if (!nodeId) continue;
-        try {
-          const node = await utils.nodes.getById.fetch({ id: nodeId });
-          if (!node?.content) continue;
-
-          let changed = false;
-
-          const patchedContent = transformTiptapContent(
-            node.content,
-            (key, value) => {
-              if (key === "href" && typeof value === "string") {
-                const rewrittenHref = rewriteImportedInternalHref(
-                  value,
-                  path,
-                  nodeMap,
-                );
-
-                if (rewrittenHref !== null && rewrittenHref !== value) {
-                  changed = true;
-                  // Patch to internal node URL if target exists, otherwise use # to
-                  // prevent broken navigation to a raw imported file path.
-                  return rewrittenHref;
-                }
-              }
-              return value;
-            },
-          );
-
-          if (changed && patchedContent) {
-            await updateNodeMutation.mutateAsync({
-              id: nodeId,
-              data: { content: patchedContent },
-            });
-          }
-        } catch {
-          // Non-fatal — skip this node
-        }
-      }
-    },
-    [utils.nodes.getById, updateNodeMutation],
+    ) =>
+      patchImportedNodeInternalLinks({
+        nodeMap,
+        entries,
+        fetchNodeById: utils.nodes.getById.fetch,
+        updateNodeContent: updateImportedNodeContent,
+      }),
+    [updateImportedNodeContent, utils.nodes.getById],
   );
 
   const healImportedInternalLinks = React.useCallback(
-    async (projectId: string, importedNodeMap: Record<string, string>) => {
-      const descendants = (await utils.nodes.getDescendants.fetch({
-        nodeId: projectId,
-      })) as ImportHealingNode[];
-      const nodesById = new Map(
-        descendants.map((descendant) => [descendant.id, descendant]),
-      );
-      const folderAliasesById = new Map<string, string[]>();
-      const aliasToNodeIds = new Map<string, Set<string>>();
-
-      const addAlias = (alias: string | null, nodeId: string) => {
-        if (!alias) {
-          return;
-        }
-
-        const normalizedAlias = normalizeImportSourcePath(alias);
-        if (!normalizedAlias) {
-          return;
-        }
-
-        const matchingNodeIds =
-          aliasToNodeIds.get(normalizedAlias) ?? new Set();
-        matchingNodeIds.add(nodeId);
-        aliasToNodeIds.set(normalizedAlias, matchingNodeIds);
-      };
-
-      const getFolderAliases = (folderId: string | null): string[] => {
-        if (!folderId || folderId === projectId) {
-          return [""];
-        }
-
-        const cachedAliases = folderAliasesById.get(folderId);
-        if (cachedAliases) {
-          return cachedAliases;
-        }
-
-        const folderNode = nodesById.get(folderId);
-        if (!folderNode || folderNode.type !== "folder") {
-          return [""];
-        }
-
-        const folderAliases = new Set<string>();
-        const importSourcePath = getImportSourcePath(folderNode.metadata);
-
-        if (importSourcePath) {
-          folderAliases.add(importSourcePath);
-          const rootlessFolderPath =
-            stripTopLevelImportSegment(importSourcePath);
-          if (rootlessFolderPath) {
-            folderAliases.add(rootlessFolderPath);
-          }
-        }
-
-        const trimmedFolderName = folderNode.name.trim();
-        if (trimmedFolderName) {
-          for (const parentAlias of getFolderAliases(folderNode.parentId)) {
-            folderAliases.add(
-              joinImportSourcePath(parentAlias, trimmedFolderName),
-            );
-          }
-        }
-
-        const resolvedFolderAliases = [...folderAliases].filter(Boolean);
-        folderAliasesById.set(
-          folderId,
-          resolvedFolderAliases.length > 0 ? resolvedFolderAliases : [""],
-        );
-
-        return folderAliasesById.get(folderId) ?? [""];
-      };
-
-      const getNotePathCandidates = (node: ImportHealingNode): string[] => {
-        const notePathCandidates = new Set<string>();
-        const importSourcePath = getImportSourcePath(node.metadata);
-
-        if (importSourcePath) {
-          notePathCandidates.add(importSourcePath);
-          const rootlessImportSourcePath =
-            stripTopLevelImportSegment(importSourcePath);
-          if (rootlessImportSourcePath) {
-            notePathCandidates.add(rootlessImportSourcePath);
-          }
-        }
-
-        const fileNameCandidates = getNoteFileNameCandidates(node);
-        for (const parentAlias of getFolderAliases(node.parentId)) {
-          for (const fileNameCandidate of fileNameCandidates) {
-            notePathCandidates.add(
-              joinImportSourcePath(parentAlias, fileNameCandidate),
-            );
-          }
-        }
-
-        return [...notePathCandidates].filter(Boolean);
-      };
-
-      for (const [nodePath, nodeId] of Object.entries(importedNodeMap)) {
-        addAlias(nodePath, nodeId);
-      }
-
-      for (const descendant of descendants) {
-        if (descendant.type !== "note") {
-          continue;
-        }
-
-        for (const notePathCandidate of getNotePathCandidates(descendant)) {
-          addAlias(notePathCandidate, descendant.id);
-        }
-      }
-
-      const projectWideNodeMap = Object.fromEntries(
-        [...aliasToNodeIds.entries()]
-          .filter(([, matchingNodeIds]) => matchingNodeIds.size === 1)
-          .map(([alias, matchingNodeIds]) => [
-            alias,
-            [...matchingNodeIds][0] as string,
-          ]),
-      );
-
-      for (const descendant of descendants) {
-        if (descendant.type !== "note" || !descendant.content) {
-          continue;
-        }
-
-        const importingNotePathCandidates = getNotePathCandidates(descendant);
-        if (importingNotePathCandidates.length === 0) {
-          continue;
-        }
-
-        let changed = false;
-        const patchedContent = transformTiptapContent(
-          descendant.content,
-          (key, value) => {
-            if (key !== "href" || typeof value !== "string") {
-              return value;
-            }
-
-            for (const importingNotePath of importingNotePathCandidates) {
-              const rewrittenHref = rewriteImportedInternalHref(
-                value,
-                importingNotePath,
-                projectWideNodeMap,
-              );
-
-              if (rewrittenHref !== null && rewrittenHref !== value) {
-                changed = true;
-                return rewrittenHref;
-              }
-            }
-
-            return value;
-          },
-        );
-
-        if (changed && patchedContent) {
-          await updateNodeMutation.mutateAsync({
-            id: descendant.id,
-            data: { content: patchedContent },
-          });
-        }
-      }
-    },
-    [updateNodeMutation, utils.nodes.getDescendants],
+    async (projectId: string, importedNodeMap: Record<string, string>) =>
+      healImportedProjectInternalLinks({
+        projectId,
+        importedNodeMap,
+        fetchDescendants: utils.nodes.getDescendants.fetch,
+        updateNodeContent: updateImportedNodeContent,
+      }),
+    [updateImportedNodeContent, utils.nodes.getDescendants],
   );
 
   const getImportTargetNodeId = React.useCallback(
     (createNewProject = false) => {
-      if (createNewProject || !currentProject || forceList) {
-        return undefined;
-      }
-
-      const selectedNode = selectedNodeQuery.data as
-        | { id: string; type: string; parentId: string | null }
-        | undefined;
-
-      if (!selectedNode) {
-        return currentProject.id;
-      }
-
-      if (selectedNode.type === "folder") {
-        return selectedNode.id;
-      }
-
-      if (selectedNode.type === "note") {
-        return selectedNode.parentId ?? currentProject.id;
-      }
-
-      return currentProject.id;
+      return deriveImportTargetNodeId(
+        createNewProject,
+        currentProject?.id,
+        forceList,
+        selectedNodeQuery.data as
+          | { id: string; type: string; parentId: string | null }
+          | undefined,
+      );
     },
-    [currentProject, forceList, selectedNodeQuery.data],
+    [currentProject?.id, forceList, selectedNodeQuery.data],
   );
 
   const runImport = React.useCallback(
@@ -1171,48 +846,29 @@ export default function ProjectsPage() {
       entries: { path: string; content: unknown }[],
       imageFilesByNotePath: Map<string, Map<string, File>>,
       options?: { createNewProject?: boolean },
-    ) => {
-      const importTargetNodeId = getImportTargetNodeId(
-        options?.createNewProject ?? false,
-      );
-
-      const result = await importDirectoryMutation.mutateAsync({
+    ) =>
+      runProjectImportWorkflow({
         projectName,
-        parentNodeId: importTargetNodeId,
-        files: entries,
-      });
-      // Patch images first (updates node content with Minio URLs)
-      if (imageFilesByNotePath.size > 0) {
-        await uploadImagesAndPatch(
-          result.nodeMap,
-          result.projectId,
-          imageFilesByNotePath,
-        );
-        // Flush the node cache so patchInternalLinks fetches fresh content
-        // (otherwise it would overwrite the just-patched image URLs with stale data)
-        await utils.nodes.getById.invalidate();
-      }
-      // Patch internal markdown links to resolve to node IDs
-      await patchInternalLinks(result.nodeMap, entries);
-      // Flush descendants cache so the healing pass does not rewrite notes from
-      // stale content and accidentally clobber already-patched image URLs.
-      await utils.nodes.getDescendants.invalidate();
-      // Revisit older imported notes now that new targets may exist.
-      await healImportedInternalLinks(result.projectId, result.nodeMap);
-      // Navigate to the newly imported project so the user can see it
-      await setCurrentProject(result.projectId);
-      await Promise.all([
-        utils.nodes.getAllProjects.invalidate(),
-        utils.nodes.getChildren.invalidate(),
-        utils.nodes.getById.invalidate(),
-        utils.nodes.getDescendants.invalidate(),
-      ]);
-      router.push("/projects");
-    },
+        entries,
+        imageFilesByNotePath,
+        createNewProject: options?.createNewProject,
+        getImportTargetNodeId,
+        importDirectory: importDirectoryMutation.mutateAsync,
+        uploadImagesAndPatch,
+        patchInternalLinks,
+        healImportedInternalLinks,
+        setCurrentProject,
+        invalidateAllProjects: () => utils.nodes.getAllProjects.invalidate(),
+        invalidateChildren: () => utils.nodes.getChildren.invalidate(),
+        invalidateNodeById: () => utils.nodes.getById.invalidate(),
+        invalidateDescendants: () => utils.nodes.getDescendants.invalidate(),
+        navigateToProjects,
+      }),
     [
       getImportTargetNodeId,
       healImportedInternalLinks,
       importDirectoryMutation,
+      navigateToProjects,
       uploadImagesAndPatch,
       patchInternalLinks,
       setCurrentProject,
@@ -1220,7 +876,6 @@ export default function ProjectsPage() {
       utils.nodes.getChildren,
       utils.nodes.getById,
       utils.nodes.getDescendants,
-      router,
     ],
   );
 
@@ -1234,140 +889,36 @@ export default function ProjectsPage() {
       e.target.value = "";
       if (allFiles.length === 0) return;
 
-      const IMAGE_EXTS = /\.(png|jpg|jpeg|gif|webp|svg)$/i;
-      const MARKDOWN_EXTS = /\.(md|txt|markdown|mdown|mkd|mdx)$/i;
+      const importDirectoryOutcome = await prepareImportDirectoryWorkflow({
+        allFiles,
+        preferredProjectName,
+        createNewProject,
+      });
 
-      // Index all image files by full relative path and by filename (for references)
-      const imageFilesByPath = new Map<string, File>(); // localPath/filename → File
-      for (const file of allFiles) {
-        const f = file as File & { webkitRelativePath: string };
-        if (!f.name.startsWith(".") && IMAGE_EXTS.test(f.name)) {
-          const path = f.webkitRelativePath || f.name;
-          imageFilesByPath.set(path, file);
-          imageFilesByPath.set(f.name, file); // alias for relative references
-        }
-      }
-
-      // Parse markdown/text files → TipTap JSON, track referenced images
-      const entries: { path: string; content: unknown }[] = [];
-      const imageFilesByNotePath = new Map<string, Map<string, File>>(); // notePath → (imgLocalPath → File)
-      const referencedImages = new Set<File>();
-
-      for (const file of allFiles) {
-        const f = file as File & { webkitRelativePath: string };
-        if (!MARKDOWN_EXTS.test(f.name) || f.name.startsWith(".")) continue;
-        const path = f.webkitRelativePath || f.name;
-        const rawText = await file.text();
-        const tiptapContent = markdownToTipTap(rawText);
-
-        // Track which images this note references
-        const imgPaths = extractImagePaths(rawText);
-        if (imgPaths.length > 0) {
-          const noteImgMap = new Map<string, File>();
-          for (const imgPath of imgPaths) {
-            const noteDir = path.split("/").slice(0, -1).join("/");
-            const candidates = [
-              imgPath,
-              `${noteDir}/${imgPath}`,
-              imgPath.split("/").pop() ?? imgPath,
-            ];
-            for (const candidate of candidates) {
-              if (imageFilesByPath.has(candidate)) {
-                const imgFile = imageFilesByPath.get(candidate)!;
-                noteImgMap.set(imgPath, imgFile);
-                referencedImages.add(imgFile);
-                break;
-              }
-            }
-          }
-          if (noteImgMap.size > 0) imageFilesByNotePath.set(path, noteImgMap);
-        }
-
-        entries.push({ path, content: tiptapContent });
-      }
-
-      // Create standalone image notes for ALL images so the folder structure appears in the
-      // project tree. Referenced images will also be patched inline into their parent notes.
-      const processedImages = new Set<File>();
-      for (const file of allFiles) {
-        const f = file as File & { webkitRelativePath: string };
-        if (!IMAGE_EXTS.test(f.name) || f.name.startsWith(".")) continue;
-        if (processedImages.has(file)) continue;
-        processedImages.add(file);
-
-        const imgPath = f.webkitRelativePath || f.name;
-        const imgName = f.name.replace(IMAGE_EXTS, "");
-        // Use .md extension so the API router accepts the entry as a note
-        const syntheticPath = imgPath.replace(IMAGE_EXTS, ".md");
-        const content = {
-          type: "doc",
-          content: [
-            {
-              type: "image",
-              attrs: { src: imgPath, alt: imgName, title: null },
-            },
-          ],
-        };
-        entries.push({ path: syntheticPath, content });
-        imageFilesByNotePath.set(syntheticPath, new Map([[imgPath, file]]));
-      }
-
-      if (entries.length === 0) {
-        const exts = [
-          ...new Set(
-            allFiles.map((f) =>
-              f.name.includes(".")
-                ? f.name.split(".").pop()!.toLowerCase()
-                : "(no ext)",
-            ),
-          ),
-        ]
-          .slice(0, 10)
-          .join(", ");
-        addToast(
-          allFiles.length === 0
-            ? "No files were received from the browser. Try selecting the folder again."
-            : `No supported files found among ${allFiles.length} files (extensions: ${exts || "none"}). Supported: .md, .txt, .png, .jpg, .jpeg, .gif, .webp, .svg`,
-          "error",
-        );
-        return;
-      }
-
-      const roots = new Set(
-        entries.map((f) => (f.path as string).split("/")[0]),
-      );
-      if (roots.size === 1) {
-        const rootDirectoryName = [...roots][0];
-        const projectName = preferredProjectName || rootDirectoryName;
-        await runImport(projectName, entries, imageFilesByNotePath, {
-          createNewProject,
-        });
-      } else {
-        setPendingImportEntries(entries);
-        setPendingImagesByNotePath(imageFilesByNotePath);
-        setImportProjectName(preferredProjectName);
-        setPendingImportCreatesProject(createNewProject);
-      }
+      await applyPreparedImportDirectoryOutcome({
+        outcome: importDirectoryOutcome,
+        runImport,
+        showUnsupportedImportMessage: (message) => addToast(message, "error"),
+        setPendingImportRequest: showImportNameDialog,
+      });
     },
-    [addToast, queuedImportProjectName, runImport],
+    [addToast, queuedImportProjectName, runImport, showImportNameDialog],
   );
 
   const handleImportWithName = React.useCallback(() => {
-    if (!pendingImportEntries || !importProjectName.trim()) return;
+    if (!pendingImportRequest || !importProjectName.trim()) return;
     void runImport(
       importProjectName.trim(),
-      pendingImportEntries,
-      pendingImagesByNotePath ?? new Map(),
-      { createNewProject: pendingImportCreatesProject },
+      pendingImportRequest.entries,
+      pendingImportRequest.imageFilesByNotePath,
+      { createNewProject: pendingImportRequest.createNewProject },
     );
     closeImportNameDialog();
   }, [
     closeImportNameDialog,
     runImport,
-    pendingImportEntries,
-    pendingImportCreatesProject,
     importProjectName,
-    pendingImagesByNotePath,
+    pendingImportRequest,
   ]);
 
   const handleImageUpload = React.useCallback(
@@ -1384,18 +935,15 @@ export default function ProjectsPage() {
     [mediaUploadMutation],
   );
 
-  const handleGetDownloadUrl = React.useCallback(
-    async (params: { id: string }) => {
-      return await utils.media.getDownloadUrl.fetch(params);
-    },
-    [utils.media.getDownloadUrl],
-  );
-
   const handleImageUploadComplete = React.useCallback(
-    (_attachmentId: string, downloadUrl: string) => {
+    (attachmentId: string) => {
       const editor = editorInstanceRef.current;
       if (editor) {
-        editor.chain().focus().setImage({ src: downloadUrl }).run();
+        editor
+          .chain()
+          .focus()
+          .setImage({ src: getMediaAttachmentUrl(attachmentId) })
+          .run();
       }
       setShowImageUpload(false);
     },
@@ -1412,62 +960,35 @@ export default function ProjectsPage() {
   // Handle link clicks from TipTap editor — navigate in the current window, never new tab
   const handleEditorLinkClick = React.useCallback(
     async (href: string) => {
-      // Handle full URLs that may point to this app (e.g. http://app.arbor.local/projects?node=uuid)
-      try {
-        const url = new URL(href, window.location.href);
-        const nodeId = url.searchParams.get("node");
-        if (nodeId) {
-          router.push(`/projects?node=${nodeId}`);
-          return;
-        }
-        if (url.origin === window.location.origin) {
-          router.push(url.pathname + url.search);
-          return;
-        }
+      const navigationTarget = deriveEditorLinkNavigationTarget(
+        href,
+        window.location.href,
+        window.location.origin,
+      );
 
-        // Handle LLM-generated arbor internal URLs like https://arbor/path/to/node-name.
-        // Try to resolve each path segment from most-specific to least.
-        if (url.hostname === "arbor" || url.hostname.endsWith(".arbor")) {
-          const segments = url.pathname.split("/").filter(Boolean);
-          for (let i = segments.length - 1; i >= 0; i--) {
-            const rawSeg = segments[i];
-            // Convert underscores/hyphens to spaces for name matching
-            const nameCandidates = [
-              rawSeg,
-              rawSeg.replace(/_/g, " "),
-              rawSeg.replace(/-/g, " "),
-            ];
-            for (const candidate of nameCandidates) {
-              try {
-                const results = await utils.search.keywordSearch.fetch({
-                  query: candidate,
-                  filters: {},
-                  options: { limit: 5 },
-                });
-                const match = results.find(
-                  (r: { node: { name: string } }) =>
-                    r.node.name === candidate ||
-                    r.node.name.replace(/\s/g, "_") === rawSeg,
-                );
-                if (match) {
-                  router.push(`/projects?node=${match.node.id}`);
-                  return;
-                }
-              } catch {
-                /* ignore search errors */
-              }
-            }
-          }
-          return; // arbor URL but no match found — don't navigate externally
-        }
-      } catch {
-        /* not a URL */
-      }
-      if (href.startsWith("?") || href.startsWith("/")) {
-        router.push(href.startsWith("?") ? `/projects${href}` : href);
+      if (navigationTarget.kind === "push") {
+        router.push(navigationTarget.href);
         return;
       }
-      window.location.href = href;
+
+      if (navigationTarget.kind === "resolve-arbor-url") {
+        const matchedNodeId = await resolveArborEditorLinkTargetNodeId(
+          navigationTarget.pathSegments,
+          async (query) =>
+            utils.search.keywordSearch.fetch({
+              query,
+              filters: {},
+              options: { limit: 5 },
+            }),
+        );
+
+        if (matchedNodeId) {
+          router.push(`/projects?node=${matchedNodeId}`);
+        }
+        return;
+      }
+
+      window.location.href = navigationTarget.href;
     },
     [router, utils],
   );
@@ -1555,23 +1076,17 @@ export default function ProjectsPage() {
   const handleExportMarkdown = React.useCallback(
     async (includeDescendants: boolean) => {
       if (!selectedNodeId) return;
-      try {
-        const result = await utils.nodes.exportMarkdown.fetch({
-          id: selectedNodeId,
-          includeDescendants,
-        });
-        const blob = new Blob([result.content], { type: "text/markdown" });
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = `${selectedNodeQuery.data?.name || "export"}.md`;
-        anchor.click();
-        URL.revokeObjectURL(url);
-        addToast(tFileTree("exportSuccess"), "success");
-      } catch {
-        addToast(tFileTree("exportError"), "error");
-      }
-      setShowExportMenu(false);
+
+      await runProjectMarkdownExport({
+        nodeId: selectedNodeId,
+        nodeName: selectedNodeQuery.data?.name,
+        includeDescendants,
+        fetchMarkdown: utils.nodes.exportMarkdown.fetch,
+        downloadTextFile,
+        addSuccessToast: () => addToast(tFileTree("exportSuccess"), "success"),
+        addErrorToast: () => addToast(tFileTree("exportError"), "error"),
+        closeExportMenu: () => setShowExportMenu(false),
+      });
     },
     [selectedNodeId, selectedNodeQuery.data?.name, utils, addToast, tFileTree],
   );
@@ -1579,22 +1094,16 @@ export default function ProjectsPage() {
   const handleExportPdf = React.useCallback(
     async (includeDescendants: boolean) => {
       if (!selectedNodeId) return;
-      try {
-        const result = await utils.nodes.exportHtml.fetch({
-          id: selectedNodeId,
-          includeDescendants,
-        });
-        const printWindow = window.open("", "_blank");
-        if (printWindow) {
-          printWindow.document.write(result.content);
-          printWindow.document.close();
-          printWindow.print();
-        }
-        addToast(tFileTree("exportSuccess"), "success");
-      } catch {
-        addToast(tFileTree("exportError"), "error");
-      }
-      setShowExportMenu(false);
+
+      await runProjectPdfExport({
+        nodeId: selectedNodeId,
+        includeDescendants,
+        fetchHtml: utils.nodes.exportHtml.fetch,
+        openHtmlPrintWindow,
+        addSuccessToast: () => addToast(tFileTree("exportSuccess"), "success"),
+        addErrorToast: () => addToast(tFileTree("exportError"), "error"),
+        closeExportMenu: () => setShowExportMenu(false),
+      });
     },
     [selectedNodeId, utils, addToast, tFileTree],
   );
@@ -1702,6 +1211,13 @@ export default function ProjectsPage() {
       case "delete":
         setNodeDeleteConfirm({ open: true, node: action.node });
         break;
+      case "tagSelection":
+        // If nothing is shift-selected, tag just the right-clicked node
+        if (selectedBulkNodeIds.size === 0) {
+          setSelectedBulkNodeIds(new Set([action.node.id]));
+        }
+        setShowBulkTagModal(true);
+        break;
     }
   };
 
@@ -1740,16 +1256,11 @@ export default function ProjectsPage() {
                 )}
               </button>
               <button
-                onClick={() =>
-                  openEditDialog({
-                    id: currentProject.id,
-                    name: currentProject.name,
-                  })
-                }
+                onClick={() => setSettingsOpen(true)}
                 className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                title={tCommon("edit")}
+                title="Project settings"
               >
-                <Pencil className="w-3 h-3" />
+                <Settings className="w-3 h-3" />
               </button>
             </div>
             {/* Unified filter panel */}
@@ -1767,7 +1278,7 @@ export default function ProjectsPage() {
               ref={fileTreeRef}
               projectId={currentProjectId}
               selectedNodeId={selectedNodeId}
-              onSelectNode={setSelectedNodeId}
+              onSelectNode={navigateToNode}
               onContextMenu={(e, node) =>
                 setContextMenu({
                   open: true,
@@ -1787,8 +1298,20 @@ export default function ProjectsPage() {
               attributionFilter={attributionFilter}
               onAddToContext={chatSidebarOpen ? handleAddToContext : undefined}
               contextNodeIds={chatSidebarOpen ? chatContextNodeIds : undefined}
+              onToggleFavorite={handleToggleFavorite}
+              selectedNodeIds={selectedBulkNodeIds}
+              onToggleNodeSelected={handleToggleBulkNode}
               className="flex-1 min-h-0"
             />
+            {currentProjectId && (
+              <BulkTagBar
+                open={showBulkTagModal}
+                onClose={() => setShowBulkTagModal(false)}
+                selectedNodeIds={selectedBulkNodeIds}
+                projectId={currentProjectId}
+                onClearSelection={() => setSelectedBulkNodeIds(new Set())}
+              />
+            )}
             <div className="border-t flex flex-col flex-shrink-0">
               {tagPanelCollapsed ? (
                 /* Collapsed — slim bar with icon button to reopen, same pattern as ChatSidebar */
@@ -1962,7 +1485,7 @@ export default function ProjectsPage() {
                     <TagPicker
                       nodeId={selNode?.id}
                       projectId={currentProjectId}
-                      onNavigateToNode={(nodeId) => setSelectedNodeId(nodeId)}
+                      onNavigateToNode={navigateToNode}
                     />
                   </div>
                   {selNode?.type === "note" && (
@@ -2013,6 +1536,7 @@ export default function ProjectsPage() {
                       <div className="flex-1 min-h-0">
                         <TiptapEditor
                           content={parsed}
+                          nodeId={selectedNodeId ?? undefined}
                           onChange={setEditorContent}
                           editorRef={editorInstanceRef}
                           onInsertImage={() =>
@@ -2044,18 +1568,19 @@ export default function ProjectsPage() {
                                 </button>
                               </div>
                               <div className="flex border-b">
-                                <button
-                                  onClick={() => setImagePickerTab("upload")}
-                                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${imagePickerTab === "upload" ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                                >
-                                  Upload new
-                                </button>
-                                <button
-                                  onClick={() => setImagePickerTab("existing")}
-                                  className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${imagePickerTab === "existing" ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                                >
-                                  Select existing
-                                </button>
+                                {(
+                                  ["upload", "existing", "generate"] as const
+                                ).map((tab) => (
+                                  <button
+                                    key={tab}
+                                    onClick={() => setImagePickerTab(tab)}
+                                    className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${imagePickerTab === tab ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                                  >
+                                    {tEditor(
+                                      `imageUpload.tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`,
+                                    )}
+                                  </button>
+                                ))}
                               </div>
                               <div className="flex-1 overflow-y-auto p-4">
                                 {imagePickerTab === "upload" ? (
@@ -2063,12 +1588,11 @@ export default function ProjectsPage() {
                                     nodeId={selectedNodeId!}
                                     projectId={currentProjectId}
                                     onUpload={handleImageUpload}
-                                    onGetDownloadUrl={handleGetDownloadUrl}
                                     onUploadComplete={handleImageUploadComplete}
                                     onUploadError={handleImageUploadError}
                                     isUploading={mediaUploadMutation.isPending}
                                   />
-                                ) : (
+                                ) : imagePickerTab === "existing" ? (
                                   <div>
                                     {projectImagesQuery.isLoading ? (
                                       <p className="text-sm text-muted-foreground text-center py-4">
@@ -2078,7 +1602,7 @@ export default function ProjectsPage() {
                                         (a) => a.mimeType.startsWith("image/"),
                                       ).length === 0 ? (
                                       <p className="text-sm text-muted-foreground text-center py-4">
-                                        No images uploaded to this project yet.
+                                        {tEditor("imageUpload.noImagesYet")}
                                       </p>
                                     ) : (
                                       <div className="grid grid-cols-3 gap-3">
@@ -2089,34 +1613,102 @@ export default function ProjectsPage() {
                                           .map((attachment) => (
                                             <button
                                               key={attachment.id}
-                                              onClick={async () => {
-                                                try {
-                                                  const { url } =
-                                                    await handleGetDownloadUrl({
-                                                      id: attachment.id,
-                                                    });
-                                                  editorInstanceRef.current
-                                                    ?.chain()
-                                                    .focus()
-                                                    .setImage({ src: url })
-                                                    .run();
-                                                  setShowImageUpload(false);
-                                                } catch {
-                                                  addToast(
-                                                    "Failed to load image",
-                                                    "error",
-                                                  );
-                                                }
+                                              type="button"
+                                              onClick={() => {
+                                                editorInstanceRef.current
+                                                  ?.chain()
+                                                  .focus()
+                                                  .setImage({
+                                                    src: getMediaAttachmentUrl(
+                                                      attachment.id,
+                                                    ),
+                                                  })
+                                                  .run();
+                                                setShowImageUpload(false);
                                               }}
-                                              className="aspect-square rounded border hover:border-primary overflow-hidden bg-muted/30 flex items-center justify-center transition-colors"
+                                              className="group aspect-square rounded border hover:border-primary overflow-hidden bg-muted/30 transition-colors"
                                               title={attachment.filename}
                                             >
-                                              <span className="text-xs text-muted-foreground truncate px-1">
-                                                {attachment.filename}
-                                              </span>
+                                              <div className="relative h-full w-full">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                  src={getMediaAttachmentUrl(
+                                                    attachment.id,
+                                                  )}
+                                                  alt={attachment.filename}
+                                                  loading="lazy"
+                                                  className="h-full w-full object-cover"
+                                                />
+                                                <div className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-1">
+                                                  <span className="block truncate text-xs text-white">
+                                                    {attachment.filename}
+                                                  </span>
+                                                </div>
+                                              </div>
                                             </button>
                                           ))}
                                       </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col gap-3">
+                                    {!masterKeyQuery.data?.masterKey ? (
+                                      <p className="text-sm text-muted-foreground text-center py-4">
+                                        {tEditor("imageUpload.noApiKey")}
+                                      </p>
+                                    ) : (
+                                      <>
+                                        <label className="text-sm font-medium">
+                                          {tEditor(
+                                            "imageUpload.generatePromptLabel",
+                                          )}
+                                        </label>
+                                        <textarea
+                                          value={aiImagePrompt}
+                                          onChange={(e) =>
+                                            setAiImagePrompt(e.target.value)
+                                          }
+                                          rows={3}
+                                          className="w-full rounded border bg-background px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-ring"
+                                          placeholder="A serene forest at dawn with soft golden light..."
+                                          disabled={
+                                            generateImageMutation.isPending
+                                          }
+                                        />
+                                        <button
+                                          onClick={() => {
+                                            if (
+                                              !aiImagePrompt.trim() ||
+                                              !currentProjectId
+                                            )
+                                              return;
+                                            generateImageMutation.mutate({
+                                              prompt: aiImagePrompt.trim(),
+                                              projectId: currentProjectId,
+                                              masterKey:
+                                                masterKeyQuery.data!.masterKey!,
+                                            });
+                                          }}
+                                          disabled={
+                                            !aiImagePrompt.trim() ||
+                                            generateImageMutation.isPending
+                                          }
+                                          className="flex items-center justify-center gap-2 px-4 py-2 rounded bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-40 transition-colors"
+                                        >
+                                          {generateImageMutation.isPending ? (
+                                            <>
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                              {tEditor(
+                                                "imageUpload.generating",
+                                              )}
+                                            </>
+                                          ) : (
+                                            tEditor(
+                                              "imageUpload.generateButton",
+                                            )
+                                          )}
+                                        </button>
+                                      </>
                                     )}
                                   </div>
                                 )}
@@ -2135,9 +1727,11 @@ export default function ProjectsPage() {
                         name: string;
                         type: string;
                         content: unknown;
+                        metadata: unknown;
                       }[]) ?? []
                     }
-                    onOpenNode={(nodeId) => setSelectedNodeId(nodeId)}
+                    onOpenNode={navigateToNode}
+                    onToggleFavorite={handleToggleFavorite}
                   />
                 ) : (
                   <div className="flex-1 overflow-y-auto p-6">
@@ -2169,6 +1763,20 @@ export default function ProjectsPage() {
             }
             onCreate={handleNodeCreate}
           />
+          {settingsOpen && currentProject && (
+            <ProjectSettingsDialog
+              open={settingsOpen}
+              onClose={() => setSettingsOpen(false)}
+              project={{
+                id: currentProject.id,
+                name: currentProject.name,
+                summary:
+                  (currentProject as { summary?: string | null }).summary ??
+                  null,
+                metadata: projectMeta,
+              }}
+            />
+          )}
           <RenameDialog
             open={renameDialog.open}
             currentName={renameDialog.currentName}
@@ -2183,6 +1791,7 @@ export default function ProjectsPage() {
             open={contextMenu.open}
             position={contextMenu.position}
             node={contextMenu.node}
+            selectedCount={selectedBulkNodeIds.size}
             onClose={() =>
               setContextMenu({
                 open: false,
@@ -2358,7 +1967,7 @@ export default function ProjectsPage() {
         data-import-mode="new-project"
         data-testid="import-directory-input"
       />
-      <div className="p-8">
+      <div className="p-8 max-w-5xl mx-auto space-y-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -2367,7 +1976,7 @@ export default function ProjectsPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setCreateDialogOpen(true)}
+              onClick={openCreateDialog}
               className={cn(
                 "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium",
                 "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -2394,74 +2003,42 @@ export default function ProjectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projectsQuery.data.map((project) => {
               const isSelected = currentProjectId === project.id;
+              const meta =
+                (project.metadata as Record<string, unknown> | null) ?? {};
               return (
-                <div
+                <NoteCard
                   key={project.id}
+                  node={{
+                    id: project.id,
+                    name: project.name,
+                    firstMediaId: meta.heroAttachmentId as
+                      | string
+                      | null
+                      | undefined,
+                    heroFocalX: meta.heroFocalX as number | null | undefined,
+                    heroFocalY: meta.heroFocalY as number | null | undefined,
+                  }}
+                  variant="compact"
+                  description={
+                    (project as { summary?: string | null }).summary ??
+                    undefined
+                  }
+                  isSelected={isSelected}
                   onClick={async () => {
                     await setCurrentProject(project.id);
-                    router.push("/projects");
+                    navigateToProjects();
                   }}
-                  className={cn(
-                    "group relative rounded-lg border bg-card p-6 hover:shadow-md transition-shadow cursor-pointer",
-                    isSelected &&
-                      "border-green-500 bg-green-50 dark:bg-green-950",
-                  )}
-                >
-                  {/* Checkmark in upper-right corner */}
-                  {isSelected && (
-                    <div className="absolute top-3 right-3">
-                      <div className="rounded-full bg-green-500 p-1">
-                        <Check className="h-4 w-4 text-white" />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <FolderTree className="h-8 w-8 text-primary flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-lg truncate">
-                          {project.name}
-                        </h3>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openEditDialog({ id: project.id, name: project.name });
-                      }}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
-                        "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        "transition-colors",
-                      )}
-                    >
-                      <Pencil className="h-3 w-3" />
-                      {tCommon("edit")}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDeleteDialog({
-                          id: project.id,
-                          name: project.name,
-                        });
-                      }}
-                      className={cn(
-                        "inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium",
-                        "border border-input bg-background hover:bg-destructive hover:text-destructive-foreground",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        "transition-colors",
-                      )}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      {tCommon("delete")}
-                    </button>
-                  </div>
-                </div>
+                  onSettings={() =>
+                    setListSettingsProject({
+                      id: project.id,
+                      name: project.name,
+                      summary:
+                        (project as { summary?: string | null }).summary ??
+                        null,
+                      metadata: meta,
+                    })
+                  }
+                />
               );
             })}
           </div>
@@ -2473,7 +2050,7 @@ export default function ProjectsPage() {
               {t("noProjectsDescription")}
             </p>
             <button
-              onClick={() => setCreateDialogOpen(true)}
+              onClick={openCreateDialog}
               className={cn(
                 "inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium",
                 "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -2491,7 +2068,7 @@ export default function ProjectsPage() {
 
         {/* Import — name project dialog (shown when importing loose files without a single root dir) */}
         <Dialog
-          open={!!pendingImportEntries}
+          open={!!pendingImportRequest}
           onClose={closeImportNameDialog}
           title="Name Your Project"
           maxWidth="sm"
@@ -2535,112 +2112,16 @@ export default function ProjectsPage() {
           </div>
         </Dialog>
 
-        {/* Create Dialog */}
-        {createDialogOpen && (
-          <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm">
-            <div className="fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 px-4">
-              <div className="overflow-hidden rounded-lg border bg-card shadow-lg">
-                {/* Header */}
-                <div className="flex items-center justify-between border-b px-6 py-4">
-                  <div>
-                    <h2 className="text-xl font-semibold">
-                      {t("createDialog.title")}
-                    </h2>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {t("createDialog.description")}
-                    </p>
-                  </div>
-                  <button
-                    onClick={closeCreateDialog}
-                    className="rounded-md p-1 hover:bg-accent transition-colors"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {/* Content */}
-                <div className="px-6 py-4 space-y-4">
-                  <div className="space-y-2">
-                    <label
-                      htmlFor="project-name"
-                      className="text-sm font-medium"
-                    >
-                      {t("createDialog.name")}
-                    </label>
-                    <input
-                      id="project-name"
-                      type="text"
-                      placeholder={t("createDialog.namePlaceholder")}
-                      value={projectName}
-                      onChange={(e) => setProjectName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleCreate();
-                        if (e.key === "Escape") {
-                          closeCreateDialog();
-                        }
-                      }}
-                      className={cn(
-                        "w-full rounded-md border border-input bg-background px-3 py-2 text-sm",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                        "placeholder:text-muted-foreground",
-                      )}
-                      autoFocus
-                    />
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-end gap-2 border-t px-6 py-4">
-                  <button
-                    onClick={closeCreateDialog}
-                    className={cn(
-                      "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-                      "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      "transition-colors",
-                    )}
-                  >
-                    {tCommon("cancel")}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setQueuedImportProjectName(projectName.trim());
-                      closeCreateDialog();
-                      importInputRef.current?.click();
-                    }}
-                    disabled={importDirectoryMutation.isPending}
-                    className={cn(
-                      "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-                      "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      "disabled:pointer-events-none disabled:opacity-50",
-                      "transition-colors",
-                    )}
-                  >
-                    {importDirectoryMutation.isPending
-                      ? t("createDialog.importing")
-                      : t("createDialog.importFromFolder")}
-                  </button>
-                  <button
-                    onClick={handleCreate}
-                    disabled={!projectName.trim() || createMutation.isPending}
-                    className={cn(
-                      "inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium",
-                      "bg-primary text-primary-foreground hover:bg-primary/90",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      "disabled:pointer-events-none disabled:opacity-50",
-                      "transition-colors",
-                    )}
-                  >
-                    {createMutation.isPending
-                      ? t("createDialog.creating")
-                      : t("createDialog.createBlank")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <CreateProjectDialog
+          open={createDialogOpen}
+          projectName={projectName}
+          isCreating={createMutation.isPending}
+          isImporting={importDirectoryMutation.isPending}
+          onClose={closeCreateDialog}
+          onProjectNameChange={handleCreateProjectNameChange}
+          onCreateBlank={handleCreate}
+          onImportFromFolder={handleCreateDialogImportFromFolder}
+        />
 
         {/* Edit Dialog */}
         {editDialogOpen && (
@@ -2800,6 +2281,21 @@ export default function ProjectsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {listSettingsProject && (
+          <ProjectSettingsDialog
+            open
+            onClose={() => setListSettingsProject(null)}
+            project={listSettingsProject}
+            onDelete={() => {
+              setListSettingsProject(null);
+              openDeleteDialog({
+                id: listSettingsProject.id,
+                name: listSettingsProject.name,
+              });
+            }}
+          />
         )}
       </div>
     </>

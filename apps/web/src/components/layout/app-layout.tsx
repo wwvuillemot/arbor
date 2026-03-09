@@ -34,7 +34,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   useCommandGroups();
 
   // Register navigation commands
-  useNavigationCommands();
+  useNavigationCommands(() => setSearchOpen(true));
 
   // Register about command
   useAboutCommand(() => aboutDialog.setOpen(true));

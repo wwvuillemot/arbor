@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { PreferencesService } from "@/services/preferences-service";
 import { getTestDb, resetTestDb } from "@tests/helpers/db";
 import { userPreferences } from "@/db/schema";
@@ -36,6 +36,16 @@ describe("PreferencesService", () => {
       const value = await preferencesService.getAppPreference("theme");
 
       expect(value).toBe("dark");
+    });
+
+    it("should update an existing preference that stores a falsey value", async () => {
+      await preferencesService.setAppPreference("sidebarCollapsed", false);
+      await preferencesService.setAppPreference("sidebarCollapsed", true);
+
+      const value =
+        await preferencesService.getAppPreference("sidebarCollapsed");
+
+      expect(value).toBe(true);
     });
 
     it("should delete a preference", async () => {

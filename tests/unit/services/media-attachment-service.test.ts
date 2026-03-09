@@ -1,4 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { MediaAttachmentService } from "@/services/media-attachment-service";
 import { MinioService } from "@/services/minio";
 import { resetTestDb } from "@tests/helpers/db";
@@ -21,14 +29,17 @@ describe("MediaAttachmentService", () => {
     });
 
     await minioService.ensureBucket("arbor-test");
-    await minioService.ensureBucket("arbor-media");
     mediaService = new MediaAttachmentService(minioService);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   beforeEach(async () => {
     await resetTestDb();
     // Clean up test bucket objects
-    for (const bucket of ["arbor-test", "arbor-media"]) {
+    for (const bucket of ["arbor-test"]) {
       try {
         const objects = await minioService.listObjects(bucket);
         for (const obj of objects) {
@@ -81,6 +92,10 @@ describe("MediaAttachmentService", () => {
       const project = await createTestProject("Default Project");
       const note = await createTestNote("Note", project.id);
       const buffer = Buffer.from("content");
+      const mockObjectKey = `${project.id}/${note.id}/default.txt`;
+      const uploadFileSpy = vi
+        .spyOn(minioService, "uploadFile")
+        .mockResolvedValue(mockObjectKey);
 
       const attachment = await mediaService.createAttachment({
         nodeId: note.id,
@@ -90,7 +105,16 @@ describe("MediaAttachmentService", () => {
         mimeType: "text/plain",
       });
 
+      expect(uploadFileSpy).toHaveBeenCalledWith(
+        "arbor-media",
+        buffer,
+        "default.txt",
+        project.id,
+        note.id,
+        "text/plain",
+      );
       expect(attachment.bucket).toBe("arbor-media");
+      expect(attachment.objectKey).toBe(mockObjectKey);
       expect(attachment.createdBy).toBe("user:system");
     });
 
@@ -301,6 +325,44 @@ describe("MediaAttachmentService", () => {
     it("should throw for non-existent attachment", async () => {
       await expect(
         mediaService.getDownloadUrl("00000000-0000-0000-0000-000000000000"),
+      ).rejects.toThrow();
+    });
+  });
+
+  describe("getAttachmentContent", () => {
+    it("should return attachment metadata and a readable stream", async () => {
+      const project = await createTestProject("Stream Project");
+      const note = await createTestNote("Note", project.id);
+      const body = "stream me directly";
+
+      const attachment = await mediaService.createAttachment({
+        nodeId: note.id,
+        projectId: project.id,
+        buffer: Buffer.from(body),
+        filename: "stream.txt",
+        mimeType: "text/plain",
+        bucket: "arbor-test",
+      });
+
+      const { attachment: fetchedAttachment, stream } =
+        await mediaService.getAttachmentContent(attachment.id);
+      const chunks: Buffer[] = [];
+
+      for await (const chunk of stream) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+
+      expect(fetchedAttachment.id).toBe(attachment.id);
+      expect(fetchedAttachment.filename).toBe("stream.txt");
+      expect(fetchedAttachment.mimeType).toBe("text/plain");
+      expect(Buffer.concat(chunks).toString("utf8")).toBe(body);
+    });
+
+    it("should throw for a missing attachment", async () => {
+      await expect(
+        mediaService.getAttachmentContent(
+          "00000000-0000-0000-0000-000000000000",
+        ),
       ).rejects.toThrow();
     });
   });

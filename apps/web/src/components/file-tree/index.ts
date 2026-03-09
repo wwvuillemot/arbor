@@ -19,3 +19,4 @@ export {
   type NodeContextMenuProps,
   type ContextMenuAction,
 } from "./context-menu";
+export { BulkTagBar } from "./bulk-tag-bar";

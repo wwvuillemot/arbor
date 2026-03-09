@@ -1,6 +1,6 @@
 # ─── Arbor MCP Server ─────────────────────────────────────────────────────────
 
-.PHONY: help setup install dev test coverage lint format clean
+.PHONY: help setup install dev test coverage lint typecheck format clean
 
 help: ## Show this help
 	@echo "========================================="
@@ -19,7 +19,7 @@ install: ## Install dependencies
 
 dev: ## Start MCP server (stdio mode)
 	@echo "🚀 Starting MCP server..."
-	@cd ../.. && npx tsx apps/mcp-server/src/index.ts
+	@cd ../.. && TSX_TSCONFIG_PATH=apps/mcp-server/tsconfig.json pnpm exec tsx apps/mcp-server/src/index.ts
 
 test: ## Run MCP unit tests
 	@echo "🧪 Running MCP tests..."
@@ -28,11 +28,15 @@ test: ## Run MCP unit tests
 coverage: ## Run tests with coverage
 	@echo "📊 Running MCP tests with coverage..."
 	@cd ../.. && rm -rf coverage/mcp-unit
-	@cd ../.. && pnpm vitest run --project mcp-unit --coverage
+	@cd ../.. && pnpm vitest run --config vitest.mcp.config.ts tests/unit/mcp/mcp-server.test.ts --coverage
 
 lint: ## Run linter
 	@echo "🔍 Running linter..."
-	@cd ../.. && pnpm run lint
+	@cd ../.. && pnpm run lint:mcp
+
+typecheck: ## Run type checker
+	@echo "🔎 Running type checker..."
+	@cd ../.. && pnpm run typecheck:mcp
 
 format: ## Format code
 	@echo "✨ Formatting code..."

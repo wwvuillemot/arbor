@@ -1,7 +1,8 @@
+import type { Readable } from "node:stream";
 import { db } from "../db/index";
 import { mediaAttachments } from "../db/schema";
 import type { MediaAttachment } from "../db/schema";
-import { eq, like } from "drizzle-orm";
+import { and, eq, like, inArray } from "drizzle-orm";
 import { MinioService, createMinioService } from "./minio";
 
 const DEFAULT_BUCKET = "arbor-media";
@@ -15,6 +16,11 @@ export interface CreateAttachmentParams {
   bucket?: string;
   metadata?: Record<string, any>;
   createdBy?: string;
+}
+
+export interface MediaAttachmentContent {
+  attachment: MediaAttachment;
+  stream: Readable;
 }
 
 /**
@@ -83,6 +89,35 @@ export class MediaAttachmentService {
   /**
    * Get all attachments for a given node.
    */
+  /**
+   * Get the first image attachment ID for each of the given node IDs.
+   * Returns a map of nodeId → attachmentId for nodes that have at least one image.
+   */
+  async getFirstImageByNodes(
+    nodeIds: string[],
+  ): Promise<Record<string, string>> {
+    if (nodeIds.length === 0) return {};
+    const rows = await db
+      .selectDistinctOn([mediaAttachments.nodeId], {
+        nodeId: mediaAttachments.nodeId,
+        id: mediaAttachments.id,
+      })
+      .from(mediaAttachments)
+      .where(
+        and(
+          inArray(mediaAttachments.nodeId, nodeIds),
+          like(mediaAttachments.mimeType, "image/%"),
+        ),
+      )
+      .orderBy(mediaAttachments.nodeId, mediaAttachments.createdAt);
+
+    const map: Record<string, string> = {};
+    for (const row of rows) {
+      map[row.nodeId] = row.id;
+    }
+    return map;
+  }
+
   async getAttachmentsByNodeId(nodeId: string): Promise<MediaAttachment[]> {
     return await db
       .select()
@@ -141,5 +176,23 @@ export class MediaAttachmentService {
       attachment.objectKey,
       expirySeconds,
     );
+  }
+
+  /**
+   * Get attachment metadata and a readable content stream.
+   * Throws if the attachment does not exist.
+   */
+  async getAttachmentContent(id: string): Promise<MediaAttachmentContent> {
+    const attachment = await this.getAttachmentById(id);
+    if (!attachment) {
+      throw new Error(`Attachment not found: ${id}`);
+    }
+
+    const stream = await this.minioService.getObject(
+      attachment.bucket,
+      attachment.objectKey,
+    );
+
+    return { attachment, stream };
   }
 }

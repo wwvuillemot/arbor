@@ -6,1383 +6,444 @@ Build a local-first, AI-powered writing assistant with hierarchical node-based d
 
 ## Current Status
 
-✅ **Phase 5: Provenance & Version Control - COMPLETE** (1054 tests passing)
+✅ **Phase 5: Provenance & Version Control — COMPLETE** (1054 tests passing)
 
-🚧 **Phase 6: UX Improvements & Agent Management - IN PROGRESS**
+🔶 **Phase 6: UX Improvements & Agent Management — MOSTLY COMPLETE** (4/5 done; 6.5 MCP panel pending)
 
-**Infrastructure:**
-
-- ✅ Docker infrastructure (PostgreSQL, Redis, MinIO, pgAdmin)
-- ✅ Unified proxy architecture (arbor-proxy nginx container)
-- ✅ Separate databases: `arbor_dev` (development) and `arbor_test` (testing)
-- ✅ Database migration system (Drizzle Kit with versioned migrations)
-- ✅ MinIO object storage service with S3-compatible API
-- ✅ All services routed via `*.arbor.local` domains
-
-**Backend:**
-
-- ✅ Fastify API server with tRPC
-- ✅ GraphQL server (Pothos + Apollo Server) - **IN PROGRESS**
-- ✅ Node CRUD operations
-- ✅ User preferences (session + app-scope)
-- ✅ Encryption infrastructure (master key + AES-256-GCM)
-- ✅ Settings service with API key management
-
-**Frontend:**
-
-- ✅ Next.js 15 web application
-- ✅ Settings UI with API key management
-- ✅ Toast notification system
-- ✅ Theme & language support (EN/JA)
-- ✅ Command palette (CMD-K) with global shortcuts
-- ✅ Tauri v2 desktop app (de-emphasized, web-first approach)
-
-**Testing:**
-
-- ✅ Test coverage: 77.76% (above 75% requirement)
-- ✅ 297 tests passing (100%)
-- ✅ Comprehensive test suite (unit + integration)
-- ✅ Test database isolation (prevents data loss)
-
-**Recent Critical Fixes:**
-
-- ✅ **Database separation**: Tests no longer wipe production data
-- ✅ **MinIO proxy routing**: Consistent architecture for all services
-- ✅ **API key persistence**: Fixed encryption and storage issues
-- ✅ **Password manager prevention**: Disabled autofill for API keys
+📋 **Phase 7: AI-First Enhancements — PLANNED**
 
 ---
 
-## Phase 0: Infrastructure Preparation
+## Completed Phases
 
-**Goal:** Prepare infrastructure for Phase 1 (Node Management & File System)
+### Phase 0: Infrastructure ✅
 
-### 0.1 MinIO Object Storage Setup
+- [x] Docker infrastructure (PostgreSQL, Redis, MinIO, pgAdmin, nginx proxy)
+- [x] All services routed via `*.arbor.local` domains
+- [x] Separate `arbor_dev` and `arbor_test` databases
+- [x] Database migration system (Drizzle Kit, versioned migrations)
+- [x] MinIO object storage (`arbor-media`, `arbor-exports`, `arbor-temp` buckets)
+- [x] Node schema: JSONB content, `position`, `created_by`, `updated_by`, `metadata`
+- [x] GraphQL server (Pothos + Apollo) mounted at `/graphql` on Fastify
+  - [x] `node(id)`, `nodes(filter)`, `nodesByTags(tags, operator)` queries
+  - [x] Relationship resolvers: parent, children, ancestors, descendants, project
+  - [x] DataLoader batching (N+1 prevention)
+  - [x] 24 tests passing
+- [x] MCP server scaffold (`apps/mcp-server/`, JSONRPC 2.0, port 3849)
 
-**Why:** S3-compatible local object storage for media attachments
+### Phase 1: Node Management & File System ✅
 
-**Key Decisions:**
+- [x] Markdown editor (TipTap, headless, Prosemirror-based)
+- [x] File tree UI with expand/collapse, drag-drop, context menu
+- [x] Media attachment system (MinIO upload, pre-signed URLs, thumbnail generation)
+- [x] File CRUD (create, rename, move, copy, delete — with cascade)
+- [x] PDF export pipeline (Pandoc + LaTeX)
 
-- Use MinIO (not filesystem) for clean abstraction and cloud migration path
-- Docker service with persistent volumes at `data/minio/`
-- Bucket structure: `arbor-media`, `arbor-exports`, `arbor-temp`
+### Phase 2: Tagging System ✅
 
-### 0.2 Update Node Schema (JSONB + Position) ✅
+- [x] Tags table with name, color, icon, type (`general`, `character`, `location`, `event`, `concept`)
+- [x] Node-tag junction table with index
+- [x] Tag management UI (create, edit, delete, color picker)
+- [x] Tag picker in editor (multi-select, autocomplete, `#tagname` shorthand)
+- [x] Entity tags: click to jump to dedicated entity node, auto-create if missing
+- [x] Tag browser sidebar, tag cloud, AND/OR filter logic, related tag suggestions
+- [x] All 13 tag tRPC endpoints covered by tests
 
-**Why:** Enable rich content storage and sibling ordering
+### Phase 3: Search & RAG ✅
 
-**Key Decisions:**
+- [x] pgvector embeddings on nodes (1536-dim, OpenAI `text-embedding-3-small`)
+- [x] HNSW index for cosine similarity search
+- [x] BullMQ background queue for embedding generation (create/update triggers)
+- [x] Keyword search (PostgreSQL full-text)
+- [x] Vector search (semantic similarity, configurable `minScore`)
+- [x] Hybrid search (weighted: `vectorWeight * vector + (1-vectorWeight) * keyword`)
+- [x] RAG context builder (top-k retrieval → token-counted context string for LLM)
+- [x] Search UI (filter panel, result cards with snippets, sort by relevance/date)
 
-- Change `content` from TEXT to JSONB for structured data
-- Add `position` INTEGER for drag-drop reordering
-- Add `created_by`/`updated_by` for provenance tracking
-- Add `metadata` JSONB for extensibility
+### Phase 4: Chat & LLM Integration ✅
 
-**Status:** Complete
+- [x] Chat threads and messages tables
+- [x] LLM provider abstraction (OpenAI, Anthropic, Google, Ollama, LocalLLM)
+- [x] Streaming support, tool/function calling, vision inputs
+- [x] MCP tools: `create_node`, `update_node`, `delete_node`, `move_node`, `list_nodes`, `search_nodes`, `search_semantic`, `add_tag`, `remove_tag`, `list_tags`, `export_to_pdf`, `attach_media`
+- [x] Agent modes: `assistant` (all tools), `planner`, `editor`, `researcher`
+- [x] Tool call visualization in chat UI (expandable inline)
+- [x] Multi-thread chat UI with streaming message display
+- [x] Reasoning model support (thinking token display)
 
-### 0.2.1 Database Migration System ✅
+### Phase 5: Provenance & Version Control ✅
 
-**Why:** Prevent data loss and enable version-controlled schema changes
-
-**Problem:** Using `drizzle-kit push` directly modifies schema and can lose data (e.g., master key was lost when user_preferences table was recreated)
-
-**Solution:** Implement proper migration workflow with Drizzle Kit
-
-**Key Changes:**
-
-- Created migration runner: `apps/api/src/db/migrate.ts`
-- Generated initial migration: `0000_glamorous_warlock.sql`
-- Updated Makefile to use `db:migrate` instead of `db:push`
-- Added safety warnings to `db:push` command
-- Created comprehensive migration documentation
-
-**New Commands:**
-
-```bash
-make db-generate    # Generate migration from schema changes
-make db-migrate     # Apply pending migrations (RECOMMENDED)
-make db-push        # Direct schema push (⚠️ can lose data)
-```
-
-**Benefits:**
-
-- ✅ Version-controlled schema changes
-- ✅ Data preservation during schema updates
-- ✅ Migration history tracking
-- ✅ Team collaboration support
-- ✅ Production-ready deployment
-
-**Documentation:** See `docs/DATABASE_MIGRATIONS.md`
-
-**Status:** Complete - All future schema changes must use migrations
-
-### 0.3 GraphQL Server Setup
-
-**Why:** Enable AI/LLM to efficiently query hierarchical node data for context building
-
-**Problem Statement:**
-
-- AI assistants need to traverse node hierarchies (projects → folders → files → blocks)
-- Need to fetch related data in single query (node + children + tags + metadata)
-- RAG pipeline requires efficient context gathering from graph structure
-- LLMs work better with GraphQL's declarative query language than imperative tRPC calls
-
-**Key Decisions:**
-
-**Architecture: Hybrid API (tRPC + GraphQL)**
-
-- **tRPC for Mutations** - Type-safe CRUD operations (create, update, delete nodes)
-- **GraphQL for Queries** - Complex graph traversal and AI context building
-- Both share same service layer (NodeService, PreferencesService, etc.)
-- Both run on same Fastify server (different endpoints)
-
-**GraphQL Library: Pothos GraphQL**
-
-- **Why Pothos:** Type-safe, code-first schema builder for TypeScript
-- **Why NOT Prisma:** We use Drizzle ORM, not Prisma
-- **Why NOT TypeGraphQL:** Pothos has better TypeScript inference
-- **Performance:** Runs locally on desktop, no network latency concerns
-
-**GraphQL Server: Apollo Server**
-
-- **Why Apollo:** Industry standard, excellent tooling, mature ecosystem
-- **Why NOT GraphQL Yoga:** Apollo has better integration with Fastify
-- **Why NOT Mercurius:** Apollo's caching and DataLoader support is superior
-
-**Initial Schema:**
-
-```graphql
-type Query {
-  # Single node lookup
-  node(id: ID!): Node
-
-  # Filtered node search
-  nodes(
-    projectId: ID
-    parentId: ID
-    nodeType: String
-    tags: [String!]
-    limit: Int
-    offset: Int
-  ): [Node!]!
-
-  # Full tree traversal (for AI context)
-  nodeTree(projectId: ID!, maxDepth: Int, includeContent: Boolean): NodeTree!
-
-  # Tag-based queries
-  nodesByTags(tags: [String!]!, operator: TagOperator): [Node!]!
-}
-
-type Node {
-  id: ID!
-  name: String!
-  nodeType: String!
-  content: JSON
-  position: Int
-  parentId: ID
-  projectId: ID
-  tags: [String!]!
-  metadata: JSON
-  createdBy: String
-  updatedBy: String
-  createdAt: DateTime!
-  updatedAt: DateTime!
-
-  # Relationships (graph traversal)
-  parent: Node
-  children: [Node!]!
-  project: Node
-  ancestors: [Node!]!
-  descendants(maxDepth: Int): [Node!]!
-}
-
-type NodeTree {
-  root: Node!
-  nodes: [Node!]!
-  totalCount: Int!
-}
-
-enum TagOperator {
-  AND # All tags must match
-  OR # Any tag matches
-}
-```
-
-**Use Cases:**
-
-1. **AI Context Building**
-
-   ```graphql
-   query GetProjectContext($projectId: ID!) {
-     nodeTree(projectId: $projectId, maxDepth: 3, includeContent: true) {
-       root {
-         name
-       }
-       nodes {
-         id
-         name
-         nodeType
-         content
-         tags
-         parent {
-           name
-         }
-       }
-     }
-   }
-   ```
-
-2. **Tag-Based Search (for RAG)**
-
-   ```graphql
-   query FindRelatedNotes($tags: [String!]!) {
-     nodesByTags(tags: $tags, operator: OR) {
-       id
-       name
-       content
-       tags
-       ancestors {
-         name
-       }
-     }
-   }
-   ```
-
-3. **Hierarchical Navigation**
-
-   ```graphql
-   query GetNodeWithContext($id: ID!) {
-     node(id: $id) {
-       id
-       name
-       content
-       ancestors {
-         id
-         name
-       }
-       children {
-         id
-         name
-         nodeType
-       }
-       parent {
-         id
-         name
-       }
-     }
-   }
-   ```
-
-**Performance Optimizations:**
-
-- DataLoader for N+1 query prevention
-- Query complexity limits (max depth: 10)
-- Field-level caching with Redis
-- Pagination for large result sets
-
-**Future Extensions:**
-
-- Subscriptions for real-time updates (Phase 4)
-- Vector search integration (Phase 3)
-- Memory queries (Phase 4)
-- Provenance tracking queries (Phase 5)
-
-### 0.4 MCP Server Scaffold
-
-**Why:** Enable LLM tool calling via Model Context Protocol
-
-**Key Decisions:**
-
-- Separate service at `apps/mcp-server/` (port 3849)
-- JSONRPC 2.0 protocol
-- Basic tools: `create_node`, `update_node`, `search_nodes`
-- Resources: `node://`, `project://` URIs
-- Prompts: `summarize_project`, `outline_structure`
+- [x] `node_history` table (version, actor_type, actor_id, action, content_before/after, diff)
+- [x] Change tracking on all node mutations (user + LLM attribution)
+- [x] Diff viewer (side-by-side and inline)
+- [x] Version rollback
+- [x] Audit log UI (timeline, filter by actor/action/date, export CSV/PDF)
+- [x] LLM attribution badges on nodes ("AI-assisted", "AI-generated")
 
 ---
 
-## Phase 1: Node Management & File System
+## Phase 6: UX Improvements & Agent Management 🔶 MOSTLY COMPLETE
 
-**Goal:** Build out the core node management system with files, folders, and markdown support
+**Overall Progress:** 4 / 5 complete
 
-### 1.1 Extend Node Schema for Files & Folders
+- [x] **6.1** Unified filter panel — `filter-panel.tsx` with search, tag AND/OR selector, attribution buttons; wired into projects page
+- [x] **6.2** Chat right sidebar — `chat-sidebar.tsx` flyout with resizable width, persisted preference, embedded ChatPanel; toggle in projects page
+- [x] **6.3** Agent mode CRUD — `agent_modes` DB table, full service CRUD (blocks modifying built-ins), tRPC endpoints (`createAgentMode`, `updateAgentMode`, `deleteAgentMode`, `listAgentModes`)
+- [x] **6.4** Independent model selection — `model` column on `chat_threads`, `model-selector.tsx` dropdown grouped by provider with capability metadata, persisted per thread
+- [ ] **6.5** MCP tool visibility — tool calls render inline in chat messages ✅; missing: `mcp.listTools` tRPC endpoint and `McpToolsPanel` browse UI
 
-- Add `content` (TEXT) for markdown storage
-- Add `mimeType`, `fileSize`, `encoding` for file metadata
-- Add `metadata` (JSONB) for folder-specific data
-- Migration script with backward compatibility
+### 6.5 MCP Tool Visibility 🔶 PARTIAL
 
-### 1.2 Markdown Editor Component
+**What's done:** Tool calls and results render inline in chat messages (`chat-message.tsx`) with expandable details.
 
-**Options:**
+**What's missing:** No way to browse available tools before using them.
 
-- **TipTap** (recommended): Headless, extensible, great TypeScript support
-- **Lexical**: Meta's framework, powerful but complex
-- **CodeMirror**: Lightweight, code-focused
+**Key files:**
 
-**Features:**
+- `apps/api/src/api/routers/` — add `mcp.listTools` endpoint
+- `apps/web/src/components/` — `McpToolsPanel` component
 
-- Live preview (split or toggle)
-- Syntax highlighting
-- Toolbar (bold, italic, headers, lists, links, images)
-- Keyboard shortcuts
-- Auto-save with debouncing
+**Tasks:**
 
-### 1.3 Media Attachment System
-
-**Storage Strategy: MinIO (S3-Compatible Object Storage)**
-
-**Why MinIO:**
-
-- ✅ S3-compatible API (easy cloud migration path)
-- ✅ Clean abstraction from filesystem
-- ✅ Built-in versioning, metadata, and access control
-- ✅ Lightweight (runs in Docker)
-- ✅ Local-first with persistent volumes
-- ✅ Future-proof (can swap to AWS S3, Cloudflare R2, etc.)
-
-**Docker Setup:**
-
-```yaml
-# docker-compose.yml
-services:
-  minio:
-    image: minio/minio:latest
-    ports:
-      - "9000:9000" # API
-      - "9001:9001" # Console
-    environment:
-      MINIO_ROOT_USER: arbor
-      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
-    volumes:
-      - ./data/minio:/data # Persistent local storage
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-```
-
-**Bucket Structure:**
-
-- `arbor-media` - User-uploaded media (images, PDFs, audio, video)
-- `arbor-exports` - Generated exports (PDFs, backups)
-- `arbor-temp` - Temporary files (auto-cleanup after 24h)
-
-**Object Key Pattern:**
-
-- `{project_id}/{node_id}/{timestamp}_{filename}`
-- Example: `proj-123/node-456/1704067200_screenshot.png`
-
-**Supported Media:**
-
-- Images: PNG, JPG, GIF, WebP, SVG
-- Documents: PDF
-- Audio: MP3, WAV, OGG
-- Video: MP4, WebM
-
-**Implementation:**
-
-- MinIO SDK for Node.js (`minio` package)
-- Upload API with multipart form data
-- Pre-signed URLs for secure downloads (expire after 1 hour)
-- Image optimization (resize, compress) before upload
-- Thumbnail generation (store as separate object)
-- Metadata: `node_id`, `uploaded_by`, `content_type`, `original_filename`
-- Markdown image syntax: `![alt](minio://bucket/key)` or `![alt](media://node_id/filename)`
-
-**Database Schema:**
-
-```sql
-CREATE TABLE media_attachments (
-  id UUID PRIMARY KEY,
-  node_id UUID REFERENCES nodes(id) ON DELETE CASCADE,
-  bucket VARCHAR(255) NOT NULL,
-  object_key VARCHAR(1024) NOT NULL,
-  filename VARCHAR(255) NOT NULL,
-  mime_type VARCHAR(100) NOT NULL,
-  size_bytes BIGINT NOT NULL,
-  checksum VARCHAR(64), -- SHA-256
-  thumbnail_key VARCHAR(1024), -- For images/videos
-  metadata JSONB,
-  created_at TIMESTAMP DEFAULT NOW(),
-  created_by VARCHAR(255) -- user_id or 'system'
-);
-
-CREATE INDEX idx_media_node ON media_attachments(node_id);
-CREATE INDEX idx_media_bucket_key ON media_attachments(bucket, object_key);
-```
-
-**Migration Path:**
-
-- Start with MinIO locally
-- When ready for cloud: swap endpoint to S3/R2
-- No code changes needed (S3-compatible API)
-- Use bucket replication for migration
-
-### 1.4 File Tree UI Component
-
-**Features:**
-
-- Collapsible tree with expand/collapse all
-- Drag-and-drop to move/reorder
-- Context menu (right-click): New, Rename, Delete, Copy, Move
-- Keyboard navigation (arrows, Enter, Delete)
-- File type icons (folder, markdown, image, etc.)
-- Search/filter within tree
-- Breadcrumb navigation
-
-**Libraries:**
-
-- `react-arborist` or `react-complex-tree`
-
-### 1.5 PDF Export via LaTeX
-
-**Pipeline:** Markdown → LaTeX → PDF
-
-**Tools:**
-
-- **Pandoc**: Universal document converter
-- **LaTeX**: pdflatex or XeLaTeX for rendering
-
-**Features:**
-
-- Export single node or entire project
-- Template system (academic, book, article)
-- Custom styling (fonts, colors, margins)
-- Table of contents generation
-- Image embedding
-- Batch export
-
-**Implementation:**
-
-- Backend service (Node.js child process)
-- Queue system for long exports
-- Progress tracking
-- Download link with expiration
-
-### 1.6 File CRUD Operations
-
-**API Endpoints:**
-
-- `POST /nodes/file` - Create file
-- `POST /nodes/folder` - Create folder
-- `GET /nodes/:id/content` - Get file content
-- `PUT /nodes/:id/content` - Update file content
-- `PUT /nodes/:id/move` - Move node
-- `POST /nodes/:id/copy` - Copy node
-- `DELETE /nodes/:id` - Delete node (cascade)
-
-**Validation:**
-
-- Name uniqueness within parent
-- Path depth limits
-- File size limits
-- MIME type validation
+- [ ] **6.5a** Add `mcp.listTools` tRPC endpoint (name, description, input schema; cached)
+- [ ] **6.5b** Build `McpToolsPanel` (expandable list, search, highlights tools active for current agent mode)
+- [ ] **6.5c** Add to Settings → Developer section or ChatSidebar collapsible
+- [ ] **6.5d** Tests + `make preflight` + commit
 
 ---
 
-## Phase 2: Tagging System
+## Phase 7: AI-First Enhancements 📋 PLANNED
 
-**Goal:** Implement rich tagging system for connecting and organizing nodes
+**Goal:** Make the LLM more capable, attribution more visual, content creation more powerful, and project identity more rich.
 
-### 2.1 Tag Schema & Database
+**Overall Progress:** 0 / 6 features complete
 
-```sql
-CREATE TABLE tags (
-  id UUID PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  color VARCHAR(7), -- hex color
-  icon VARCHAR(50), -- icon name
-  type VARCHAR(50) DEFAULT 'general', -- general, character, location, etc.
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE node_tags (
-  node_id UUID REFERENCES nodes(id) ON DELETE CASCADE,
-  tag_id UUID REFERENCES tags(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT NOW(),
-  PRIMARY KEY (node_id, tag_id)
-);
-
-CREATE INDEX idx_node_tags_node ON node_tags(node_id);
-CREATE INDEX idx_node_tags_tag ON node_tags(tag_id);
-```
-
-### 2.2 Tag Management UI
-
-- Tag library page
-- Create/edit/delete tags
-- Color picker (preset palette + custom)
-- Icon selector (Lucide icons)
-- Tag search and filtering
-- Bulk operations
-
-### 2.3 Tag Assignment to Nodes
-
-- Tag picker component (multi-select dropdown)
-- Autocomplete with fuzzy search
-- Quick-add: type `#tagname` in editor
-- Inline tag display with colors
-- Remove tag with click
-
-### 2.4 Character/Entity Tagging
-
-**Special Features:**
-
-- Tag type: `character`, `location`, `event`, `concept`
-- Click tag → jump to dedicated node for that entity
-- Auto-create entity node if doesn't exist
-- Relationship mapping (character A appears with character B)
-- Entity timeline view
-
-### 2.5 Tag-based Navigation
-
-- Tag browser sidebar
-- Tag cloud visualization
-- Filter nodes by tag(s)
-- Tag intersection (AND/OR logic)
-- Related tags suggestions
+| Feature                              | Status          | Owner | PR  |
+| ------------------------------------ | --------------- | ----- | --- |
+| 7.1 Wire tool filtering              | ✅ DONE         | —     | —   |
+| 7.2 AI/Human Tiptap attribution      | ✅ DONE         | —     | —   |
+| 7.3 Multi-select bulk tagging        | 🔶 BACKEND DONE | —     | —   |
+| 7.4 Favorites                        | 🔶 BACKEND DONE | —     | —   |
+| 7.5 AI image generation              | 📋 TODO         | —     | —   |
+| 7.6 Project hero image & description | 🔶 BACKEND DONE | —     | —   |
 
 ---
 
-## Phase 3: Search & RAG
+### 7.1 Wire Agent Mode Tool Filtering
 
-**Goal:** Build vector search, embeddings, and RAG capabilities
+**Problem:** `filterToolsForConfig()` exists in `agent-mode-helpers.ts` and is imported but never called. All 12 MCP tools are sent to the LLM regardless of agent mode. `planner` should only have 4 tools but currently gets all 12.
 
-### 3.1 Embedding Service Setup
+**Root cause:** `apps/api/src/services/chat-send-message-service.ts:81` fetches all tools and uses them directly, skipping `filterToolsForConfig()`.
 
-**Providers:**
+**Architecture decision:** No new infrastructure. One call site change + tests.
 
-- **OpenAI**: `text-embedding-3-small` (1536 dims, $0.02/1M tokens)
-- **OpenAI**: `text-embedding-3-large` (3072 dims, $0.13/1M tokens)
-- **Cohere**: `embed-english-v3.0` (1024 dims)
-- **Local**: `all-MiniLM-L6-v2` via Transformers.js (384 dims, free)
+**Key files:**
 
-**Recommendation:** Start with OpenAI small, add local option for privacy
+- `apps/api/src/services/chat-send-message-service.ts` (line 81 — add the call)
+- `apps/api/src/services/agent-mode-helpers.ts` (`filterToolsForConfig` — already implemented)
+- `apps/api/src/db/seed.ts` (agent mode `allowedTools` definitions)
 
-**Storage:** PostgreSQL with pgvector extension (already installed)
+**Tasks:**
 
-### 3.2 Vector Storage Schema
+- [ ] **7.1a** Write RED tests — these should FAIL before the fix
+  - `tests/unit/services/chat-send-message-service.test.ts`: planner mode only receives its 4 allowed tools
+  - `tests/unit/services/chat-send-message-service.test.ts`: editor mode only receives its 3 allowed tools
+  - `tests/unit/services/chat-send-message-service.test.ts`: assistant mode receives all tools
+- [ ] **7.1b** Fix: after `getMcpTools()`, call `filterToolsForConfig(agentModeConfig, tools)` and assign result back
+- [ ] **7.1c** Confirm tests GREEN + `make preflight` + commit
 
-```sql
--- Add vector column to nodes table
-ALTER TABLE nodes ADD COLUMN embedding vector(1536);
-
--- Create index for similarity search
-CREATE INDEX ON nodes USING ivfflat (embedding vector_cosine_ops)
-  WITH (lists = 100);
-
--- For better performance with large datasets
-CREATE INDEX ON nodes USING hnsw (embedding vector_cosine_ops);
-```
-
-### 3.3 Embedding Generation Pipeline
-
-**Background Job System:**
-
-- Use BullMQ (Redis-backed queue)
-- Job types: `generate_embedding`, `regenerate_all`
-- Retry logic with exponential backoff
-
-**Chunking Strategy:**
-
-- Split large documents (>8000 tokens) into chunks
-- Overlap chunks by 200 tokens
-- Store chunk metadata (position, parent_node_id)
-
-**Triggers:**
-
-- On node create/update
-- Batch processing for existing nodes
-- Manual regeneration option
-
-### 3.4 Vector Search API
-
-**Endpoints:**
-
-- `POST /search/vector` - Semantic search
-- `POST /search/hybrid` - Vector + keyword search
-
-**Features:**
-
-- Cosine similarity ranking
-- Filter by project, tags, node type
-- Pagination with cursor
-- Relevance score threshold
-- Re-ranking with cross-encoder (optional)
-
-**Hybrid Search:**
-
-- Combine vector similarity with PostgreSQL full-text search
-- Weighted scoring: `0.7 * vector_score + 0.3 * keyword_score`
-
-### 3.5 RAG Context Builder
-
-**Pipeline:**
-
-1. **Query** → Generate embedding
-2. **Retrieve** → Top-k similar nodes (k=10-20)
-3. **Rerank** → Score by relevance + recency
-4. **Format** → Build context string for LLM
-
-**Context Format:**
-
-```
-# Relevant Context
-
-## Document 1: {node.name}
-Path: {node.path}
-Tags: {node.tags}
-Content:
-{node.content}
-
----
-
-## Document 2: ...
-```
-
-**Optimization:**
-
-- Token counting to stay within LLM limits
-- Summarization for very long nodes
-- Metadata-only for low-relevance nodes
-
-### 3.6 Search UI Component
-
-**Features:**
-
-- Search bar with autocomplete
-- Filter panel (project, tags, date range, node type)
-- Result cards with:
-  - Title, path, tags
-  - Snippet with highlighted matches
-  - Relevance score
-  - Preview on hover
-- Sort by: relevance, date, name
-- Export results
-
----
-
-## Phase 4: Chat & LLM Integration
-
-**Goal:** Implement multi-threaded chat with MCP server and multiple agent modes
-
-### 4.1 Chat Schema & Database
-
-```sql
-CREATE TABLE chat_threads (
-  id UUID PRIMARY KEY,
-  project_id UUID REFERENCES nodes(id) ON DELETE CASCADE,
-  name VARCHAR(255),
-  agent_mode VARCHAR(50) DEFAULT 'assistant',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE chat_messages (
-  id UUID PRIMARY KEY,
-  thread_id UUID REFERENCES chat_threads(id) ON DELETE CASCADE,
-  role VARCHAR(20) NOT NULL, -- user, assistant, system, tool
-  content TEXT,
-  model VARCHAR(100), -- e.g., gpt-4o, claude-3.5-sonnet
-  tokens_used INTEGER,
-  tool_calls JSONB, -- function calls made
-  metadata JSONB, -- reasoning steps, etc.
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_messages_thread ON chat_messages(thread_id, created_at);
-```
-
-### 4.2 LLM Provider Abstraction
-
-**Interface:**
+**RED tests:**
 
 ```typescript
-interface LLMProvider {
-  chat(messages: Message[], options: ChatOptions): AsyncIterator<Chunk>;
-  embed(text: string): Promise<number[]>;
-  models(): Promise<Model[]>;
-}
+it("planner mode should only receive its 4 allowed tools", async () => {
+  // set up thread with agentMode = 'planner'
+  // spy on llmProvider.chat
+  // assert tools arg only contains: create_node, move_node, list_nodes, add_tag
+});
+
+it("editor mode should only receive its 3 allowed tools", async () => {
+  // assert tools arg only contains: update_node, search_nodes, list_nodes
+});
+
+it("assistant mode should receive all tools", async () => {
+  // assert tools arg.length === totalMcpTools
+});
 ```
 
-**Providers:**
+---
 
-- OpenAI (GPT-4o, o1, o3)
-- Anthropic (Claude 3.5 Sonnet, Claude 3 Opus)
-- Google (Gemini 2.0 Flash, Gemini 1.5 Pro)
-- Local (Ollama, LM Studio)
+### 7.2 AI vs Human Attribution in Tiptap Editor
 
-**Features:**
+**Problem:** Editor shows content but doesn't distinguish AI-generated text from human text. Provenance data exists (`node_history.actor_type`) but isn't surfaced in the editor.
 
-- Streaming support
-- Function/tool calling
-- Vision (image inputs)
-- Reasoning model support (thinking tokens)
-- Token counting and cost tracking
+**Architecture decision:** Custom TipTap `aiAttribution` Mark applied on load from version history. No new DB columns — `node_history.actor_type = 'llm'` already exists.
 
-### 4.3 MCP Server Implementation
+**Key files:**
 
-**Model Context Protocol (JSONRPC 2.0)**
+- `apps/web/src/components/editor/tiptap-editor.tsx` — add mark extension + attribution loader
+- `apps/web/src/styles/globals.css` — `.ai-attributed` CSS class
+- `apps/api/src/api/routers/nodes.ts` — ensure `getHistory` returns `actor_type`
+- `apps/web/src/components/provenance/version-history.tsx` — reference
 
-**Tools:**
+**Tasks:**
 
-1. **Node Management**
-   - `create_node(name, type, parent_id, content)`
-   - `update_node(id, content)`
-   - `delete_node(id)`
-   - `move_node(id, new_parent_id)`
-   - `list_nodes(project_id, filters)`
+- [x] **7.2a** Create `AiAttributionMark` extension (attributes: `modelName`, `timestamp`; renders `<span class="ai-attributed">`)
+- [ ] **7.2b** Load attribution on editor mount: call `trpc.nodes.getHistory`, apply marks to LLM-authored ranges
+- [x] **7.2c** Style: subtle left border + background tint; toolbar toggle (off by default, `Sparkles` icon)
+- [x] **7.2d** Write RED tests → GREEN (64 tests passing)
+  - attribution toggle button renders in toolbar
+  - toggle calls `onToggleAttribution`
+  - container gets `ai-attribution-visible` class; toggles off on second click
+- [x] **7.2e** `make preflight` clean + commit
 
-2. **Search**
-   - `search_nodes(query, filters)`
-   - `search_semantic(query, top_k)`
+**RED tests:**
 
-3. **Tag Management**
-   - `add_tag(node_id, tag_name)`
-   - `remove_tag(node_id, tag_name)`
-   - `list_tags()`
+```typescript
+it('should render ai-attributed spans for LLM-edited content', async () => {
+  // mock getHistory to return actor_type: 'llm' entry
+  render(<TiptapEditor nodeId="test" ... />);
+  await waitFor(() => {
+    expect(document.querySelector('.ai-attributed')).toBeInTheDocument();
+  });
+});
 
-4. **Media Generation**
-   - `generate_image(prompt, style)` - DALL-E, Stable Diffusion
-   - `attach_media(node_id, media_url)`
-
-5. **Export**
-   - `export_to_pdf(node_id, template)`
-   - `export_project(project_id, format)`
-
-**Implementation:**
-
-- Separate service (port 3849)
-- Authentication via API key
-- Rate limiting
-- Audit logging of all tool calls
-
-### 4.4 Agent Mode System
-
-**Modes:**
-
-1. **Assistant** (Default)
-   - General-purpose helper
-   - All tools available
-   - Balanced creativity
-
-2. **Planner**
-   - Focus on structure and organization
-   - Tools: create_node, move_node, add_tag
-   - High reasoning, low creativity
-
-3. **Editor**
-   - Content refinement and improvement
-   - Tools: update_node, search_nodes
-   - Focus on clarity, grammar, style
-
-4. **Researcher**
-   - Information gathering and synthesis
-   - Tools: search_semantic, list_nodes
-   - High accuracy, cite sources
-
-**System Prompt Template:**
-
-```
-You are {mode_name}, an AI assistant for Arbor.
-
-Role: {mode_description}
-
-Available Tools: {tool_list}
-
-Guidelines:
-{mode_specific_guidelines}
-
-Current Project: {project_name}
+it('should hide attribution marks when toggle is off', async () => {
+  // click toolbar toggle off
+  expect(document.querySelector('.ai-attributed')).not.toBeVisible();
+});
 ```
 
-**Mode Switching:**
-
-- Dropdown in chat UI
-- Persisted per thread
-- Can change mid-conversation
-
-### 4.5 Chat UI Component
-
-**Layout:**
-
-- Left sidebar: Thread list
-- Main area: Message history
-- Bottom: Input box with mode selector
-- Right sidebar (optional): Tool call inspector
-
-**Features:**
-
-- Streaming message display
-- Markdown rendering in messages
-- Code syntax highlighting
-- Tool call visualization (collapsible)
-- Reasoning display for o1/o3 models
-- Copy message, regenerate, edit
-- Attach files/images to messages
-- Thread search
-
-### 4.6 Reasoning Model Support
-
-**Models:**
-
-- OpenAI o1, o3
-- DeepSeek R1
-
-**Features:**
-
-- Display thinking/reasoning tokens separately
-- Collapsible reasoning section
-- Token usage breakdown (thinking vs output)
-- Cost optimization (cache reasoning)
-
 ---
 
-## Phase 5: Provenance & Version Control
+### 7.3 Multi-Select Bulk Tagging
 
-**Goal:** Track all changes with granular provenance (user vs LLM)
+**Problem:** Tags can only be applied one node at a time. Writers need to select 20 research notes and apply "chapter-3" in one action.
 
-### 5.1 Provenance Schema Design
+**Architecture decision:** Selection state as `Set<nodeId>` in FileTree. Bulk ops via `tags.bulkAddToNodes` / `tags.bulkRemoveFromNodes` tRPC calls. No new DB schema — loop existing `addTagToNode` server-side.
 
-**Granularity Options:**
+**Key files:**
 
-**Option A: Node-level** (Simpler)
+- `apps/web/src/components/file-tree/file-tree.tsx` — selection state + checkbox UI
+- `apps/web/src/components/file-tree/file-tree-node.tsx` — checkbox on hover
+- `apps/api/src/api/routers/tags.ts` — `bulkAddToNodes`, `bulkRemoveFromNodes`
+- `apps/api/src/services/tag-service.ts` — bulk methods
 
-- Track changes to entire node
-- Store: who, what (create/update/delete), when, why
+**Tasks:**
 
-**Option B: Content-level** (More detailed)
+- [ ] **7.3a** Write RED tests
+  - `bulkAddToNodes` applies tag to all provided node IDs
+  - `bulkRemoveFromNodes` removes tag from all provided node IDs
+  - checkbox appears on hover; selecting multiple shows `BulkTagBar`
+- [ ] **7.3b** Add selection state to FileTree (`Cmd+click` / `Shift+click` for range; "3 selected" badge)
+- [ ] **7.3c** Add `bulkAddToNodes` / `bulkRemoveFromNodes` endpoints + service methods
+- [ ] **7.3d** Build `BulkTagBar` (tag picker, Add/Remove buttons, spinner, toast on completion)
+- [ ] **7.3e** Confirm GREEN + `make preflight` + commit
 
-- Track changes within node content
-- Store diffs (character-level or line-level)
-- Enables inline attribution
+**RED tests:**
 
-**Recommendation:** Start with node-level, add content-level for critical nodes
+```typescript
+it("bulkAddToNodes should add tag to all specified nodes", async () => {
+  const caller = createCaller();
+  const tag = await caller.tags.create({ name: "BulkTag" });
+  const project = await createTestProject();
+  const note1 = await createTestNote(project.id, "N1");
+  const note2 = await createTestNote(project.id, "N2");
 
-```sql
-CREATE TABLE node_history (
-  id UUID PRIMARY KEY,
-  node_id UUID REFERENCES nodes(id) ON DELETE CASCADE,
-  version INTEGER NOT NULL,
-  actor_type VARCHAR(20) NOT NULL, -- user, llm
-  actor_id VARCHAR(255), -- user_id or model name
-  action VARCHAR(50) NOT NULL, -- create, update, delete, move
-  content_before TEXT,
-  content_after TEXT,
-  diff JSONB, -- structured diff
-  metadata JSONB, -- context, reasoning, etc.
-  created_at TIMESTAMP DEFAULT NOW()
-);
+  await caller.tags.bulkAddToNodes({
+    nodeIds: [note1.id, note2.id],
+    tagId: tag.id,
+  });
 
-CREATE INDEX idx_history_node ON node_history(node_id, version DESC);
+  const tags1 = await caller.tags.getNodeTags({ nodeId: note1.id });
+  const tags2 = await caller.tags.getNodeTags({ nodeId: note2.id });
+  expect(tags1.map((t) => t.id)).toContain(tag.id);
+  expect(tags2.map((t) => t.id)).toContain(tag.id);
+});
 ```
 
-### 5.2 Change Tracking System
-
-**Implementation:**
-
-- Trigger on all node mutations
-- Compute diff (use `diff-match-patch` library)
-- Store attribution metadata
-- Async processing for large diffs
-
-**Metadata:**
-
-- User: `{user_id, username, session_id}`
-- LLM: `{model, mode, thread_id, message_id, tool_call_id}`
-
-### 5.3 Content Versioning
-
-**Features:**
-
-- View version history
-- Diff viewer (side-by-side or inline)
-- Rollback to previous version
-- Branch/merge for collaborative editing
-- Conflict resolution UI
-
-**Git-like Commands:**
-
-- `checkout(version)` - View old version
-- `revert(version)` - Rollback
-- `compare(v1, v2)` - Diff
-- `merge(branch)` - Combine changes
-
-### 5.4 Blockchain Evaluation
-
-**Pros:**
-
-- Immutable audit trail
-- Cryptographic verification
-- Distributed trust (if multi-user)
-
-**Cons:**
-
-- Complexity (wallet management, gas fees)
-- Performance overhead
-- Overkill for single-user local-first app
-
-**Recommendation:** **Skip blockchain** for now
-
-- Use cryptographic hashing (SHA-256) for integrity
-- Sign changes with user's private key (optional)
-- Simpler, faster, sufficient for provenance
-
-**Alternative:** Content-addressable storage (CAS)
-
-- Store content by hash (like Git)
-- Deduplication
-- Integrity verification
-
-### 5.5 Audit Log UI
-
-**Features:**
-
-- Timeline view of all changes
-- Filter by:
-  - Actor (user vs LLM)
-  - Action type
-  - Date range
-  - Node/project
-- Diff viewer
-- Export audit report (CSV, PDF)
-- Search within changes
-
-### 5.6 LLM Attribution Badges
-
-**Visual Indicators:**
-
-- Badge on node: "✨ AI-assisted" or "🤖 AI-generated"
-- Inline annotations in editor (highlight LLM-edited text)
-- Tooltip with details (model, timestamp, reasoning)
-
-**Granularity:**
-
-- Node-level: Badge in file tree
-- Paragraph-level: Highlight in editor
-- Character-level: Underline with tooltip
-
 ---
 
-## Technical Considerations
+### 7.4 Favorites
 
-### Media Storage
+**Problem:** No way to bookmark frequently accessed nodes without restructuring the file tree.
 
-**Recommendation:** Filesystem with DB references
+**Architecture decision:** Store in `nodes.metadata.isFavorite` (boolean). No new table. Expose via `nodes.toggleFavorite` + `nodes.getFavorites`. Show pinned section at top of file tree.
 
-- Simple, fast, easy to backup
-- Store in `{project_root}/media/{node_id}/{filename}`
-- Cleanup on node deletion
+**Key files:**
 
-### Blockchain for Provenance
-
-**Recommendation:** Skip it
-
-- Use SHA-256 hashing for integrity
-- Cryptographic signatures (optional)
-- Simpler, faster, sufficient
-
-### Smallest Node Granularity
-
-**Recommendation:** File-level nodes
-
-- Easier to manage
-- Clear boundaries
-- Use content versioning for sub-file tracking
-
-### Background Jobs
-
-**Recommendation:** BullMQ (Redis-backed)
-
-- Reliable, persistent
-- Retry logic
-- Progress tracking
-- Already have Redis in stack
-
-### Markdown Editor
-
-**Recommendation:** TipTap
-
-- Headless, extensible
-- Great TypeScript support
-- Active community
-- Prosemirror-based (robust)
-
----
-
-## Dependencies & Order
-
-### Phase 1 → Phase 2
-
-- Tags can be added to files/folders
-- File tree can filter by tags
-
-### Phase 1 → Phase 3
-
-- Embeddings generated from file content
-- Search returns files/folders
-
-### Phase 3 → Phase 4
-
-- RAG uses vector search for context
-- Chat can search and retrieve nodes
-
-### Phase 4 → Phase 5
-
-- LLM changes tracked in provenance
-- Attribution shows which agent made changes
-
-### Recommended Order
-
-1. **Phase 1** (Foundation)
-2. **Phase 2** (Organization)
-3. **Phase 3** (Search)
-4. **Phase 4** (AI Integration)
-5. **Phase 5** (Accountability)
-
----
-
-## Project Progress
-
-### Phase 0: Infrastructure Preparation
-
-#### 0.1 MinIO Object Storage Setup ✅ COMPLETED
-
-**Commit:** `b8b930d`
-
-- [x] Added MinIO service to docker-compose.yml
-- [x] Installed `minio@8.0.6` package
-- [x] Created `MinioService` with upload/download/delete/list operations
-- [x] Comprehensive test suite (8 tests passing)
-- [x] Coverage: 64.68% → 75.44% (+10.76%)
-
-#### 0.2 Update Node Schema (JSONB + Position) ✅ COMPLETED (Commits: `38e4e51`, `5b63c46`, `9d53c2b`, `174706a`)
-
-- [x] Change `content` field from TEXT to JSONB
-- [x] Add `position` INTEGER field for sibling ordering
-- [x] Add `created_by` VARCHAR(255) field (user_id or 'llm:model-name')
-- [x] Add `updated_by` VARCHAR(255) field
-- [x] Add `metadata` JSONB field for extensibility (already existed)
-- [x] Create migration script with backward compatibility (manual SQL migration)
-- [x] Update `NodeService` to handle JSONB content (Commit: `9d53c2b`)
-- [x] Update tRPC routers to support new schema (Commit: `174706a`)
-- [x] Add tests for new fields (18 comprehensive tests: 8 schema + 10 service)
-- [x] Update seed data to use new schema (Commit: `5b63c46`)
-- [x] Run preflight and commit
-
-**Coverage:** 75.44% → 76.26% (improved) ✅
-
-#### 0.3 GraphQL Server Setup 🚧 IN PROGRESS (85% Complete)
-
-**Status:** Core schema and resolvers implemented, tests passing, needs endpoint mounting and documentation
-
-**Architecture:**
-
-- GraphQL is part of the **API service** (`apps/api`), not a separate service
-- Mounted on same Fastify server as tRPC (different endpoint: `/graphql`)
-- Shares same service layer (NodeService, PreferencesService, etc.)
-- Tests in `tests/unit/graphql/`
-- Files structure:
-  - `apps/api/src/graphql/schema.ts` - Pothos schema builder ✅
-  - `apps/api/src/graphql/loaders.ts` - DataLoader instances ✅
-  - `apps/api/src/api/index.ts` - Mount Apollo Server (TODO)
-
-**Completed Tasks:**
-
-- [x] Install dependencies ✅
-  - [x] `@pothos/core@4.4.0` - Type-safe schema builder
-  - [x] `@apollo/server@4.12.2` - GraphQL server
-  - [x] `graphql@16.10.0` - GraphQL.js
-  - [x] `dataloader@2.2.3` - N+1 query prevention
-- [x] Create GraphQL schema with Pothos ✅
-  - [x] Define Node type with all fields (id, name, type, content, position, metadata, provenance)
-  - [x] Define TagOperator enum (AND, OR)
-  - [x] Add `node(id)` query
-  - [x] Add `nodes(filter)` query with pagination
-  - [x] Add `nodesByTags(tags, operator)` query
-- [x] Implement resolvers ✅
-  - [x] Node.parent resolver (with DataLoader)
-  - [x] Node.children resolver (with DataLoader)
-  - [x] Node.ancestors resolver
-  - [x] Node.descendants resolver with maxDepth
-  - [x] Node.project resolver
-- [x] Add comprehensive tests ✅ (24 tests passing)
-  - [x] Test `node(id)` query
-  - [x] Test `nodes(filter)` with various filters
-  - [x] Test `nodesByTags` with AND/OR operators
-  - [x] Test relationship resolvers (parent, children, ancestors, descendants)
-  - [x] Test DataLoader batching (N+1 prevention)
-  - [x] Test error handling (invalid IDs, missing nodes)
-
-**Remaining Tasks:**
-
-- [ ] Add GraphQL endpoint to Fastify
-  - [ ] Mount Apollo Server at `/graphql`
-  - [ ] Add GraphQL Playground (dev only)
-  - [ ] Add query complexity limits
-  - [ ] Add depth limits (max: 10)
-- [ ] Update documentation
-  - [ ] Add GraphQL usage examples to ARCHITECTURE.md ✅ (partially done)
-  - [ ] Document when to use GraphQL vs tRPC ✅ (done)
-  - [ ] Add example queries for AI context building ✅ (done)
-- [ ] Run preflight and commit
-
-**Expected Coverage:** Maintain 76%+
-
-#### 0.4 MCP Server Scaffold 📋 TODO
-
-- [ ] Create new service at `apps/mcp-server/`
-- [ ] Install MCP dependencies (`@modelcontextprotocol/sdk`)
-- [ ] Implement JSONRPC 2.0 server
-- [ ] Add basic tools: `create_node`, `update_node`, `search_nodes`
-- [ ] Add resources: `node://`, `project://`
-- [ ] Add prompts: `summarize_project`, `outline_structure`
-- [ ] Add to docker-compose.yml
-- [ ] Add tests for MCP tools
-- [ ] Document MCP integration
-- [ ] Run preflight and commit
-
-**Expected Coverage:** Maintain 75%+
-
----
-
-### Phase 1: Node Management & File System
-
-#### Success Criteria
-
-- [ ] Create/edit markdown files
-- [ ] Upload and embed images
-- [ ] Export project to PDF
-- [ ] File tree with drag-drop
-
----
-
-### Phase 2: Tagging System
-
-#### Success Criteria
-
-- [ ] Create and assign tags
-- [ ] Jump to character nodes
-- [ ] Filter by multiple tags
-
----
-
-### Phase 3: Search & RAG
-
-#### Success Criteria
-
-- [ ] Semantic search finds relevant nodes
-- [ ] Hybrid search outperforms keyword-only
-- [ ] RAG context improves LLM responses
-
----
-
-### Phase 4: Chat & LLM Integration
-
-#### Success Criteria
-
-- [ ] Chat with multiple threads
-- [ ] LLM creates/edits nodes via tools
-- [ ] Switch agent modes mid-conversation
-- [ ] Reasoning models show thinking process
-
----
-
-### Phase 5: Provenance & Version Control ✅ COMPLETED
-
-**Commit:** `a7d99c9`
-
-All 6 sub-phases complete:
-
-- ✅ 5.1: Provenance Schema Design
-- ✅ 5.2: Change Tracking System
-- ✅ 5.3: Content Versioning
-- ✅ 5.4: Attribution UI Components
-- ✅ 5.5: Audit Log & Export
-- ✅ 5.6: LLM Attribution Badges
-
-**Test Coverage:** 1054 tests passing (595 API + 39 MCP + 420 Web)
-
-#### Success Criteria ✅
-
-- [x] View complete change history
-- [x] Distinguish user vs LLM edits
-- [x] Rollback to previous version
-- [x] Export audit report
-
----
-
-### Phase 6: UX Improvements & Agent Management 🚧 IN PROGRESS
-
-**Goal:** Improve Projects page UX, move chat to right sidebar, enable custom agent modes, add independent model selection, and surface MCP tools
-
-#### 6.1: Unified Project Navigation Filter
-
-**Problem:** Fragmented filtering UI with attribution filter at top, tag filter at bottom, no text search
-
-**Solution:** Single `FilterPanel` component consolidating all filters
+- `apps/api/src/api/routers/nodes.ts` — `toggleFavorite`, `getFavorites`
+- `apps/api/src/services/node-service.ts` — `toggleFavorite(nodeId)`, `getFavoriteNodes(projectId)`
+- `apps/web/src/components/file-tree/file-tree.tsx` — Favorites section at top
+- `apps/web/src/components/file-tree/file-tree-node.tsx` — star icon toggle
 
 **Tasks:**
 
-- [ ] 6.1a: Design unified filter component
-  - Create `FilterPanel` with search input, tag selector, attribution buttons
-  - Compact single-row or collapsible design
-  - Clear visual hierarchy
-- [ ] 6.1b: Add text search to node filtering
-  - Implement fuzzy text search across node names
-  - Filter FileTree by search results
-  - Combine with existing tag/attribution filters
-- [ ] 6.1c: Wire up unified filters to FileTree
-  - Update ProjectsPage to use FilterPanel
-  - Remove separate attribution filter bar
-  - Move TagBrowser filter logic into FilterPanel
-- [ ] 6.1d: Update tests and commit
-  - Test FilterPanel component
-  - Test integration with FileTree
-  - Run `make preflight` and commit
+- [ ] **7.4a** Write RED tests
+  - `toggleFavorite` sets `metadata.isFavorite = true` then back to `false` on second call
+  - `getFavorites` returns only favorited nodes for the project
+  - clicking star calls `toggleFavorite`; node appears in Favorites section
+- [ ] **7.4b** Add `toggleFavorite` + `getFavoriteNodes` to NodeService
+- [ ] **7.4c** Add tRPC endpoints (`nodes.toggleFavorite`, `nodes.getFavorites`)
+- [ ] **7.4d** Add star icon (☆/★) to FileTreeNode (hover to show, always visible when favorited)
+- [ ] **7.4e** Add Favorites pinned section above file tree (collapse/expand, empty state)
+- [ ] **7.4f** Confirm GREEN + `make preflight` + commit
 
-**Expected Outcome:** Single cohesive filter panel above file tree with search + tags + attribution
+**RED tests:**
 
-#### 6.2: Chat UI Redesign - Right Sidebar
+```typescript
+it("toggleFavorite should mark node as favorite", async () => {
+  const caller = createCaller();
+  const project = await createTestProject();
+  const note = await createTestNote(project.id);
 
-**Problem:** Chat is on separate page (`/chat`), not integrated with project workflow
+  const updated = await caller.nodes.toggleFavorite({ nodeId: note.id });
+  expect(updated.metadata?.isFavorite).toBe(true);
 
-**Solution:** Right-hand flyout sidebar in Projects page
+  const favorites = await caller.nodes.getFavorites({ projectId: project.id });
+  expect(favorites.map((n) => n.id)).toContain(note.id);
+});
 
-**Tasks:**
+it("toggleFavorite twice should unfavorite the node", async () => {
+  // call twice, expect isFavorite = false and getFavorites excludes it
+});
+```
 
-- [ ] 6.2a: Create ChatSidebar component
-  - Flyout sidebar (collapsible/expandable)
-  - Thread list, message history, input box
-  - Reuse existing ChatPanel logic
-  - Add close/minimize controls
-- [ ] 6.2b: Integrate ChatSidebar into ProjectsPage
-  - Add toggle button (top-right or in header)
-  - Manage sidebar open/closed state
-  - Preserve chat context per project
-  - Responsive width (e.g., 400px default, resizable)
-- [ ] 6.2c: Update chat page routing
-  - Redirect `/chat` to `/projects?chat=open`
-  - Update navigation links
-  - Preserve backward compatibility
-- [ ] 6.2d: Update tests and commit
-  - Test ChatSidebar component
-  - Test integration with ProjectsPage
-  - Run `make preflight` and commit
+---
 
-**Expected Outcome:** Chat accessible from Projects page via right sidebar flyout
+### 7.5 AI Image Generation with Style Consistency
 
-#### 6.3: Agent Mode CRUD
+**Problem:** Writers want to generate character art and scene illustrations from within Arbor, with consistent visual style across all project images.
 
-**Problem:** Only 4 hardcoded agent modes (assistant, planner, editor, researcher), no way to create custom modes
+**Architecture decision:**
 
-**Solution:** Database-backed custom agent modes with CRUD UI
+- **No platform sandbox** — call OpenAI Images API (`/v1/images/generations`) server-side directly
+- **Sub-agent pattern** — orchestrator calls `generate_image` MCP tool; tool handles OpenAI → download → MinIO upload → `mediaAttachment` record → returns attachment ID
+- **Style profile** — stored in `nodes.metadata.styleProfile` on the project node: `{ artStyle, colorPalette, moodKeywords, negativeKeywords }`. No migration needed.
+- **Prompt construction** — style profile prepended server-side automatically
+
+**Key files:**
+
+- `apps/api/src/services/image-generation-service.ts` (NEW)
+- `apps/api/src/api/routers/media.ts` — `generateImage` endpoint
+- `apps/api/src/services/mcp-integration-service.ts` — register `generate_image` tool
+- `apps/web/src/components/editor/image-upload.tsx` — "Generate with AI" tab
 
 **Tasks:**
 
-- [ ] 6.3a: Extend agent mode schema
-  - Add `agent_modes` table (id, name, displayName, description, allowedTools, guidelines, temperature, isBuiltIn, createdAt, updatedAt)
-  - Migration to create table
-  - Seed built-in modes into table
-  - Update `AgentMode` type to support custom IDs
-- [ ] 6.3b: Agent mode service CRUD
-  - Add `createAgentMode()`, `updateAgentMode()`, `deleteAgentMode()`, `listCustomAgentModes()` to `agent-mode-service.ts`
-  - Prevent deletion/modification of built-in modes
-  - Validate tool names against available MCP tools
-- [ ] 6.3c: Agent mode tRPC endpoints
-  - Add CRUD endpoints to `chat` router
-  - `createAgentMode`, `updateAgentMode`, `deleteAgentMode`, `listAllAgentModes`
-  - Authorization checks (prevent modifying built-ins)
-- [ ] 6.3d: Agent mode management UI
-  - Create `AgentModeManager` component (Settings page or modal)
-  - List all modes (built-in + custom)
-  - Create/edit dialog with form (name, description, tools, guidelines, temperature)
-  - Delete confirmation for custom modes
-  - Tool selector (multi-select from available MCP tools)
-- [ ] 6.3e: Update tests and commit
-  - Test agent mode CRUD service
-  - Test tRPC endpoints
-  - Test UI component
-  - Run `make preflight` and commit
+- [ ] **7.5a** Write RED tests
+  - `ImageGenerationService` prepends style profile to prompt
+  - uploads buffer to MinIO and creates `mediaAttachment` record with `metadata.generated = true`
+  - handles OpenAI API error gracefully
+  - `generate_image` MCP tool is registered and callable
+- [ ] **7.5b** Create `ImageGenerationService` (fetch project style → build prompt → call DALL-E 3 → upload to MinIO → create attachment record)
+- [ ] **7.5c** Register `generate_image` MCP tool in `mcp-integration-service.ts`
+- [ ] **7.5d** Add `media.generateImage` tRPC endpoint
+- [ ] **7.5e** Add "Generate with AI" tab to `ImageUploadDialog` (prompt input, style preview, ~10s loading state)
+- [ ] **7.5f** Confirm GREEN + `make preflight` + commit
 
-**Expected Outcome:** Users can create custom agent modes with specific tool restrictions and behavioral guidelines
+**RED tests:**
 
-#### 6.4: Independent Model Selection
+```typescript
+it("should prepend project style profile to prompt", async () => {
+  const project = await nodeService.createNode({
+    type: "project",
+    name: "Test",
+  });
+  await nodeService.updateNode(project.id, {
+    metadata: { styleProfile: { artStyle: "watercolor illustration" } },
+  });
 
-**Problem:** Model is coupled to agent mode, can't independently select model (e.g., use GPT-4o with planner mode)
+  const mockOpenAI = {
+    images: {
+      generate: vi.fn().mockResolvedValue({ data: [{ b64_json: "abc" }] }),
+    },
+  };
+  const service = new ImageGenerationService(
+    mockOpenAI as any,
+    minioService,
+    db,
+  );
+  await service.generateImage("a dragon", project.id, {});
 
-**Solution:** Add model field to chat threads, decouple from agent mode
+  expect(mockOpenAI.images.generate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      prompt: expect.stringContaining("watercolor illustration"),
+    }),
+  );
+});
 
-**Tasks:**
+it("should create a mediaAttachment record after generation", async () => {
+  // after generateImage, query mediaAttachments; expect metadata.generated === true
+});
+```
 
-- [ ] 6.4a: Add model field to chat threads
-  - Migration to add `model VARCHAR(100)` to `chat_threads`
-  - Update schema and types
-  - Default to null (use provider default)
-- [ ] 6.4b: LLM provider model listing
-  - Add `listModels()` to `LLMProvider` interface
-  - Implement for OpenAI, Anthropic, Google, Ollama providers
-  - Add tRPC endpoint `llm.listAvailableModels` to aggregate from all configured providers
-  - Return grouped by provider with metadata (name, description, context window, cost)
-- [ ] 6.4c: Model selector UI component
-  - Create `ModelSelector` dropdown component
-  - Group models by provider (OpenAI, Anthropic, Google, Local)
-  - Show model metadata (context window, cost tier)
-  - Filter by capability (chat, reasoning, vision)
-- [ ] 6.4d: Integrate model selection in chat
-  - Add ModelSelector to ChatSidebar (above input or in thread settings)
-  - Persist selected model per thread
-  - Update `ChatService.sendMessage()` to use thread's model
-  - Show current model in thread header
-- [ ] 6.4e: Update tests and commit
-  - Test model listing from providers
-  - Test model selection and persistence
-  - Test chat with different models
-  - Run `make preflight` and commit
+---
 
-**Expected Outcome:** Users can select any available model independently from agent mode
+### 7.6 Project Hero Image and Description
 
-#### 6.5: MCP Tool Visibility
+**Problem:** Projects page is a flat list. Writers can't tell projects apart at a glance or communicate tone/premise.
 
-**Problem:** No way to see what MCP tools are available or their schemas
+**Architecture decision:** Hero image stored as `mediaAttachment` with `metadata.role = 'hero'`. Short logline stored in new `nodes.summary` column (requires migration). Projects page becomes a visual card grid.
 
-**Solution:** UI panel showing available tools with descriptions and schemas
+**Key files:**
+
+- `apps/api/src/db/schema.ts` — add `summary TEXT` column
+- `apps/api/src/db/migrations/` — generate + apply migration
+- `apps/api/src/api/routers/nodes.ts` — expose `summary`; add `setHeroImage` endpoint
+- `apps/web/src/app/[locale]/(app)/projects/page.tsx` — card grid redesign
 
 **Tasks:**
 
-- [ ] 6.5a: MCP tool introspection endpoint
-  - Add tRPC endpoint `mcp.listTools` that calls MCP server's `listTools()`
-  - Return tool name, description, input schema, examples
-  - Cache results (tools don't change often)
-- [ ] 6.5b: MCP tools panel UI
-  - Create `McpToolsPanel` component
-  - List all available tools
-  - Expandable sections showing description, input schema, usage examples
-  - Search/filter tools by name
-  - Visual indicator for tools allowed by current agent mode
-- [ ] 6.5c: Integrate MCP tools panel
-  - Add to Settings page under "Developer" section
-  - OR add as collapsible section in ChatSidebar
-  - Show which tools are available for current agent mode (highlight allowed tools)
-  - Link to agent mode settings
-- [ ] 6.5d: Update tests and commit
-  - Test MCP tool listing endpoint
-  - Test McpToolsPanel component
-  - Test filtering by agent mode
-  - Run `make preflight` and commit
+- [ ] **7.6a** Write RED tests
+  - `summary` field is saved and returned on create/update
+  - `setHeroImage` sets `metadata.heroAttachmentId`
+  - projects page renders cards with name and summary
+  - hero image renders when `heroAttachmentId` is set
+- [ ] **7.6b** Add `summary` column: update schema, run `make db-generate` + `make db-migrate`, update NodeService
+- [ ] **7.6c** Add `nodes.setHeroImage({ nodeId, attachmentId })` + `nodes.getHeroImage({ nodeId })` endpoints
+- [ ] **7.6d** Redesign Projects page as card grid (hero image or gradient placeholder, name, summary, tag chips, last-updated; responsive 1/2/3 col)
+- [ ] **7.6e** Add project settings panel (Name, Summary, Hero Image, Description, Style Profile for 7.5)
+- [ ] **7.6f** Confirm GREEN + `make preflight` + commit
 
-**Expected Outcome:** Users can see all available MCP tools, their schemas, and which tools are available for each agent mode
+**RED tests:**
 
-#### Success Criteria
+```typescript
+it("should save and return summary field", async () => {
+  const caller = createCaller();
+  const project = await createTestProject();
+  const updated = await caller.nodes.update({
+    id: project.id,
+    summary: "A sweeping epic about dragons and destiny",
+  });
+  expect(updated.summary).toBe("A sweeping epic about dragons and destiny");
+});
 
-- [ ] Single unified filter panel in Projects page (search + tags + attribution)
-- [ ] Chat accessible via right sidebar flyout in Projects page
-- [ ] Users can create/edit/delete custom agent modes
-- [ ] Users can select LLM model independently from agent mode
-- [ ] Users can view available MCP tools and their schemas
+it("setHeroImage should store attachmentId in metadata", async () => {
+  const caller = createCaller();
+  const project = await createTestProject();
+  const updated = await caller.nodes.setHeroImage({
+    nodeId: project.id,
+    attachmentId: "attach-123",
+  });
+  expect(updated.metadata?.heroAttachmentId).toBe("attach-123");
+});
+```
 
-**Expected Test Coverage:** Maintain >75% (currently 77.76%)
+---
+
+### Phase 7 Architecture Notes
+
+**Build order (recommended):**
+
+| Order | Feature                 | Reason                                                 |
+| ----- | ----------------------- | ------------------------------------------------------ |
+| 1     | 7.1 Tool filtering      | Zero-risk 1-line fix; unblocks testing other modes     |
+| 2     | 7.4 Favorites           | Self-contained; no new DB migration                    |
+| 3     | 7.3 Bulk tagging        | Reuses existing tag infrastructure                     |
+| 4     | 7.6 Project hero image  | DB migration; sets up style profile for 7.5            |
+| 5     | 7.5 AI image generation | Requires style profile (7.6) and MinIO (already done)  |
+| 6     | 7.2 Tiptap attribution  | Most complex frontend; requires stable provenance data |
+
+**Scaling note:** When MCP tool count exceeds ~30, replace the static `allowedTools[]` list with pgvector tool retrieval — embed tool descriptions, retrieve top-K per query via cosine similarity. Arbor already has the embedding infrastructure from Phase 3.
+
+**Sub-agent pattern:** For 7.5 and future multi-step actions, the orchestrator LLM calls a specialist tool rather than handling side-effects directly. The tool owns the full lifecycle (API call → download → storage → record creation) and returns a clean result. The orchestrator never touches bytes.

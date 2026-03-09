@@ -1,9 +1,51 @@
 import { describe, it, expect, vi } from "vitest";
-import { graphql } from "graphql";
+import { graphql, type ExecutionResult } from "graphql";
 import { schema } from "@server/graphql/schema";
 import { createTestProject, createTestNote } from "@tests/helpers/fixtures";
 import { getTestDb } from "@tests/helpers/db";
 import { nodes } from "@server/db/schema";
+
+interface NodesByTagsQueryResult {
+  nodesByTags: Array<{
+    id: string;
+    name: string;
+    tags?: string[];
+  }>;
+}
+
+interface NodesQueryResult {
+  nodes: Array<{
+    id: string;
+    name: string;
+    parent?: {
+      id: string;
+      name: string;
+    } | null;
+    children?: Array<{
+      id: string;
+      name: string;
+    }>;
+  }>;
+}
+
+interface NodeQueryResult {
+  node: {
+    id: string;
+    name?: string;
+    parent?: {
+      id: string;
+      name: string;
+    } | null;
+    project?: {
+      id: string;
+      name: string;
+    } | null;
+  } | null;
+}
+
+function getGraphqlData<T>(result: ExecutionResult): T {
+  return result.data as T;
+}
 
 describe("GraphQL Tag Queries and DataLoader", () => {
   describe("Query: nodesByTags", () => {
@@ -61,8 +103,9 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.nodesByTags).toBeDefined();
-      expect((result.data as any)?.nodesByTags.length).toBe(3);
+      const data = getGraphqlData<NodesByTagsQueryResult>(result);
+      expect(data.nodesByTags).toBeDefined();
+      expect(data.nodesByTags).toHaveLength(3);
     });
 
     it("should find nodes with ALL matching tags (AND operator)", async () => {
@@ -108,9 +151,10 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.nodesByTags).toBeDefined();
-      expect((result.data as any)?.nodesByTags.length).toBe(1);
-      expect(result.data?.nodesByTags[0].name).toBe("Note 1");
+      const data = getGraphqlData<NodesByTagsQueryResult>(result);
+      expect(data.nodesByTags).toBeDefined();
+      expect(data.nodesByTags).toHaveLength(1);
+      expect(data.nodesByTags[0].name).toBe("Note 1");
     });
 
     it("should default to OR operator if not specified", async () => {
@@ -121,8 +165,7 @@ describe("GraphQL Tag Queries and DataLoader", () => {
         type: "note",
         name: "Note 1",
         parentId: project.id,
-        tags: ["tag1"],
-        metadata: {},
+        metadata: { tags: ["tag1"] },
         authorType: "human",
         position: 0,
         createdBy: "user:system",
@@ -145,7 +188,8 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.nodesByTags).toBeDefined();
+      const data = getGraphqlData<NodesByTagsQueryResult>(result);
+      expect(data.nodesByTags).toBeDefined();
     });
 
     it("should return empty array if no nodes match", async () => {
@@ -165,7 +209,8 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.nodesByTags).toEqual([]);
+      const data = getGraphqlData<NodesByTagsQueryResult>(result);
+      expect(data.nodesByTags).toEqual([]);
     });
   });
 
@@ -178,7 +223,7 @@ describe("GraphQL Tag Queries and DataLoader", () => {
 
       // Spy on database queries to verify batching
       const db = getTestDb();
-      const selectSpy = vi.spyOn(db, "select");
+      vi.spyOn(db, "select");
 
       const query = `
         query GetNodes($parentId: ID) {
@@ -200,7 +245,8 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect((result.data as any)?.nodes.length).toBe(3);
+      const data = getGraphqlData<NodesQueryResult>(result);
+      expect(data.nodes).toHaveLength(3);
 
       // DataLoader should batch all parent lookups into a single query
       // Without DataLoader, this would be 1 query for nodes + 3 queries for parents (N+1)
@@ -233,7 +279,8 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.nodes).toBeDefined();
+      const data = getGraphqlData<NodesQueryResult>(result);
+      expect(data.nodes).toBeDefined();
       // DataLoader should batch children lookups
     });
 
@@ -264,8 +311,9 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect((result.data as any)?.node.parent.id).toBe(project.id);
-      expect((result.data as any)?.node.project.id).toBe(project.id);
+      const data = getGraphqlData<NodeQueryResult>(result);
+      expect(data.node?.parent?.id).toBe(project.id);
+      expect(data.node?.project?.id).toBe(project.id);
       // DataLoader should cache the project lookup and reuse it
     });
   });
@@ -288,7 +336,8 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       // Should not throw error, just return null
-      expect(result.data?.node).toBeNull();
+      const data = getGraphqlData<NodeQueryResult>(result);
+      expect(data.node).toBeNull();
     });
 
     it("should handle empty tags array", async () => {
@@ -308,7 +357,8 @@ describe("GraphQL Tag Queries and DataLoader", () => {
       });
 
       expect(result.errors).toBeUndefined();
-      expect(result.data?.nodesByTags).toEqual([]);
+      const data = getGraphqlData<NodesByTagsQueryResult>(result);
+      expect(data.nodesByTags).toEqual([]);
     });
 
     it("should handle missing required arguments", async () => {

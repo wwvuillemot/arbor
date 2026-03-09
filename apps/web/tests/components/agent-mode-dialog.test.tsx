@@ -4,6 +4,17 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { AgentModeDialog } from "@/components/agent-mode-dialog";
 import * as trpcModule from "@/lib/trpc";
 
+interface MockMarkdownEditorProps {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}
+
+interface MockToolSelectorProps {
+  value: string[];
+  onChange: (value: string[]) => void;
+}
+
 // Mock next-intl
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
@@ -11,7 +22,11 @@ vi.mock("next-intl", () => ({
 
 // Mock MarkdownEditor component (uses TipTap which doesn't work well in jsdom)
 vi.mock("@/components/markdown-editor", () => ({
-  MarkdownEditor: ({ value, onChange, placeholder }: any) => (
+  MarkdownEditor: ({
+    value,
+    onChange,
+    placeholder,
+  }: MockMarkdownEditorProps) => (
     <textarea
       data-testid="markdown-editor"
       value={value}
@@ -23,7 +38,7 @@ vi.mock("@/components/markdown-editor", () => ({
 
 // Mock ToolSelector component (simplify for testing)
 vi.mock("@/components/tool-selector", () => ({
-  ToolSelector: ({ value, onChange }: any) => (
+  ToolSelector: ({ value, onChange }: MockToolSelectorProps) => (
     <div data-testid="tool-selector">
       {["create_node", "update_node", "delete_node"].map((tool) => (
         <label key={tool}>
@@ -35,7 +50,7 @@ vi.mock("@/components/tool-selector", () => ({
               if (e.target.checked) {
                 onChange([...value, tool]);
               } else {
-                onChange(value.filter((t: string) => t !== tool));
+                onChange(value.filter((selectedTool) => selectedTool !== tool));
               }
             }}
           />
@@ -59,8 +74,8 @@ describe("AgentModeDialog", () => {
     guidelines: "Custom guidelines",
     temperature: 0.5,
     isBuiltIn: false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 
   beforeEach(() => {
@@ -106,7 +121,7 @@ describe("AgentModeDialog", () => {
           },
         },
       })),
-    } as any);
+    } as unknown as typeof trpcModule.trpc);
   });
 
   it("should not render when closed", () => {

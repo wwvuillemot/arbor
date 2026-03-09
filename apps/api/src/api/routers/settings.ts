@@ -1,6 +1,16 @@
-import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { SettingsService } from "../../services/settings-service";
+import {
+  createSettingExistsResponse,
+  createSettingSuccessResponse,
+  createSettingValueResponse,
+  deleteSettingInputSchema,
+  getAllSettingsInputSchema,
+  getAllSettingsOrEmpty,
+  getSettingInputSchema,
+  hasSettingInputSchema,
+  setSettingInputSchema,
+} from "./settings-router-helpers";
 
 const settingsService = new SettingsService();
 
@@ -20,82 +30,52 @@ export const settingsRouter = router({
    * Get a single setting (decrypted)
    */
   getSetting: publicProcedure
-    .input(
-      z.object({
-        key: z.string(),
-        masterKey: z.string(),
-      }),
-    )
+    .input(getSettingInputSchema)
     .query(async ({ input }) => {
       const value = await settingsService.getSetting(
         input.key,
         input.masterKey,
       );
-      return { key: input.key, value };
+      return createSettingValueResponse(input.key, value);
     }),
 
   /**
    * Get all settings (decrypted)
    */
   getAllSettings: publicProcedure
-    .input(
-      z.object({
-        masterKey: z.string(),
-      }),
-    )
+    .input(getAllSettingsInputSchema)
     .query(async ({ input }) => {
-      try {
-        return await settingsService.getAllSettings(input.masterKey);
-      } catch (error) {
-        console.error("Failed to get all settings:", error);
-        // Return empty object on error to prevent UI from breaking
-        // The error will be logged for debugging
-        return {};
-      }
+      return getAllSettingsOrEmpty(settingsService, input.masterKey);
     }),
 
   /**
    * Set a setting (encrypted)
    */
   setSetting: publicProcedure
-    .input(
-      z.object({
-        key: z.string(),
-        value: z.string(),
-        masterKey: z.string(),
-      }),
-    )
+    .input(setSettingInputSchema)
     .mutation(async ({ input }) => {
       await settingsService.setSetting(input.key, input.value, input.masterKey);
-      return { success: true, key: input.key };
+      return createSettingSuccessResponse(input.key);
     }),
 
   /**
    * Delete a setting
    */
   deleteSetting: publicProcedure
-    .input(
-      z.object({
-        key: z.string(),
-      }),
-    )
+    .input(deleteSettingInputSchema)
     .mutation(async ({ input }) => {
       await settingsService.deleteSetting(input.key);
-      return { success: true, key: input.key };
+      return createSettingSuccessResponse(input.key);
     }),
 
   /**
    * Check if a setting exists
    */
   hasSetting: publicProcedure
-    .input(
-      z.object({
-        key: z.string(),
-      }),
-    )
+    .input(hasSettingInputSchema)
     .query(async ({ input }) => {
       const exists = await settingsService.hasSetting(input.key);
-      return { key: input.key, exists };
+      return createSettingExistsResponse(input.key, exists);
     }),
 
   /**

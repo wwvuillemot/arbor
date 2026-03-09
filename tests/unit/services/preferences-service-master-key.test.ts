@@ -1,11 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { PreferencesService } from "@/services/preferences-service";
-import { getTestDb, resetTestDb } from "@tests/helpers/db";
-import { userPreferences } from "@/db/schema";
 
 describe("PreferencesService - Master Key Management", () => {
   let preferencesService: PreferencesService;
-  const db = getTestDb();
 
   beforeEach(async () => {
     // resetTestDb() is already called by the global beforeEach hook in tests/setup.ts

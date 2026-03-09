@@ -1,6 +1,6 @@
 # Makefile for Arbor API Server
 
-.PHONY: help setup install dev build start clean test coverage lint format db-push db-seed db-studio
+.PHONY: help setup install dev build start clean test coverage lint typecheck format db-push db-seed db-studio
 
 help:
 	@echo "========================================="
@@ -16,6 +16,7 @@ help:
 	@echo "  make test       - Run tests"
 	@echo "  make coverage   - Run tests with coverage"
 	@echo "  make lint       - Run linter"
+	@echo "  make typecheck  - Run type checker"
 	@echo "  make format     - Format code (auto-fix)"
 	@echo "  make clean      - Clean build artifacts"
 	@echo ""
@@ -70,7 +71,11 @@ coverage:
 
 lint:
 	@echo "Running linter..."
-	@cd ../.. && pnpm run lint || echo "⚠️  No lint script configured"
+	@cd ../.. && pnpm run lint:api
+
+typecheck:
+	@echo "Running type checker..."
+	@cd ../.. && pnpm run typecheck:api
 
 format:
 	@echo "Formatting code..."

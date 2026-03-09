@@ -2,7 +2,13 @@ import { describe, it, expect } from "vitest";
 import enMessages from "../../src/i18n/messages/en.json";
 import jaMessages from "../../src/i18n/messages/ja.json";
 
-type TranslationObject = Record<string, any>;
+type TranslationScalar = string | number | boolean | null;
+
+interface TranslationObject {
+  [key: string]: TranslationValue;
+}
+
+type TranslationValue = TranslationScalar | TranslationObject | unknown[];
 
 /**
  * Recursively find all keys in a nested object

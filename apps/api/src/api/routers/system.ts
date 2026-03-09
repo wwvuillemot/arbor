@@ -24,7 +24,7 @@ export const systemRouter = router({
         },
         environment: process.env.NODE_ENV || "development",
       };
-    } catch (error) {
+    } catch (_error) {
       // If migrations table doesn't exist yet, return default values
       return {
         version: "0.1.0",

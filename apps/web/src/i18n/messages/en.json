@@ -233,6 +233,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
+    "settings": "Settings",
     "create": "Create",
     "close": "Close"
   },
@@ -352,6 +353,33 @@
     "deleteError": "Failed to delete project"
   },
   "editor": {
+    "projectSettings": {
+      "title": "{name} Settings",
+      "tabGeneral": "General",
+      "tabAppearance": "Appearance",
+      "tabStyle": "Style Presets",
+      "name": "Project name",
+      "namePlaceholder": "My Project",
+      "description": "Description",
+      "descriptionPlaceholder": "A short summary of this project...",
+      "descriptionHint": "Shown on project cards and used as context for AI features.",
+      "save": "Save changes",
+      "saved": "Saved",
+      "delete": "Delete",
+      "heroImage": "Hero image",
+      "heroImageHint": "Click an image from your project media to use it as the hero. It appears on project cards and the dashboard.",
+      "clearHero": "Remove hero image",
+      "focalPointHint": "Click or drag on the image to set the focal point — this area stays visible when the image is cropped on cards.",
+      "loadingImages": "Loading images...",
+      "noImages": "No images in this project yet.",
+      "styleHint": "Style presets are automatically applied when generating images for this project. The active preset (✓) is used for generation.",
+      "dangerZone": "Danger zone",
+      "deleteProject": "Delete this project",
+      "deleteProjectWarning": "Once deleted, all notes, media, and settings for this project will be permanently removed. This action cannot be undone.",
+      "deleteConfirmPrompt": "To confirm, type the project name \"{name}\" below:",
+      "deleteConfirmButton": "I understand, delete this project permanently",
+      "cancel": "Cancel"
+    },
     "toolbar": "Editor toolbar",
     "undo": "Undo",
     "redo": "Redo",
@@ -374,13 +402,43 @@
     "insertLink": "Insert link",
     "removeLink": "Remove link",
     "insertImage": "Insert image",
+    "aiAttribution": "Show AI attribution",
     "imageUpload": {
       "uploading": "Uploading image...",
       "dropOrClick": "Drop an image here or click to select",
       "supportedFormats": "PNG, JPG, GIF, WebP, SVG (max 10MB)",
       "invalidType": "Invalid file type. Please upload an image.",
       "fileTooLarge": "File is too large. Maximum size is 10MB.",
-      "uploadFailed": "Failed to upload image"
+      "uploadFailed": "Failed to upload image",
+      "tabUpload": "Upload new",
+      "tabExisting": "Select existing",
+      "tabGenerate": "Generate with AI",
+      "generatePromptLabel": "Describe the image",
+      "generatePromptPlaceholder": "A watercolor map of a fantasy kingdom...",
+      "generateButton": "Generate",
+      "generating": "Generating...",
+      "generateError": "Failed to generate image",
+      "noApiKey": "OpenAI API key not configured",
+      "noImagesYet": "No images uploaded to this project yet."
+    },
+    "heroImage": {
+      "setHero": "Set as hero image",
+      "clearHero": "Clear hero image"
+    },
+    "styleProfile": {
+      "title": "Style Presets",
+      "addPreset": "New",
+      "presetName": "Preset name",
+      "presetNamePlaceholder": "e.g. Watercolor",
+      "artStyle": "Art style",
+      "artStylePlaceholder": "e.g. watercolor illustration, delicate linework",
+      "colorPalette": "Color palette",
+      "colorPalettePlaceholder": "e.g. muted earth tones, warm ivory",
+      "moodKeywords": "Mood keywords",
+      "moodKeywordsPlaceholder": "e.g. dramatic, ethereal",
+      "saveAndActivate": "Save & activate",
+      "saved": "Saved",
+      "emptyDescription": "Add a preset to keep your illustrations consistent."
     }
   },
   "fileTree": {
@@ -449,6 +507,28 @@
       "aiAssisted": "AI-assisted",
       "aigenerated": "AI-generated",
       "aiassisted": "AI-assisted"
+    },
+    "favorites": {
+      "section": "Favorites",
+      "empty": "No favorites yet",
+      "add": "Add to favorites",
+      "remove": "Remove from favorites",
+      "added": "Added to favorites",
+      "removed": "Removed from favorites"
+    },
+    "tagNode": "Add tags…",
+    "tagSelection": "Tag {count} selected…",
+    "bulkTagBar": {
+      "title": "Tag {count} selected nodes",
+      "hint": "Click tags to toggle. Selected tags will be applied to all nodes.",
+      "tagOnAll": "Applied to all selected nodes",
+      "tagOnSome": "Applied to some selected nodes (dashed border)",
+      "apply": "Apply",
+      "cancel": "Cancel",
+      "added": "Tag added to {count} nodes",
+      "removed": "Tag removed from {count} nodes",
+      "error": "Failed to apply bulk tag change",
+      "noTags": "No tags in this project yet"
     }
   },
   "tags": {

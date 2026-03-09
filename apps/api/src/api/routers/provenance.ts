@@ -1,30 +1,31 @@
-import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { ProvenanceService } from "../../services/provenance-service";
+import {
+  buildAuditLogFilterParams,
+  buildAuditLogParams,
+  buildHistoryInRangeParams,
+  compareVersionsInputSchema,
+  exportAuditReportInputSchema,
+  getAuditLogCountInputSchema,
+  getAuditLogInputSchema,
+  getHistoryByActorInputSchema,
+  getHistoryInputSchema,
+  getHistoryInRangeInputSchema,
+  getNodeVersionOrThrow,
+  getVersionInputSchema,
+  nodeIdInputSchema,
+  rollbackInputSchema,
+  searchHistoryInputSchema,
+} from "./provenance-router-helpers";
 
 const provenanceService = new ProvenanceService();
-
-const actorTypeEnum = ["user", "llm", "system"] as const;
-const actionTypeEnum = [
-  "create",
-  "update",
-  "delete",
-  "move",
-  "restore",
-] as const;
 
 export const provenanceRouter = router({
   /**
    * Get version history for a node (newest first)
    */
   getHistory: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        limit: z.number().int().positive().max(100).optional(),
-        offset: z.number().int().min(0).optional(),
-      }),
-    )
+    .input(getHistoryInputSchema)
     .query(async ({ input }) => {
       return await provenanceService.getHistory(input);
     }),
@@ -33,30 +34,21 @@ export const provenanceRouter = router({
    * Get a specific version of a node
    */
   getVersion: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        version: z.number().int().positive(),
-      }),
-    )
+    .input(getVersionInputSchema)
     .query(async ({ input }) => {
-      const entry = await provenanceService.getVersion(
+      return await getNodeVersionOrThrow(
+        provenanceService,
         input.nodeId,
         input.version,
+        `Version ${input.version} not found for node ${input.nodeId}`,
       );
-      if (!entry) {
-        throw new Error(
-          `Version ${input.version} not found for node ${input.nodeId}`,
-        );
-      }
-      return entry;
     }),
 
   /**
    * Get the latest version of a node
    */
   getLatestVersion: publicProcedure
-    .input(z.object({ nodeId: z.string().uuid() }))
+    .input(nodeIdInputSchema)
     .query(async ({ input }) => {
       return await provenanceService.getLatestVersion(input.nodeId);
     }),
@@ -65,7 +57,7 @@ export const provenanceRouter = router({
    * Get version count for a node
    */
   getVersionCount: publicProcedure
-    .input(z.object({ nodeId: z.string().uuid() }))
+    .input(nodeIdInputSchema)
     .query(async ({ input }) => {
       return await provenanceService.getVersionCount(input.nodeId);
     }),
@@ -74,14 +66,7 @@ export const provenanceRouter = router({
    * Get history filtered by actor type (user vs LLM)
    */
   getHistoryByActor: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        actorType: z.enum(actorTypeEnum),
-        limit: z.number().int().positive().max(100).optional(),
-        offset: z.number().int().min(0).optional(),
-      }),
-    )
+    .input(getHistoryByActorInputSchema)
     .query(async ({ input }) => {
       return await provenanceService.getHistoryByActor(input);
     }),
@@ -90,31 +75,18 @@ export const provenanceRouter = router({
    * Get history within a date range
    */
   getHistoryInRange: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        startDate: z.string().datetime(),
-        endDate: z.string().datetime(),
-      }),
-    )
+    .input(getHistoryInRangeInputSchema)
     .query(async ({ input }) => {
-      return await provenanceService.getHistoryInRange({
-        nodeId: input.nodeId,
-        startDate: new Date(input.startDate),
-        endDate: new Date(input.endDate),
-      });
+      return await provenanceService.getHistoryInRange(
+        buildHistoryInRangeParams(input),
+      );
     }),
 
   /**
    * Checkout a specific version (read-only view of content at that version)
    */
   checkout: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        version: z.number().int().positive(),
-      }),
-    )
+    .input(getVersionInputSchema)
     .query(async ({ input }) => {
       return await provenanceService.checkout(input.nodeId, input.version);
     }),
@@ -123,20 +95,22 @@ export const provenanceRouter = router({
    * Compare two versions of a node
    */
   compareVersions: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        versionA: z.number().int().positive(),
-        versionB: z.number().int().positive(),
-      }),
-    )
+    .input(compareVersionsInputSchema)
     .query(async ({ input }) => {
       const [vA, vB] = await Promise.all([
-        provenanceService.getVersion(input.nodeId, input.versionA),
-        provenanceService.getVersion(input.nodeId, input.versionB),
+        getNodeVersionOrThrow(
+          provenanceService,
+          input.nodeId,
+          input.versionA,
+          `Version ${input.versionA} not found`,
+        ),
+        getNodeVersionOrThrow(
+          provenanceService,
+          input.nodeId,
+          input.versionB,
+          `Version ${input.versionB} not found`,
+        ),
       ]);
-      if (!vA) throw new Error(`Version ${input.versionA} not found`);
-      if (!vB) throw new Error(`Version ${input.versionB} not found`);
 
       const diff = provenanceService.computeDiff(
         vA.contentAfter,
@@ -150,13 +124,7 @@ export const provenanceRouter = router({
    * Rollback a node to a specific version
    */
   rollback: publicProcedure
-    .input(
-      z.object({
-        nodeId: z.string().uuid(),
-        targetVersion: z.number().int().positive(),
-        actorId: z.string().optional(),
-      }),
-    )
+    .input(rollbackInputSchema)
     .mutation(async ({ input }) => {
       return await provenanceService.rollbackToVersion(
         input.nodeId,
@@ -172,57 +140,27 @@ export const provenanceRouter = router({
    * Get audit log across all nodes with filters
    */
   getAuditLog: publicProcedure
-    .input(
-      z.object({
-        limit: z.number().int().positive().max(100).optional(),
-        offset: z.number().int().min(0).optional(),
-        actorType: z.enum(actorTypeEnum).optional(),
-        action: z.enum(actionTypeEnum).optional(),
-        startDate: z.string().datetime().optional(),
-        endDate: z.string().datetime().optional(),
-        nodeId: z.string().uuid().optional(),
-      }),
-    )
+    .input(getAuditLogInputSchema)
     .query(async ({ input }) => {
-      return await provenanceService.getAuditLog({
-        ...input,
-        startDate: input.startDate ? new Date(input.startDate) : undefined,
-        endDate: input.endDate ? new Date(input.endDate) : undefined,
-      });
+      return await provenanceService.getAuditLog(buildAuditLogParams(input));
     }),
 
   /**
    * Get total count of audit log entries matching filters
    */
   getAuditLogCount: publicProcedure
-    .input(
-      z.object({
-        actorType: z.enum(actorTypeEnum).optional(),
-        action: z.enum(actionTypeEnum).optional(),
-        startDate: z.string().datetime().optional(),
-        endDate: z.string().datetime().optional(),
-        nodeId: z.string().uuid().optional(),
-      }),
-    )
+    .input(getAuditLogCountInputSchema)
     .query(async ({ input }) => {
-      return await provenanceService.getAuditLogCount({
-        ...input,
-        startDate: input.startDate ? new Date(input.startDate) : undefined,
-        endDate: input.endDate ? new Date(input.endDate) : undefined,
-      });
+      return await provenanceService.getAuditLogCount(
+        buildAuditLogFilterParams(input),
+      );
     }),
 
   /**
    * Search within change history
    */
   searchHistory: publicProcedure
-    .input(
-      z.object({
-        query: z.string().min(1),
-        limit: z.number().int().positive().max(100).optional(),
-        offset: z.number().int().min(0).optional(),
-      }),
-    )
+    .input(searchHistoryInputSchema)
     .query(async ({ input }) => {
       return await provenanceService.searchHistory(input);
     }),
@@ -231,24 +169,9 @@ export const provenanceRouter = router({
    * Export audit report (CSV or HTML for PDF)
    */
   exportAuditReport: publicProcedure
-    .input(
-      z.object({
-        format: z.enum(["csv", "html"]),
-        actorType: z.enum(actorTypeEnum).optional(),
-        action: z.enum(actionTypeEnum).optional(),
-        startDate: z.string().datetime().optional(),
-        endDate: z.string().datetime().optional(),
-        nodeId: z.string().uuid().optional(),
-      }),
-    )
+    .input(exportAuditReportInputSchema)
     .query(async ({ input }) => {
-      const filterParams = {
-        actorType: input.actorType,
-        action: input.action,
-        startDate: input.startDate ? new Date(input.startDate) : undefined,
-        endDate: input.endDate ? new Date(input.endDate) : undefined,
-        nodeId: input.nodeId,
-      };
+      const filterParams = buildAuditLogFilterParams(input);
 
       if (input.format === "csv") {
         return await provenanceService.exportAuditCsv(filterParams);

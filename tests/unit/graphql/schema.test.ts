@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { graphql } from "graphql";
 import { schema } from "@server/graphql/schema";
 import {

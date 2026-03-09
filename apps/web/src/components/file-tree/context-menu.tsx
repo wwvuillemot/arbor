@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { FolderPlus, FilePlus, Pencil, Trash2 } from "lucide-react";
+import { FolderPlus, FilePlus, Pencil, Trash2, Tag } from "lucide-react";
 import type { TreeNode } from "./file-tree-node";
 
 export interface ContextMenuAction {
-  type: "newFolder" | "newNote" | "rename" | "delete";
+  type: "newFolder" | "newNote" | "rename" | "delete" | "tagSelection";
   node: TreeNode;
 }
 
@@ -16,6 +16,8 @@ export interface NodeContextMenuProps {
   node: TreeNode | null;
   onClose: () => void;
   onAction: (action: ContextMenuAction) => void;
+  /** Number of currently shift-selected nodes; when > 1 shows bulk-tag action */
+  selectedCount?: number;
 }
 
 const expandableTypes = new Set(["folder", "project"]);
@@ -26,6 +28,7 @@ export function NodeContextMenu({
   node,
   onClose,
   onAction,
+  selectedCount = 0,
 }: NodeContextMenuProps) {
   const t = useTranslations("fileTree");
   const menuRef = React.useRef<HTMLDivElement>(null);
@@ -92,6 +95,22 @@ export function NodeContextMenu({
       style={{ left: position.x, top: position.y }}
       data-testid="context-menu"
     >
+      <>
+        <button
+          role="menuitem"
+          className="flex items-center gap-2 w-full rounded-sm px-2 py-1.5 text-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+          onClick={() => {
+            onAction({ type: "tagSelection", node: node! });
+            onClose();
+          }}
+        >
+          <Tag className="w-4 h-4" />
+          {selectedCount > 1
+            ? t("tagSelection", { count: selectedCount })
+            : t("tagNode")}
+        </button>
+        <div className="my-1 border-t" />
+      </>
       {menuItems.map((item, _index) => (
         <React.Fragment key={item.type}>
           {item.type === "rename" && isContainer && (

@@ -109,15 +109,17 @@ describe("useNavigationCommands", () => {
     expect(mockPush).toHaveBeenCalledWith("/dashboard");
   });
 
-  it("should navigate to search when search command is executed", () => {
-    renderHook(() => useNavigationCommands());
+  it("should call onSearchOpen when search command is executed", () => {
+    const mockSearchOpen = vi.fn();
+    renderHook(() => useNavigationCommands(mockSearchOpen));
 
     const command = commandRegistry
       .getCommands()
       .find((cmd) => cmd.id === "nav-search");
     command?.action();
 
-    expect(mockPush).toHaveBeenCalledWith("/search");
+    expect(mockSearchOpen).toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalledWith("/search");
   });
 
   it("should navigate to projects when projects command is executed", () => {

@@ -2,16 +2,37 @@ import SchemaBuilder from "@pothos/core";
 import { NodeService } from "../services/node-service";
 import { db } from "../db/index";
 import { nodes } from "../db/schema";
-import { eq, and, sql, or } from "drizzle-orm";
+import { eq, and, type SQL } from "drizzle-orm";
 
 // Define the Node type from database
 type DbNode = typeof nodes.$inferSelect;
+type JsonPrimitive = boolean | number | string | null;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
+function getNodeTags(metadata: DbNode["metadata"]): string[] {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+
+  const tagsValue = (metadata as Record<string, unknown>).tags;
+  if (!Array.isArray(tagsValue)) {
+    return [];
+  }
+
+  return tagsValue.filter((tag): tag is string => typeof tag === "string");
+}
 
 // Create Pothos schema builder with default context
 const builder = new SchemaBuilder<{
   Objects: {
     Node: DbNode;
     NodeTree: { root: DbNode; nodes: DbNode[]; totalCount: number };
+  };
+  Scalars: {
+    JSON: {
+      Input: JsonValue;
+      Output: JsonValue;
+    };
   };
 }>({});
 
@@ -39,7 +60,7 @@ const TagOperator = builder.enumType("TagOperator", {
 // Add JSON scalar
 builder.scalarType("JSON", {
   serialize: (value) => value,
-  parseValue: (value) => value,
+  parseValue: (value) => value as JsonValue,
 });
 
 // Node type implementation
@@ -53,7 +74,7 @@ NodeType.implement({
     content: t.field({
       type: "JSON",
       nullable: true,
-      resolve: (node) => node.content,
+      resolve: (node) => (node.content as JsonValue | null) ?? null,
     }),
     position: t.int({
       nullable: true,
@@ -78,15 +99,12 @@ NodeType.implement({
     }),
     tags: t.field({
       type: ["String"],
-      resolve: (node) => {
-        const metadata = node.metadata as Record<string, any> | null;
-        return (metadata?.tags as string[]) || [];
-      },
+      resolve: (node) => getNodeTags(node.metadata),
     }),
     metadata: t.field({
       type: "JSON",
       nullable: true,
-      resolve: (node) => node.metadata,
+      resolve: (node) => (node.metadata as JsonValue | null) ?? null,
     }),
     createdBy: t.string({
       nullable: true,
@@ -120,7 +138,7 @@ NodeType.implement({
     project: t.field({
       type: NodeType,
       nullable: true,
-      resolve: async (node) => {
+      resolve: async (node): Promise<DbNode | null> => {
         // Traverse up to find the root project
         let current = node;
         while (current.parentId) {
@@ -185,7 +203,7 @@ builder.queryType({
       args: {
         id: t.arg.id({ required: true }),
       },
-      resolve: async (_root, args) => {
+      resolve: async (_root, args): Promise<DbNode | null> => {
         return await nodeService.getNodeById(args.id as string);
       },
     }),
@@ -199,7 +217,7 @@ builder.queryType({
         offset: t.arg.int({ defaultValue: 0 }),
       },
       resolve: async (_root, args) => {
-        const conditions: any[] = [];
+        const conditions: SQL<unknown>[] = [];
 
         // Filter by parentId
         if (args.parentId) {
@@ -208,7 +226,7 @@ builder.queryType({
 
         // Filter by nodeType
         if (args.nodeType) {
-          conditions.push(eq(nodes.type, args.nodeType));
+          conditions.push(eq(nodes.type, args.nodeType as DbNode["type"]));
         }
 
         // Build query
@@ -219,7 +237,7 @@ builder.queryType({
         }
 
         // Apply pagination
-        query = query.limit(args.limit).offset(args.offset) as any;
+        query = query.limit(args.limit ?? 100).offset(args.offset ?? 0) as any;
 
         let results = await query;
 
@@ -287,8 +305,7 @@ builder.queryType({
 
         // Filter nodes based on tags
         const filtered = allNodes.filter((node) => {
-          const metadata = node.metadata as Record<string, any> | null;
-          const nodeTags = (metadata?.tags as string[]) || [];
+          const nodeTags = getNodeTags(node.metadata);
 
           if (operator === "AND") {
             // All tags must match

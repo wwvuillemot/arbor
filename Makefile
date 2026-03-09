@@ -293,6 +293,9 @@ coverage:
 	@echo "🔧 API Coverage..."
 	@cd apps/api && $(MAKE) coverage
 	@echo ""
+	@echo "🤖 MCP Server Coverage..."
+	@cd apps/mcp-server && $(MAKE) coverage
+	@echo ""
 	@echo "🌐 Web Coverage..."
 	@cd apps/web && $(MAKE) coverage
 	@echo ""
@@ -316,6 +319,9 @@ lint:
 	@echo ""
 	@echo "🔧 API Lint..."
 	@cd apps/api && $(MAKE) lint
+	@echo ""
+	@echo "🤖 MCP Server Lint..."
+	@cd apps/mcp-server && $(MAKE) lint
 	@echo ""
 	@echo "🌐 Web Lint..."
 	@cd apps/web && $(MAKE) lint
@@ -343,7 +349,25 @@ format:
 	@echo "========================================="
 
 typecheck:
-	pnpm run typecheck
+	@echo "========================================="
+	@echo "   Running Type Checks"
+	@echo "========================================="
+	@echo ""
+	@echo "🔧 API Typecheck..."
+	@cd apps/api && $(MAKE) typecheck
+	@echo ""
+	@echo "🤖 MCP Server Typecheck..."
+	@cd apps/mcp-server && $(MAKE) typecheck
+	@echo ""
+	@echo "🌐 Web Typecheck..."
+	@cd apps/web && $(MAKE) typecheck
+	@echo ""
+	@echo "🧪 Root Tests & Tooling Typecheck..."
+	@pnpm run typecheck:root
+	@echo ""
+	@echo "========================================="
+	@echo "   ✅ Typechecking complete!"
+	@echo "========================================="
 
 audit:
 	pnpm audit
@@ -355,16 +379,19 @@ preflight:
 	@echo "   🚀 Running Preflight Checks"
 	@echo "========================================="
 	@echo ""
-	@echo "Step 1/4: Formatting code..."
+	@echo "Step 1/5: Formatting code..."
 	@$(MAKE) format
 	@echo ""
-	@echo "Step 2/4: Linting code..."
+	@echo "Step 2/5: Linting code..."
 	@$(MAKE) lint
 	@echo ""
-	@echo "Step 3/4: Running tests..."
+	@echo "Step 3/5: Typechecking code..."
+	@$(MAKE) typecheck
+	@echo ""
+	@echo "Step 4/5: Running tests..."
 	@$(MAKE) test
 	@echo ""
-	@echo "Step 4/4: Generating coverage..."
+	@echo "Step 5/5: Generating coverage..."
 	@$(MAKE) coverage
 	@echo ""
 	@echo "========================================="

@@ -1,7 +1,21 @@
 import { db } from "../db/index";
-import { tags, nodeTags, nodes } from "../db/schema";
-import type { Tag, TagType } from "../db/schema";
-import { eq, and, inArray, isNull, or, sql, count } from "drizzle-orm";
+import { tags } from "../db/schema";
+import type { Node, Tag, TagType } from "../db/schema";
+import { eq, and, isNull, or } from "drizzle-orm";
+import {
+  addTagToNode as addTagToNodeRelation,
+  getNodeTags as getNodeTagsRelation,
+  getNodesByTag as getNodesByTagRelation,
+  getNodesByTags as getNodesByTagsRelation,
+  getRelatedTags as getRelatedTagsRelation,
+  getTagsWithCounts as getTagsWithCountsRelation,
+  removeTagFromNode as removeTagFromNodeRelation,
+} from "./tag-service-relations";
+import {
+  createEntityNode as createEntityNodeForTag,
+  linkEntityNode as linkEntityNodeForTag,
+  unlinkEntityNode as unlinkEntityNodeForTag,
+} from "./tag-service-entity-nodes";
 
 export interface CreateTagParams {
   name: string;
@@ -112,55 +126,46 @@ export class TagService {
    * Add a tag to a node
    */
   async addTagToNode(nodeId: string, tagId: string): Promise<void> {
-    // Verify node exists
-    const [node] = await db.select().from(nodes).where(eq(nodes.id, nodeId));
-    if (!node) {
-      throw new Error(`Node not found: ${nodeId}`);
-    }
-
-    // Verify tag exists
-    const tag = await this.getTagById(tagId);
-    if (!tag) {
-      throw new Error(`Tag not found: ${tagId}`);
-    }
-
-    // Check if already associated (upsert - ignore conflict)
-    await db.insert(nodeTags).values({ nodeId, tagId }).onConflictDoNothing();
+    await addTagToNodeRelation(nodeId, tagId);
   }
 
   /**
    * Remove a tag from a node
    */
   async removeTagFromNode(nodeId: string, tagId: string): Promise<void> {
-    await db
-      .delete(nodeTags)
-      .where(and(eq(nodeTags.nodeId, nodeId), eq(nodeTags.tagId, tagId)));
+    await removeTagFromNodeRelation(nodeId, tagId);
+  }
+
+  /**
+   * Add a tag to multiple nodes in one call
+   */
+  async bulkAddToNodes(nodeIds: string[], tagId: string): Promise<void> {
+    await Promise.all(
+      nodeIds.map((nodeId) => this.addTagToNode(nodeId, tagId)),
+    );
+  }
+
+  /**
+   * Remove a tag from multiple nodes in one call
+   */
+  async bulkRemoveFromNodes(nodeIds: string[], tagId: string): Promise<void> {
+    await Promise.all(
+      nodeIds.map((nodeId) => this.removeTagFromNode(nodeId, tagId)),
+    );
   }
 
   /**
    * Get all tags for a node
    */
   async getNodeTags(nodeId: string): Promise<Tag[]> {
-    const results = await db
-      .select({ tag: tags })
-      .from(nodeTags)
-      .innerJoin(tags, eq(nodeTags.tagId, tags.id))
-      .where(eq(nodeTags.nodeId, nodeId));
-
-    return results.map((r) => r.tag);
+    return getNodeTagsRelation(nodeId);
   }
 
   /**
    * Get all nodes with a specific tag
    */
-  async getNodesByTag(tagId: string): Promise<(typeof nodes.$inferSelect)[]> {
-    const results = await db
-      .select({ node: nodes })
-      .from(nodeTags)
-      .innerJoin(nodes, eq(nodeTags.nodeId, nodes.id))
-      .where(eq(nodeTags.tagId, tagId));
-
-    return results.map((r) => r.node);
+  async getNodesByTag(tagId: string): Promise<Node[]> {
+    return getNodesByTagRelation(tagId);
   }
 
   // ─── Tag Navigation Methods ─────────────────────────────────────────────
@@ -171,63 +176,15 @@ export class TagService {
   async getNodesByTags(
     tagIds: string[],
     operator: "AND" | "OR" = "OR",
-  ): Promise<(typeof nodes.$inferSelect)[]> {
-    if (tagIds.length === 0) return [];
-
-    if (operator === "OR") {
-      // Get distinct node IDs that have any of the specified tags
-      const nodeIdRows = await db
-        .selectDistinct({ nodeId: nodeTags.nodeId })
-        .from(nodeTags)
-        .where(inArray(nodeTags.tagId, tagIds));
-
-      if (nodeIdRows.length === 0) return [];
-
-      const nodeIds = nodeIdRows.map((r) => r.nodeId);
-      return await db.select().from(nodes).where(inArray(nodes.id, nodeIds));
-    }
-
-    // AND: all tags must match — get node IDs that have ALL specified tags
-    const nodeIdRows = await db
-      .select({ nodeId: nodeTags.nodeId })
-      .from(nodeTags)
-      .where(inArray(nodeTags.tagId, tagIds))
-      .groupBy(nodeTags.nodeId)
-      .having(sql`count(distinct ${nodeTags.tagId}) = ${tagIds.length}`);
-
-    if (nodeIdRows.length === 0) return [];
-
-    const nodeIds = nodeIdRows.map((r) => r.nodeId);
-    return await db.select().from(nodes).where(inArray(nodes.id, nodeIds));
+  ): Promise<Node[]> {
+    return getNodesByTagsRelation(tagIds, operator);
   }
 
   /**
    * Get all tags with their node usage count (for tag cloud).
    */
   async getTagsWithCounts(): Promise<(Tag & { nodeCount: number })[]> {
-    const results = await db
-      .select({
-        tag: tags,
-        nodeCount: count(nodeTags.nodeId),
-      })
-      .from(tags)
-      .leftJoin(nodeTags, eq(tags.id, nodeTags.tagId))
-      .groupBy(
-        tags.id,
-        tags.name,
-        tags.color,
-        tags.icon,
-        tags.type,
-        tags.entityNodeId,
-        tags.projectId,
-        tags.createdAt,
-        tags.updatedAt,
-      );
-
-    return results.map((r) => ({
-      ...r.tag,
-      nodeCount: Number(r.nodeCount),
-    }));
+    return getTagsWithCountsRelation();
   }
 
   /**
@@ -239,107 +196,21 @@ export class TagService {
     tagId: string,
     limit = 10,
   ): Promise<(Tag & { sharedCount: number })[]> {
-    // Find all nodes that have the given tag
-    const taggedNodeIds = db
-      .select({ nodeId: nodeTags.nodeId })
-      .from(nodeTags)
-      .where(eq(nodeTags.tagId, tagId));
-
-    // Find other tags on those same nodes
-    const results = await db
-      .select({
-        tag: tags,
-        sharedCount: count(nodeTags.nodeId),
-      })
-      .from(nodeTags)
-      .innerJoin(tags, eq(nodeTags.tagId, tags.id))
-      .where(
-        and(
-          inArray(nodeTags.nodeId, taggedNodeIds),
-          sql`${nodeTags.tagId} != ${tagId}`,
-        ),
-      )
-      .groupBy(
-        tags.id,
-        tags.name,
-        tags.color,
-        tags.icon,
-        tags.type,
-        tags.entityNodeId,
-        tags.projectId,
-        tags.createdAt,
-        tags.updatedAt,
-      )
-      .orderBy(sql`count(${nodeTags.nodeId}) desc`)
-      .limit(limit);
-
-    return results.map((r) => ({
-      ...r.tag,
-      sharedCount: Number(r.sharedCount),
-    }));
+    return getRelatedTagsRelation(tagId, limit);
   }
-
-  // ─── Entity Node Methods ───────────────────────────────────────────────
-
-  /**
-   * Entity tag types that can have dedicated entity nodes
-   */
-  private static ENTITY_TYPES: readonly string[] = [
-    "character",
-    "location",
-    "event",
-    "concept",
-  ];
 
   /**
    * Link a tag to an existing entity node
    */
   async linkEntityNode(tagId: string, entityNodeId: string): Promise<Tag> {
-    const tag = await this.getTagById(tagId);
-    if (!tag) {
-      throw new Error(`Tag not found: ${tagId}`);
-    }
-
-    if (!TagService.ENTITY_TYPES.includes(tag.type)) {
-      throw new Error(
-        `Only entity-type tags (character, location, event, concept) can be linked to nodes`,
-      );
-    }
-
-    // Verify node exists
-    const [node] = await db
-      .select()
-      .from(nodes)
-      .where(eq(nodes.id, entityNodeId));
-    if (!node) {
-      throw new Error(`Node not found: ${entityNodeId}`);
-    }
-
-    const [updated] = await db
-      .update(tags)
-      .set({ entityNodeId, updatedAt: new Date() })
-      .where(eq(tags.id, tagId))
-      .returning();
-
-    return updated;
+    return linkEntityNodeForTag(tagId, entityNodeId);
   }
 
   /**
    * Unlink a tag from its entity node
    */
   async unlinkEntityNode(tagId: string): Promise<Tag> {
-    const tag = await this.getTagById(tagId);
-    if (!tag) {
-      throw new Error(`Tag not found: ${tagId}`);
-    }
-
-    const [updated] = await db
-      .update(tags)
-      .set({ entityNodeId: null, updatedAt: new Date() })
-      .where(eq(tags.id, tagId))
-      .returning();
-
-    return updated;
+    return unlinkEntityNodeForTag(tagId);
   }
 
   /**
@@ -349,56 +220,7 @@ export class TagService {
   async createEntityNode(
     tagId: string,
     parentId: string,
-  ): Promise<{ tag: Tag; node: typeof nodes.$inferSelect }> {
-    const tag = await this.getTagById(tagId);
-    if (!tag) {
-      throw new Error(`Tag not found: ${tagId}`);
-    }
-
-    if (!TagService.ENTITY_TYPES.includes(tag.type)) {
-      throw new Error(
-        `Only entity-type tags (character, location, event, concept) can have entity nodes`,
-      );
-    }
-
-    if (tag.entityNodeId) {
-      throw new Error(`Tag "${tag.name}" already has an entity node`);
-    }
-
-    // Verify parent exists
-    const [parent] = await db
-      .select()
-      .from(nodes)
-      .where(eq(nodes.id, parentId));
-    if (!parent) {
-      throw new Error(`Parent node not found: ${parentId}`);
-    }
-
-    // Create the entity node as a note
-    const slug = tag.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    const [entityNode] = await db
-      .insert(nodes)
-      .values({
-        type: "note",
-        name: tag.name,
-        parentId,
-        slug,
-        content: {},
-        metadata: { entityTagId: tagId, entityType: tag.type },
-        authorType: "human",
-        position: 0,
-        createdBy: "user:system",
-        updatedBy: "user:system",
-      })
-      .returning();
-
-    // Link the tag to the new node
-    const [updatedTag] = await db
-      .update(tags)
-      .set({ entityNodeId: entityNode.id, updatedAt: new Date() })
-      .where(eq(tags.id, tagId))
-      .returning();
-
-    return { tag: updatedTag, node: entityNode };
+  ): Promise<{ tag: Tag; node: Node }> {
+    return createEntityNodeForTag(tagId, parentId);
   }
 }

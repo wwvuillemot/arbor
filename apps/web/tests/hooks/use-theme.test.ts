@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useTheme } from "../../src/hooks/use-theme";
-import type { useAppPreferences } from "../../src/hooks/use-app-preferences";
 
-// Create a mock function that we can control
-const mockGetPreference = vi.fn((key: string, defaultValue?: any) => {
+function resolvePreferenceValue(key: string, defaultValue?: unknown): unknown {
   if (key === "theme") return "light";
   return defaultValue;
-});
+}
+
+// Create a mock function that we can control
+const mockGetPreference = vi.fn(resolvePreferenceValue);
 const mockSetPreference = vi.fn();
 
 // Mock the useAppPreferences hook
@@ -29,10 +30,7 @@ describe("useTheme", () => {
     localStorage.clear();
     // Reset mocks
     vi.clearAllMocks();
-    mockGetPreference.mockImplementation((key: string, defaultValue?: any) => {
-      if (key === "theme") return "light";
-      return defaultValue;
-    });
+    mockGetPreference.mockImplementation(resolvePreferenceValue);
   });
 
   it("should return current theme from preferences", () => {
@@ -43,7 +41,9 @@ describe("useTheme", () => {
 
   it("should default to system theme if no preference is set", () => {
     mockGetPreference.mockImplementation(
-      (key: string, defaultValue?: any) => defaultValue,
+      (_key: string, defaultValue?: unknown) => {
+        return defaultValue;
+      },
     );
 
     const { result } = renderHook(() => useTheme());
@@ -68,10 +68,12 @@ describe("useTheme", () => {
   });
 
   it("should apply dark class to document when theme is dark", async () => {
-    mockGetPreference.mockImplementation((key: string, defaultValue?: any) => {
-      if (key === "theme") return "dark";
-      return defaultValue;
-    });
+    mockGetPreference.mockImplementation(
+      (key: string, defaultValue?: unknown) => {
+        if (key === "theme") return "dark";
+        return defaultValue;
+      },
+    );
 
     renderHook(() => useTheme());
 
@@ -83,10 +85,12 @@ describe("useTheme", () => {
   it("should remove dark class when theme is light", async () => {
     document.documentElement.classList.add("dark");
 
-    mockGetPreference.mockImplementation((key: string, defaultValue?: any) => {
-      if (key === "theme") return "light";
-      return defaultValue;
-    });
+    mockGetPreference.mockImplementation(
+      (key: string, defaultValue?: unknown) => {
+        if (key === "theme") return "light";
+        return defaultValue;
+      },
+    );
 
     renderHook(() => useTheme());
 
@@ -113,10 +117,12 @@ describe("useTheme", () => {
       value: mockMatchMedia,
     });
 
-    mockGetPreference.mockImplementation((key: string, defaultValue?: any) => {
-      if (key === "theme") return "system";
-      return defaultValue;
-    });
+    mockGetPreference.mockImplementation(
+      (key: string, defaultValue?: unknown) => {
+        if (key === "theme") return "system";
+        return defaultValue;
+      },
+    );
 
     renderHook(() => useTheme());
 
@@ -126,7 +132,7 @@ describe("useTheme", () => {
   });
 
   it("should return resolvedTheme (actual applied theme)", async () => {
-    mockGetPreference.mockImplementation((key: string, defaultValue?: any) => {
+    mockGetPreference.mockImplementation(<T>(key: string, defaultValue?: T) => {
       if (key === "theme") return "dark";
       return defaultValue;
     });

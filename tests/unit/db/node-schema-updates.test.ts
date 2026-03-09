@@ -14,6 +14,18 @@ import { getTestDb } from "@tests/helpers/db";
 import { nodes } from "@server/db/schema";
 import { eq } from "drizzle-orm";
 
+interface StructuredNodeContent {
+  type: string;
+  content: Array<{ type: string }>;
+}
+
+interface NodeMetadataValue {
+  tags: string[];
+  wordCount: number;
+  readingTime: number;
+  customField: string;
+}
+
 describe("Phase 0.2: Node Schema Updates", () => {
   let testProjectId: string;
   const db = getTestDb();
@@ -62,8 +74,9 @@ describe("Phase 0.2: Node Schema Updates", () => {
         .returning();
 
       expect(node.content).toBeDefined();
-      expect(node.content.type).toBe("doc");
-      expect(node.content.content[0].type).toBe("paragraph");
+      const storedContent = node.content as StructuredNodeContent;
+      expect(storedContent.type).toBe("doc");
+      expect(storedContent.content[0].type).toBe("paragraph");
 
       // Cleanup
       await db.delete(nodes).where(eq(nodes.id, node.id));
@@ -246,8 +259,9 @@ describe("Phase 0.2: Node Schema Updates", () => {
         .returning();
 
       expect(node.metadata).toEqual(metadata);
-      expect(node.metadata.tags).toContain("important");
-      expect(node.metadata.wordCount).toBe(1500);
+      const storedMetadata = node.metadata as NodeMetadataValue;
+      expect(storedMetadata.tags).toContain("important");
+      expect(storedMetadata.wordCount).toBe(1500);
 
       // Cleanup
       await db.delete(nodes).where(eq(nodes.id, node.id));

@@ -16,8 +16,8 @@ export interface AgentModeConfig {
   guidelines: string;
   temperature: number;
   isBuiltIn: boolean;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export function AgentModeManager() {

@@ -7,8 +7,7 @@ import {
   createTestFolder,
 } from "@tests/helpers/fixtures";
 import { getTestDb } from "@tests/helpers/db";
-import { nodes, tags, nodeTags } from "@server/db/schema";
-import { eq } from "drizzle-orm";
+import { tags, nodeTags } from "@server/db/schema";
 
 let ragService: RAGService;
 let provider: LocalEmbeddingProvider;

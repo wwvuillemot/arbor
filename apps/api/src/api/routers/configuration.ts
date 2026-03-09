@@ -1,16 +1,11 @@
-import { z } from "zod";
 import { router, publicProcedure } from "../trpc";
 import { ConfigurationService } from "../../services/configuration-service";
+import {
+  configurationKeyInputSchema,
+  setConfigurationInputSchema,
+} from "./configuration-router-helpers";
 
 const configurationService = new ConfigurationService();
-
-// Valid configuration keys
-const configKeySchema = z.enum([
-  "DATABASE_URL",
-  "REDIS_URL",
-  "API_URL",
-  "OLLAMA_BASE_URL",
-]);
 
 export const configurationRouter = router({
   /**
@@ -18,11 +13,7 @@ export const configurationRouter = router({
    * Returns the stored value if it exists, otherwise returns the default
    */
   getConfiguration: publicProcedure
-    .input(
-      z.object({
-        key: configKeySchema,
-      }),
-    )
+    .input(configurationKeyInputSchema)
     .query(async ({ input }) => {
       return await configurationService.getConfiguration(input.key);
     }),
@@ -32,12 +23,7 @@ export const configurationRouter = router({
    * Creates a new entry or updates an existing one
    */
   setConfiguration: publicProcedure
-    .input(
-      z.object({
-        key: configKeySchema,
-        value: z.string(),
-      }),
-    )
+    .input(setConfigurationInputSchema)
     .mutation(async ({ input }) => {
       await configurationService.setConfiguration(input.key, input.value);
     }),
@@ -55,11 +41,7 @@ export const configurationRouter = router({
    * Deletes the stored value so the default will be used
    */
   resetConfiguration: publicProcedure
-    .input(
-      z.object({
-        key: configKeySchema,
-      }),
-    )
+    .input(configurationKeyInputSchema)
     .mutation(async ({ input }) => {
       await configurationService.resetConfiguration(input.key);
     }),
@@ -69,11 +51,7 @@ export const configurationRouter = router({
    * Returns true if the value differs from the default
    */
   isCustomized: publicProcedure
-    .input(
-      z.object({
-        key: configKeySchema,
-      }),
-    )
+    .input(configurationKeyInputSchema)
     .query(async ({ input }) => {
       return await configurationService.isCustomized(input.key);
     }),

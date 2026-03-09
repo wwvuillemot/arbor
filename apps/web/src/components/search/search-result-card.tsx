@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { extractHeroImage, tiptapToMarkdown } from "@/lib/tiptap-utils";
+import { HeroGradient } from "@/components/hero-gradient";
 
 export interface TagInfo {
   id: string;
@@ -89,11 +90,13 @@ export function SearchResultCard({
     });
   }, [result.updatedAt]);
 
+  const tags = result.tags ?? [];
+
   return (
     <button
       onClick={onClick}
       className={cn(
-        "w-full text-left border rounded-xl overflow-hidden",
+        "flex flex-col w-full text-left border rounded-xl overflow-hidden p-0",
         "hover:border-accent hover:shadow-md transition-all duration-150",
         "focus:outline-none focus:ring-2 focus:ring-ring",
         "bg-card",
@@ -101,13 +104,14 @@ export function SearchResultCard({
       )}
       data-testid="search-result-card"
     >
-      {/* Hero image */}
-      {heroImage && (
-        <div className="w-full h-32 overflow-hidden border-b">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={heroImage} alt="" className="w-full h-full object-cover" />
-        </div>
-      )}
+      {/* Hero image / gradient */}
+      <div className="w-full h-32 border-b">
+        <HeroGradient
+          seed={result.name}
+          imageUrl={heroImage}
+          className="w-full h-full"
+        />
+      </div>
 
       <div className="p-3 space-y-2">
         {/* Header: icon + type + title */}
@@ -143,9 +147,9 @@ export function SearchResultCard({
         </div>
 
         {/* Tags */}
-        {(result.tags ?? []).length > 0 && (
+        {tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {(result.tags ?? []).slice(0, 5).map((tag) => (
+            {tags.slice(0, 3).map((tag) => (
               <span
                 key={tag.id}
                 className="text-[10px] px-1.5 py-0.5 rounded-full border font-medium"
@@ -162,9 +166,9 @@ export function SearchResultCard({
                 {tag.name}
               </span>
             ))}
-            {(result.tags ?? []).length > 5 && (
+            {tags.length > 3 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                +{result.tags.length - 5}
+                +{tags.length - 3}
               </span>
             )}
           </div>

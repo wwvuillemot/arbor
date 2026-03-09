@@ -1,6 +1,6 @@
 # Makefile for Arbor Web App (Next.js)
 
-.PHONY: help setup install dev build start clean test lint format coverage up down restart nuke
+.PHONY: help setup install dev build start clean test lint lint-fix typecheck format coverage up down restart nuke
 
 help:
 	@echo "========================================="
@@ -20,6 +20,7 @@ help:
 	@echo "  make test       - Run tests"
 	@echo "  make coverage   - Run tests with coverage"
 	@echo "  make lint       - Run linter"
+	@echo "  make typecheck  - Run type checker"
 	@echo "  make format     - Format code (auto-fix)"
 	@echo "  make clean      - Clean build artifacts"
 	@echo ""
@@ -75,11 +76,15 @@ coverage:
 
 lint:
 	@echo "Running linter..."
-	@cd ../.. && pnpm run lint
+	@cd ../.. && pnpm run lint:web
 
 lint-fix:
 	@echo "Running linter with auto-fix..."
-	@cd ../.. && pnpm run lint:fix
+	@cd ../.. && pnpm run lint:web -- --fix
+
+typecheck:
+	@echo "Running type checker..."
+	@cd ../.. && pnpm run typecheck:web
 
 format:
 	@echo "Formatting code..."

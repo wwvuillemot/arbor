@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useTranslations } from "next-intl";
 import { ImagePlus, Loader2 } from "lucide-react";
+import { arrayBufferToBase64 } from "@/lib/base64";
 
 const ACCEPTED_IMAGE_TYPES = [
   "image/png",
@@ -17,7 +18,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 interface ImageUploadProps {
   nodeId: string;
   projectId: string;
-  onUploadComplete: (attachmentId: string, downloadUrl: string) => void;
+  onUploadComplete: (attachmentId: string) => void;
   onUploadError?: (error: string) => void;
   onUpload: (params: {
     nodeId: string;
@@ -26,7 +27,6 @@ interface ImageUploadProps {
     mimeType: string;
     data: string;
   }) => Promise<{ id: string }>;
-  onGetDownloadUrl: (params: { id: string }) => Promise<{ url: string }>;
   isUploading?: boolean;
 }
 
@@ -36,7 +36,6 @@ export function ImageUpload({
   onUploadComplete,
   onUploadError,
   onUpload,
-  onGetDownloadUrl,
   isUploading = false,
 }: ImageUploadProps) {
   const t = useTranslations("editor");
@@ -65,15 +64,8 @@ export function ImageUpload({
       }
 
       try {
-        // Convert to base64 using chunked approach to avoid call stack overflow
         const arrayBuffer = await file.arrayBuffer();
-        const bytes = new Uint8Array(arrayBuffer);
-        const CHUNK = 8192;
-        let binary = "";
-        for (let i = 0; i < bytes.length; i += CHUNK) {
-          binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-        }
-        const base64 = btoa(binary);
+        const base64 = arrayBufferToBase64(arrayBuffer);
 
         // Upload via tRPC
         const attachment = await onUpload({
@@ -84,9 +76,7 @@ export function ImageUpload({
           data: base64,
         });
 
-        // Get download URL
-        const { url } = await onGetDownloadUrl({ id: attachment.id });
-        onUploadComplete(attachment.id, url);
+        onUploadComplete(attachment.id);
       } catch (error) {
         const message =
           error instanceof Error
@@ -100,7 +90,6 @@ export function ImageUpload({
       projectId,
       validateFile,
       onUpload,
-      onGetDownloadUrl,
       onUploadComplete,
       onUploadError,
       t,

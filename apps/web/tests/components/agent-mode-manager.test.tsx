@@ -1,8 +1,16 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { AgentModeManager } from "@/components/agent-mode-manager";
+import {
+  AgentModeManager,
+  type AgentModeConfig,
+} from "@/components/agent-mode-manager";
 import * as trpcModule from "@/lib/trpc";
+
+interface MockAgentModeDialogProps {
+  open: boolean;
+  onClose: (saved: boolean) => void;
+}
 
 // Mock next-intl
 vi.mock("next-intl", () => ({
@@ -11,7 +19,7 @@ vi.mock("next-intl", () => ({
 
 // Mock AgentModeDialog
 vi.mock("@/components/agent-mode-dialog", () => ({
-  AgentModeDialog: ({ open, onClose }: any) =>
+  AgentModeDialog: ({ open, onClose }: MockAgentModeDialogProps) =>
     open ? (
       <div data-testid="agent-mode-dialog">
         <button onClick={() => onClose(false)}>Cancel</button>
@@ -21,7 +29,9 @@ vi.mock("@/components/agent-mode-dialog", () => ({
 }));
 
 describe("AgentModeManager", () => {
-  const mockModes = [
+  const isoTimestamp = new Date().toISOString();
+
+  const mockModes: AgentModeConfig[] = [
     {
       id: "1",
       name: "assistant",
@@ -31,8 +41,8 @@ describe("AgentModeManager", () => {
       guidelines: "Be helpful",
       temperature: 0.7,
       isBuiltIn: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: isoTimestamp,
+      updatedAt: isoTimestamp,
     },
     {
       id: "2",
@@ -43,8 +53,8 @@ describe("AgentModeManager", () => {
       guidelines: "Custom guidelines",
       temperature: 0.5,
       isBuiltIn: false,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: isoTimestamp,
+      updatedAt: isoTimestamp,
     },
   ];
 
@@ -69,7 +79,7 @@ describe("AgentModeManager", () => {
           })),
         },
       },
-    } as any);
+    } as unknown as typeof trpcModule.trpc);
   });
 
   it("should render loading state", () => {
@@ -88,7 +98,7 @@ describe("AgentModeManager", () => {
           })),
         },
       },
-    } as any);
+    } as unknown as typeof trpcModule.trpc);
 
     render(<AgentModeManager />);
     expect(screen.getByText("loading")).toBeInTheDocument();

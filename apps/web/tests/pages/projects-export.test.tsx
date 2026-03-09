@@ -13,6 +13,16 @@ import {
   act,
 } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { FileTreeHandle } from "@/components/file-tree";
+import { getMediaAttachmentUrl } from "@/lib/media-url";
+
+interface MockTiptapEditorProps {
+  [key: string]: unknown;
+}
+
+interface MockFileTreeProps {
+  onSelectNode: (id: string) => void;
+}
 
 const {
   currentProjectState,
@@ -34,10 +44,11 @@ const {
   mockInvalidateGetChildren,
   mockInvalidateGetDescendants,
   folderChildrenData,
+  projectImagesData,
   selectedNodeData,
 } = vi.hoisted(() => ({
   currentProjectState: { value: "proj-1" as string | null },
-  mockSearchParamGet: vi.fn(() => null),
+  mockSearchParamGet: vi.fn((_key: string): string | null => null),
   mockPush: vi.fn(),
   mockAddToast: vi.fn(),
   mockSetCurrentProject: vi.fn(),
@@ -59,6 +70,11 @@ const {
   mockInvalidateGetChildren: vi.fn(),
   mockInvalidateGetDescendants: vi.fn(),
   folderChildrenData: [] as Array<Record<string, unknown>>,
+  projectImagesData: [] as Array<{
+    id: string;
+    filename: string;
+    mimeType: string;
+  }>,
   selectedNodeData: {
     id: "node-1",
     name: "Test Note",
@@ -119,9 +135,21 @@ vi.mock("@/hooks/use-auto-save", () => ({
 
 // Mock TipTap editor components
 vi.mock("@/components/editor", () => ({
-  TiptapEditor: (props: any) => {
+  TiptapEditor: (props: MockTiptapEditorProps) => {
     mockTiptapEditor(props);
-    return <div data-testid="tiptap-editor" />;
+    const { onInsertImage } = props as { onInsertImage?: () => void };
+    return (
+      <>
+        <div data-testid="tiptap-editor" />
+        <button
+          type="button"
+          data-testid="tiptap-editor-insert-image"
+          onClick={() => onInsertImage?.()}
+        >
+          Open image dialog
+        </button>
+      </>
+    );
   },
   ImageUpload: () => null,
   LinkPickerDialog: () => null,
@@ -149,22 +177,43 @@ vi.mock("@/components/chat", () => ({
   ChatSidebar: () => <div data-testid="chat-sidebar" />,
 }));
 
+vi.mock("@/app/[locale]/(app)/projects/projects-import-directory", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/app/[locale]/(app)/projects/projects-import-directory")
+  >("@/app/[locale]/(app)/projects/projects-import-directory");
+
+  return {
+    ...actual,
+    prepareImportDirectoryWorkflow: vi.fn(
+      actual.prepareImportDirectoryWorkflow,
+    ),
+  };
+});
+
 // Mock FileTree component - calls onSelectNode on mount to simulate selecting a node
 vi.mock("@/components/file-tree", () => ({
-  FileTree: React.forwardRef(
-    ({ onSelectNode }: { onSelectNode: (id: string) => void }, _ref: any) => {
+  FileTree: React.forwardRef<FileTreeHandle, MockFileTreeProps>(
+    function MockFileTree(
+      { onSelectNode },
+      _ref: React.ForwardedRef<FileTreeHandle>,
+    ) {
       React.useEffect(() => {
         onSelectNode("node-1");
       }, [onSelectNode]);
+
       return <div data-testid="file-tree" />;
     },
   ),
-  CreateNodeDialog: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="create-node-dialog" /> : null,
-  RenameDialog: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="rename-dialog" /> : null,
-  NodeContextMenu: ({ open }: { open: boolean }) =>
-    open ? <div data-testid="context-menu" /> : null,
+  CreateNodeDialog: function MockCreateNodeDialog({ open }: { open: boolean }) {
+    return open ? <div data-testid="create-node-dialog" /> : null;
+  },
+  RenameDialog: function MockRenameDialog({ open }: { open: boolean }) {
+    return open ? <div data-testid="rename-dialog" /> : null;
+  },
+  NodeContextMenu: function MockNodeContextMenu({ open }: { open: boolean }) {
+    return open ? <div data-testid="context-menu" /> : null;
+  },
+  BulkTagBar: () => null,
 }));
 
 // Mock tRPC
@@ -241,6 +290,10 @@ vi.mock("@/lib/trpc", () => {
           makeMutation({ mutateAsync: mockImportDirectoryMutateAsync }),
         ),
       },
+      toggleFavorite: { useMutation: vi.fn(() => makeMutation()) },
+      getFavorites: {
+        useQuery: vi.fn(() => ({ data: [], isLoading: false, error: null })),
+      },
     },
     tags: {
       getNodesByTags: {
@@ -250,6 +303,8 @@ vi.mock("@/lib/trpc", () => {
           error: null,
         })),
       },
+      bulkAddToNodes: { useMutation: vi.fn(() => makeMutation()) },
+      bulkRemoveFromNodes: { useMutation: vi.fn(() => makeMutation()) },
     },
     search: {
       keywordSearch: {
@@ -263,7 +318,7 @@ vi.mock("@/lib/trpc", () => {
     media: {
       getByProject: {
         useQuery: vi.fn(() => ({
-          data: [],
+          data: projectImagesData,
           isLoading: false,
           error: null,
         })),
@@ -272,6 +327,10 @@ vi.mock("@/lib/trpc", () => {
         useMutation: vi.fn(() =>
           makeMutation({ mutateAsync: mockMediaUploadMutateAsync }),
         ),
+      },
+      generateImage: { useMutation: vi.fn(() => makeMutation()) },
+      getFirstImageByNodes: {
+        useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
       },
     },
     preferences: {
@@ -292,6 +351,13 @@ vi.mock("@/lib/trpc", () => {
       setAppPreference: { useMutation: vi.fn(() => makeMutation()) },
       setAppPreferences: { useMutation: vi.fn(() => makeMutation()) },
       deleteAppPreference: { useMutation: vi.fn(() => makeMutation()) },
+      getMasterKey: {
+        useQuery: vi.fn(() => ({
+          data: { masterKey: null },
+          isLoading: false,
+          error: null,
+        })),
+      },
     },
     useUtils: vi.fn(() => ({
       nodes: {
@@ -304,6 +370,7 @@ vi.mock("@/lib/trpc", () => {
           fetch: mockGetByIdFetch,
         },
         getChildren: { invalidate: mockInvalidateGetChildren },
+        getFavorites: { invalidate: vi.fn() },
         getDescendants: {
           fetch: mockGetDescendantsFetch,
           invalidate: mockInvalidateGetDescendants,
@@ -318,6 +385,9 @@ vi.mock("@/lib/trpc", () => {
             .mockResolvedValue({ url: "https://minio.test/img.png" }),
         },
       },
+      tags: {
+        getNodeTags: { invalidate: vi.fn() },
+      },
       preferences: {
         getAllAppPreferences: {
           invalidate: vi.fn(),
@@ -331,6 +401,7 @@ vi.mock("@/lib/trpc", () => {
 });
 
 // Import the page component AFTER mocks
+import * as projectsImportDirectory from "@/app/[locale]/(app)/projects/projects-import-directory";
 import ProjectsPage from "@/app/[locale]/(app)/projects/page";
 
 function TestWrapper({ children }: { children: React.ReactNode }) {
@@ -349,7 +420,9 @@ describe("ProjectsPage Export", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     currentProjectState.value = "proj-1";
-    mockSearchParamGet.mockImplementation(() => null);
+    mockSearchParamGet.mockImplementation(
+      (_key: string): string | null => null,
+    );
     mockCreateProjectMutate.mockReset();
     selectedNodeData.name = "Test Note";
     selectedNodeData.id = "node-1";
@@ -357,6 +430,7 @@ describe("ProjectsPage Export", () => {
     selectedNodeData.parentId = "proj-1";
     selectedNodeData.content = null;
     folderChildrenData.length = 0;
+    projectImagesData.length = 0;
     mockImportDirectoryMutateAsync.mockReset();
     mockImportDirectoryMutateAsync.mockResolvedValue({});
     mockUpdateNodeMutateAsync.mockReset();
@@ -404,6 +478,30 @@ describe("ProjectsPage Export", () => {
     );
     expect(screen.getByText("Scene One")).toBeInTheDocument();
     expect(screen.getByText("Scene Two")).toBeInTheDocument();
+  });
+
+  it("should render image thumbnails in the existing image picker tab", async () => {
+    projectImagesData.push({
+      id: "media-existing-1",
+      filename: "castle-map.png",
+      mimeType: "image/png",
+    });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    fireEvent.click(screen.getByTestId("tiptap-editor-insert-image"));
+    expect(screen.getByTestId("image-upload-modal")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("imageUpload.tabExisting"));
+
+    const existingImageThumbnail = await screen.findByRole("img", {
+      name: "castle-map.png",
+    });
+
+    expect(existingImageThumbnail).toHaveAttribute(
+      "src",
+      getMediaAttachmentUrl("media-existing-1"),
+    );
   });
 
   it("should render export button when a node is selected", async () => {
@@ -538,15 +636,33 @@ describe("ProjectsPage Export", () => {
 
   it("should call exportHtml and open print window for PDF export", async () => {
     const mockPrint = vi.fn();
-    const mockClose = vi.fn();
-    const mockWrite = vi.fn();
+    const mockFocus = vi.fn();
+    const mockAddEventListener = vi.fn(
+      (eventName: string, listener: EventListenerOrEventListenerObject) => {
+        if (eventName === "load") {
+          if (typeof listener === "function") {
+            listener(new Event("load"));
+          } else {
+            listener.handleEvent(new Event("load"));
+          }
+        }
+      },
+    );
+    const mockRemoveEventListener = vi.fn();
     const mockWindowObj = {
-      document: { write: mockWrite, close: mockClose },
-      focus: vi.fn(),
+      addEventListener: mockAddEventListener,
+      removeEventListener: mockRemoveEventListener,
+      focus: mockFocus,
       print: mockPrint,
     };
     const originalOpen = window.open;
     const mockOpenFn = vi.fn().mockReturnValue(mockWindowObj);
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:test-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
     Object.defineProperty(window, "open", {
       value: mockOpenFn,
       writable: true,
@@ -568,8 +684,9 @@ describe("ProjectsPage Export", () => {
         id: "node-1",
         includeDescendants: false,
       });
-      expect(mockOpenFn).toHaveBeenCalledWith("", "_blank");
-      expect(mockWrite).toHaveBeenCalled();
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockOpenFn).toHaveBeenCalledWith("blob:test-url", "_blank");
+      expect(mockFocus).toHaveBeenCalled();
       expect(mockPrint).toHaveBeenCalled();
       expect(mockAddToast).toHaveBeenCalledWith("exportSuccess", "success");
     });
@@ -580,6 +697,8 @@ describe("ProjectsPage Export", () => {
       writable: true,
       configurable: true,
     });
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
   it("should show error toast when export fails", async () => {
@@ -846,7 +965,7 @@ describe("ProjectsPage Export", () => {
             {
               type: "image",
               attrs: {
-                src: "https://minio.test/img.png",
+                src: getMediaAttachmentUrl("media-1"),
                 alt: "Map",
                 title: null,
               },
@@ -875,7 +994,7 @@ describe("ProjectsPage Export", () => {
             {
               type: "image",
               attrs: {
-                src: "https://minio.test/img.png",
+                src: getMediaAttachmentUrl("media-1"),
                 alt: "Map",
                 title: null,
               },
@@ -994,7 +1113,7 @@ describe("ProjectsPage Export", () => {
               {
                 type: "image",
                 attrs: {
-                  src: "https://minio.test/img.png",
+                  src: getMediaAttachmentUrl("media-1"),
                   alt: "map",
                   title: null,
                 },
@@ -1181,6 +1300,77 @@ describe("ProjectsPage Export", () => {
     await waitFor(() => {
       expect(mockImportDirectoryMutateAsync).toHaveBeenCalledWith({
         projectName: "pathfinders",
+        parentNodeId: undefined,
+        files: expect.any(Array),
+      });
+    });
+
+    expect(mockSetCurrentProject).toHaveBeenCalledWith("proj-imported");
+  });
+
+  it("should prompt for a project name when importing loose files", async () => {
+    mockSearchParamGet.mockImplementation((key: string) =>
+      key === "list" ? "1" : null,
+    );
+    mockImportDirectoryMutateAsync.mockResolvedValueOnce({
+      imported: 2,
+      folders: 0,
+      projectId: "proj-imported",
+      importTargetNodeId: "proj-imported",
+      nodeMap: {
+        "alpha.md": "node-alpha",
+        "beta.md": "node-beta",
+      },
+    });
+    vi.mocked(
+      projectsImportDirectory.prepareImportDirectoryWorkflow,
+    ).mockResolvedValueOnce({
+      kind: "prompt-for-project-name",
+      initialProjectName: "",
+      createNewProject: true,
+      entries: [
+        { path: "alpha.md", content: { type: "doc", content: [] } },
+        { path: "beta.md", content: { type: "doc", content: [] } },
+      ],
+      imageFilesByNotePath: new Map(),
+    });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    const alphaMarkdownFile = new File(["# Alpha"], "alpha.md", {
+      type: "text/markdown",
+    });
+
+    const betaMarkdownFile = new File(["# Beta"], "beta.md", {
+      type: "text/markdown",
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByTestId("import-directory-input"), {
+        target: { files: [alphaMarkdownFile, betaMarkdownFile] },
+      });
+    });
+
+    await waitFor(() => {
+      expect(
+        projectsImportDirectory.prepareImportDirectoryWorkflow,
+      ).toHaveBeenCalledWith({
+        allFiles: [alphaMarkdownFile, betaMarkdownFile],
+        preferredProjectName: "",
+        createNewProject: true,
+      });
+    });
+
+    const projectNameInput = await screen.findByPlaceholderText("Project name");
+
+    fireEvent.change(projectNameInput, {
+      target: { value: "Loose Files Project" },
+    });
+    fireEvent.keyDown(projectNameInput, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(mockImportDirectoryMutateAsync).toHaveBeenCalledWith({
+        projectName: "Loose Files Project",
         parentNodeId: undefined,
         files: expect.any(Array),
       });

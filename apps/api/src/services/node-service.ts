@@ -1,24 +1,30 @@
 import { db } from "../db/index";
-import { nodes } from "../db/schema";
-import type { NodeType, AuthorType, ActorType } from "../db/schema";
-import { eq, isNull, and, sql } from "drizzle-orm";
+import { mediaAttachments, nodes } from "../db/schema";
+import type { NodeType, AuthorType, Node } from "../db/schema";
+import { eq, isNull, and, inArray, sql } from "drizzle-orm";
 import { ProvenanceService } from "./provenance-service";
+import {
+  recordNodeCreated,
+  recordNodeDeleted,
+  recordNodeMoved,
+  recordNodeUpdated,
+} from "./node-service-provenance";
+import {
+  createNodeRecord,
+  getUpdatedFieldNames,
+  moveNodeRecord,
+  reorderNodeChildren,
+  updateNodeRecord,
+  validateCreateNodeParams,
+  validateMoveNode,
+} from "./node-service-mutations";
+import {
+  deepCopyNodeTree,
+  getNodeDescendants,
+  resolveProjectIdForNode,
+} from "./node-service-tree";
 
 const provenanceService = new ProvenanceService();
-
-/**
- * Parse a provenance string ("user:{id}" or "llm:{model}") into actor type and ID.
- */
-function parseProvenance(provenance?: string): {
-  actorType: ActorType;
-  actorId: string;
-} {
-  if (!provenance) return { actorType: "user", actorId: "user:system" };
-  if (provenance.startsWith("llm:")) {
-    return { actorType: "llm", actorId: provenance };
-  }
-  return { actorType: "user", actorId: provenance };
-}
 
 export interface CreateNodeParams {
   type: NodeType;
@@ -27,6 +33,7 @@ export interface CreateNodeParams {
   slug?: string;
   content?: any; // JSONB content (can be object, string, or null)
   metadata?: Record<string, any>;
+  summary?: string | null;
   authorType?: AuthorType; // DEPRECATED: Use createdBy/updatedBy instead
   position?: number; // Position for ordering siblings
   createdBy?: string; // Provenance: "user:{id}" or "llm:{model}"
@@ -38,6 +45,7 @@ export interface UpdateNodeParams {
   slug?: string;
   content?: any; // JSONB content (can be object, string, or null)
   metadata?: Record<string, any>;
+  summary?: string | null;
   authorType?: AuthorType; // DEPRECATED: Use updatedBy instead
   position?: number; // Position for ordering siblings
   updatedBy?: string; // Provenance: "user:{id}" or "llm:{model}"
@@ -47,49 +55,17 @@ export class NodeService {
   /**
    * Create a new node with validation
    */
-  async createNode(params: CreateNodeParams) {
-    // Validation: Projects cannot have a parent
-    if (params.type === "project" && params.parentId) {
-      throw new Error("Projects cannot have a parent");
-    }
+  async createNode(params: CreateNodeParams): Promise<Node> {
+    validateCreateNodeParams(params);
 
-    // Validation: Only projects can be top-level nodes
-    if (params.type !== "project" && !params.parentId) {
-      throw new Error("Only projects can be top-level nodes");
-    }
-
-    // Auto-generate slug if not provided
-    const slug = params.slug || this.generateSlug(params.name);
-
-    const [node] = await db
-      .insert(nodes)
-      .values({
-        type: params.type,
-        name: params.name,
-        parentId: params.parentId || null,
-        slug,
-        content: params.content,
-        metadata: params.metadata || {},
-        authorType: params.authorType || "human", // DEPRECATED
-        position: params.position ?? 0, // Default to 0 if not provided
-        createdBy: params.createdBy || "user:system", // Default to user:system
-        updatedBy: params.updatedBy || "user:system", // Default to user:system
-      })
-      .returning();
+    const node = await createNodeRecord(params);
 
     // Record provenance
-    const { actorType, actorId } = parseProvenance(
+    await recordNodeCreated(
+      provenanceService,
+      node,
       params.createdBy || params.updatedBy,
     );
-    await provenanceService.recordChange({
-      nodeId: node.id,
-      actorType,
-      actorId,
-      action: "create",
-      contentBefore: null,
-      contentAfter: node.content,
-      metadata: { name: node.name, type: node.type },
-    });
 
     return node;
   }
@@ -97,7 +73,7 @@ export class NodeService {
   /**
    * Get a node by ID
    */
-  async getNodeById(id: string) {
+  async getNodeById(id: string): Promise<Node | null> {
     const [node] = await db.select().from(nodes).where(eq(nodes.id, id));
 
     return node || null;
@@ -106,7 +82,7 @@ export class NodeService {
   /**
    * Get all children of a node, ordered by position
    */
-  async getNodesByParentId(parentId: string) {
+  async getNodesByParentId(parentId: string): Promise<Node[]> {
     return await db
       .select()
       .from(nodes)
@@ -117,7 +93,7 @@ export class NodeService {
   /**
    * Get all top-level projects
    */
-  async getAllProjects() {
+  async getAllProjects(): Promise<Node[]> {
     return await db
       .select()
       .from(nodes)
@@ -128,67 +104,30 @@ export class NodeService {
   /**
    * Resolve the top-level project ID for any node in a project tree.
    */
-  async getProjectIdForNode(nodeId: string) {
-    let currentNode = await this.getNodeById(nodeId);
-
-    if (!currentNode) {
-      throw new Error("Node not found");
-    }
-
-    while (currentNode.parentId) {
-      const parentNode = await this.getNodeById(currentNode.parentId);
-
-      if (!parentNode) {
-        throw new Error("Parent node not found");
-      }
-
-      currentNode = parentNode;
-    }
-
-    if (currentNode.type !== "project") {
-      throw new Error("Top-level node is not a project");
-    }
-
-    return currentNode.id;
+  async getProjectIdForNode(nodeId: string): Promise<string> {
+    return resolveProjectIdForNode(this, nodeId);
   }
 
   /**
    * Update a node
    */
-  async updateNode(id: string, updates: UpdateNodeParams) {
+  async updateNode(id: string, updates: UpdateNodeParams): Promise<Node> {
     // Check if node exists
     const existing = await this.getNodeById(id);
     if (!existing) {
       throw new Error("Node not found");
     }
 
-    const contentBefore = existing.content;
-
-    const [updated] = await db
-      .update(nodes)
-      .set({
-        ...updates,
-        updatedAt: new Date(),
-        // If updatedBy is not provided, keep the existing value
-        // (don't override with default)
-      })
-      .where(eq(nodes.id, id))
-      .returning();
+    const updated = await updateNodeRecord(id, updates);
 
     // Record provenance for content or name changes
-    const { actorType, actorId } = parseProvenance(
-      updates.updatedBy || existing.updatedBy,
-    );
-    await provenanceService.recordChange({
+    await recordNodeUpdated({
+      provenanceService,
       nodeId: id,
-      actorType,
-      actorId,
-      action: "update",
-      contentBefore,
-      contentAfter: updated.content,
-      metadata: {
-        updatedFields: Object.keys(updates).filter((k) => k !== "updatedBy"),
-      },
+      previousNode: existing,
+      updatedNode: updated,
+      updatedBy: updates.updatedBy,
+      updatedFieldNames: getUpdatedFieldNames(updates),
     });
 
     return updated;
@@ -196,27 +135,101 @@ export class NodeService {
 
   /**
    * Delete a node (cascade delete handled by database).
+   * Preserves media attachments that are still referenced elsewhere in the
+   * same project so stable /media/:id URLs do not break.
    * Optionally accepts deletedBy for provenance tracking.
    */
   async deleteNode(id: string, deletedBy?: string) {
     // Capture content before deletion for provenance
     const existing = await this.getNodeById(id);
     if (existing) {
-      const { actorType, actorId } = parseProvenance(
-        deletedBy || existing.updatedBy,
-      );
-      await provenanceService.recordChange({
-        nodeId: id,
-        actorType,
-        actorId,
-        action: "delete",
-        contentBefore: existing.content,
-        contentAfter: null,
-        metadata: { name: existing.name, type: existing.type },
+      await recordNodeDeleted({
+        provenanceService,
+        node: existing,
+        deletedBy,
       });
+
+      await this.preserveReferencedAttachmentsBeforeDelete(existing);
     }
 
     await db.delete(nodes).where(eq(nodes.id, id));
+  }
+
+  private async preserveReferencedAttachmentsBeforeDelete(
+    nodeToDelete: Node,
+  ): Promise<void> {
+    if (nodeToDelete.type === "project") {
+      return;
+    }
+
+    const descendantNodes = await this.getDescendants(nodeToDelete.id);
+    const subtreeNodes = [nodeToDelete, ...descendantNodes];
+    const subtreeNodeIds = subtreeNodes.map((subtreeNode) => subtreeNode.id);
+
+    const attachmentsInSubtree = await db
+      .select()
+      .from(mediaAttachments)
+      .where(inArray(mediaAttachments.nodeId, subtreeNodeIds));
+
+    if (attachmentsInSubtree.length === 0) {
+      return;
+    }
+
+    const projectId = await this.getProjectIdForNode(nodeToDelete.id);
+    const projectNode = await this.getNodeById(projectId);
+
+    if (!projectNode) {
+      throw new Error("Project node not found");
+    }
+
+    const subtreeNodeIdSet = new Set(subtreeNodeIds);
+    const projectDescendants = await this.getDescendants(projectId);
+    const externalNodes = [projectNode, ...projectDescendants].filter(
+      (projectScopedNode) => !subtreeNodeIdSet.has(projectScopedNode.id),
+    );
+
+    if (externalNodes.length === 0) {
+      return;
+    }
+
+    const attachmentIdsToPreserve = this.collectReferencedAttachmentIds({
+      attachmentsInSubtree,
+      externalNodes,
+    });
+
+    if (attachmentIdsToPreserve.length === 0) {
+      return;
+    }
+
+    await db
+      .update(mediaAttachments)
+      .set({ nodeId: projectId })
+      .where(inArray(mediaAttachments.id, attachmentIdsToPreserve));
+  }
+
+  private collectReferencedAttachmentIds({
+    attachmentsInSubtree,
+    externalNodes,
+  }: {
+    attachmentsInSubtree: Array<{ id: string }>;
+    externalNodes: Node[];
+  }): string[] {
+    const externallyReferencedAttachmentIds = new Set<string>();
+
+    for (const externalNode of externalNodes) {
+      if (externalNode.content == null) {
+        continue;
+      }
+
+      const serializedContent = JSON.stringify(externalNode.content);
+      for (const attachment of attachmentsInSubtree) {
+        if (serializedContent.includes(`/media/${attachment.id}`)) {
+          externallyReferencedAttachmentIds.add(attachment.id);
+        }
+      }
+    }
+
+    return [...externallyReferencedAttachmentIds];
   }
 
   /**
@@ -229,62 +242,20 @@ export class NodeService {
       throw new Error("Node not found");
     }
 
-    // Projects cannot be moved (they are always top-level)
-    if (node.type === "project") {
-      throw new Error("Projects cannot be moved");
-    }
-
-    // Check new parent exists
-    const newParent = await this.getNodeById(newParentId);
-    if (!newParent) {
-      throw new Error("Target parent not found");
-    }
-
-    // Check for circular reference: newParentId must not be a descendant of nodeId
-    const descendants = await this.getDescendantsInternal(nodeId);
-    const descendantIds = descendants.map((d) => d.id);
-    if (descendantIds.includes(newParentId)) {
-      throw new Error("Cannot move a node into its own descendant");
-    }
-
-    // Check depth limit: compute depth of newParentId from root
-    const parentDepth = await this.getNodeDepth(newParentId);
-    // The moved node (and any subtree) adds at least 1 more level
-    const maxSubtreeDepth = await this.getMaxSubtreeDepth(nodeId);
-    if (parentDepth + 1 + maxSubtreeDepth >= 10) {
-      throw new Error("Move would exceed maximum path depth of 10 levels");
-    }
-
-    const updateData: Record<string, any> = {
-      parentId: newParentId,
-      updatedAt: new Date(),
-    };
-    if (position !== undefined) {
-      updateData.position = position;
-    }
+    await validateMoveNode(this, node, newParentId);
 
     const oldParentId = node.parentId;
 
-    const [updated] = await db
-      .update(nodes)
-      .set(updateData)
-      .where(eq(nodes.id, nodeId))
-      .returning();
+    const updated = await moveNodeRecord(nodeId, newParentId, position);
 
     // Record provenance for move
-    const { actorType, actorId } = parseProvenance(node.updatedBy);
-    await provenanceService.recordChange({
-      nodeId,
-      actorType,
-      actorId,
-      action: "move",
-      contentBefore: node.content,
-      contentAfter: updated.content,
-      metadata: {
-        oldParentId,
-        newParentId,
-        position: position ?? updated.position,
-      },
+    await recordNodeMoved({
+      provenanceService,
+      previousNode: node,
+      updatedNode: updated,
+      oldParentId,
+      newParentId,
+      position,
     });
 
     return updated;
@@ -306,7 +277,7 @@ export class NodeService {
       throw new Error("Target parent not found");
     }
 
-    return this.deepCopyNode(sourceNode, targetParentId);
+    return deepCopyNodeTree(this, sourceNode, targetParentId);
   }
 
   /**
@@ -319,7 +290,138 @@ export class NodeService {
       throw new Error("Node not found");
     }
 
-    return this.getDescendantsInternal(nodeId, maxDepth);
+    return getNodeDescendants(this, nodeId, maxDepth);
+  }
+
+  /**
+   * Set or clear the hero image attachment for a node.
+   * Stores the attachment ID in metadata.heroAttachmentId.
+   */
+  async setHeroImage(
+    nodeId: string,
+    attachmentId: string | null,
+  ): Promise<Node> {
+    const node = await this.getNodeById(nodeId);
+    if (!node) {
+      throw new Error("Node not found");
+    }
+
+    const meta = (node.metadata as Record<string, unknown>) ?? {};
+
+    return this.updateNode(nodeId, {
+      metadata: { ...meta, heroAttachmentId: attachmentId },
+    });
+  }
+
+  /**
+   * Toggle the isFavorite flag in a node's metadata.
+   * Returns the updated node.
+   */
+  async toggleFavorite(nodeId: string): Promise<Node> {
+    const node = await this.getNodeById(nodeId);
+    if (!node) {
+      throw new Error("Node not found");
+    }
+
+    const meta = (node.metadata as Record<string, unknown>) ?? {};
+    const isFavorite = meta.isFavorite === true;
+
+    return this.updateNode(nodeId, {
+      metadata: { ...meta, isFavorite: !isFavorite },
+    });
+  }
+
+  /**
+   * Get all favorited nodes (metadata.isFavorite === true) that are
+   * descendants of the given project node.
+   */
+  async getFavoriteNodes(projectId: string): Promise<Node[]> {
+    const descendants = await this.getDescendants(projectId);
+    return descendants.filter(
+      (node) =>
+        (node.metadata as Record<string, unknown> | null)?.isFavorite === true,
+    );
+  }
+
+  /**
+   * Get all favorited nodes across all projects, each annotated with its
+   * top-level project ID (resolved via a single recursive CTE query).
+   */
+  async getAllFavoriteNodes(): Promise<
+    {
+      id: string;
+      name: string;
+      type: string;
+      content: unknown;
+      metadata: unknown;
+      updatedAt: Date;
+      projectId: string;
+      projectName: string;
+      firstMediaId: string | null;
+      tags: { id: string; name: string; color: string | null }[];
+    }[]
+  > {
+    const result = await db.execute(sql`
+      WITH RECURSIVE ancestor_chain AS (
+        SELECT id, parent_id, type, id AS favorite_id
+        FROM nodes
+        WHERE metadata->>'isFavorite' = 'true'
+
+        UNION ALL
+
+        SELECT n.id, n.parent_id, n.type, ac.favorite_id
+        FROM nodes n
+        JOIN ancestor_chain ac ON n.id = ac.parent_id
+        WHERE ac.type <> 'project'
+      ),
+      project_roots AS (
+        SELECT DISTINCT ON (favorite_id) favorite_id, id AS project_id
+        FROM ancestor_chain
+        WHERE type = 'project'
+      ),
+      first_media AS (
+        SELECT DISTINCT ON (node_id) node_id, id AS media_id
+        FROM media_attachments
+        WHERE mime_type LIKE 'image/%'
+        ORDER BY node_id, created_at ASC
+      )
+      SELECT
+        n.id, n.name, n.type, n.content, n.metadata, n.updated_at,
+        pr.project_id,
+        pn.name AS project_name,
+        fm.media_id AS first_media_id,
+        COALESCE(
+          json_agg(json_build_object('id', t.id, 'name', t.name, 'color', t.color))
+            FILTER (WHERE t.id IS NOT NULL),
+          '[]'
+        ) AS tags
+      FROM nodes n
+      JOIN project_roots pr ON pr.favorite_id = n.id
+      JOIN nodes pn ON pn.id = pr.project_id
+      LEFT JOIN first_media fm ON fm.node_id = n.id
+      LEFT JOIN node_tags nt ON nt.node_id = n.id
+      LEFT JOIN tags t ON t.id = nt.tag_id
+      GROUP BY n.id, pr.project_id, pn.name, fm.media_id
+      ORDER BY n.updated_at DESC
+    `);
+
+    return Array.from(result).map((r) => {
+      const row = r as Record<string, unknown>;
+      return {
+        id: row.id as string,
+        name: row.name as string,
+        type: row.type as string,
+        content: row.content,
+        metadata: row.metadata,
+        updatedAt: row.updated_at as Date,
+        projectId: row.project_id as string,
+        projectName: row.project_name as string,
+        firstMediaId: (row.first_media_id as string) ?? null,
+        tags:
+          (row.tags as { id: string; name: string; color: string | null }[]) ??
+          [],
+      };
+    });
   }
 
   /**
@@ -332,111 +434,6 @@ export class NodeService {
       throw new Error("Parent not found");
     }
 
-    // Update each child's position based on its index in the array
-    for (let i = 0; i < childIds.length; i++) {
-      await db
-        .update(nodes)
-        .set({ position: i, updatedAt: new Date() })
-        .where(eq(nodes.id, childIds[i]));
-    }
-  }
-
-  /**
-   * Generate a URL-friendly slug from a name
-   */
-  private generateSlug(name: string): string {
-    return name
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, "") // Remove special characters
-      .replace(/\s+/g, "-") // Replace spaces with hyphens
-      .replace(/-+/g, "-"); // Replace multiple hyphens with single hyphen
-  }
-
-  /**
-   * Internal: get descendants without existence check (used by moveNode)
-   */
-  private async getDescendantsInternal(
-    nodeId: string,
-    maxDepth?: number,
-    currentDepth = 0,
-  ): Promise<any[]> {
-    if (maxDepth !== undefined && currentDepth >= maxDepth) {
-      return [];
-    }
-
-    const children = await this.getNodesByParentId(nodeId);
-    const descendants = [...children];
-
-    for (const child of children) {
-      const childDescendants = await this.getDescendantsInternal(
-        child.id,
-        maxDepth,
-        currentDepth + 1,
-      );
-      descendants.push(...childDescendants);
-    }
-
-    return descendants;
-  }
-
-  /**
-   * Get the depth of a node from the root (project = 0)
-   */
-  private async getNodeDepth(nodeId: string): Promise<number> {
-    let depth = 0;
-    let currentNode = await this.getNodeById(nodeId);
-
-    while (currentNode && currentNode.parentId) {
-      depth++;
-      currentNode = await this.getNodeById(currentNode.parentId);
-    }
-
-    return depth;
-  }
-
-  /**
-   * Get the maximum depth of a node's subtree (0 for leaf nodes)
-   */
-  private async getMaxSubtreeDepth(nodeId: string): Promise<number> {
-    const children = await this.getNodesByParentId(nodeId);
-    if (children.length === 0) return 0;
-
-    let maxDepth = 0;
-    for (const child of children) {
-      const childDepth = await this.getMaxSubtreeDepth(child.id);
-      maxDepth = Math.max(maxDepth, childDepth + 1);
-    }
-    return maxDepth;
-  }
-
-  /**
-   * Deep copy a node and all its children recursively
-   */
-  private async deepCopyNode(sourceNode: any, targetParentId: string) {
-    // Create copy of the node
-    const [copiedNode] = await db
-      .insert(nodes)
-      .values({
-        type: sourceNode.type,
-        name: sourceNode.name,
-        parentId: targetParentId,
-        slug: sourceNode.slug,
-        content: sourceNode.content,
-        metadata: sourceNode.metadata || {},
-        authorType: sourceNode.authorType || "human",
-        position: sourceNode.position ?? 0,
-        createdBy: sourceNode.createdBy || "user:system",
-        updatedBy: sourceNode.updatedBy || "user:system",
-      })
-      .returning();
-
-    // Recursively copy children
-    const children = await this.getNodesByParentId(sourceNode.id);
-    for (const child of children) {
-      await this.deepCopyNode(child, copiedNode.id);
-    }
-
-    return copiedNode;
+    await reorderNodeChildren(childIds);
   }
 }

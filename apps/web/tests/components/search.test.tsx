@@ -63,7 +63,7 @@ vi.mock("@/lib/trpc", () => {
     },
   ];
 
-  const makeQuery = (data: any, isLoading = false) => ({
+  const makeQuery = <T,>(data: T, isLoading = false) => ({
     useQuery: vi.fn(() => ({
       data,
       isLoading,
