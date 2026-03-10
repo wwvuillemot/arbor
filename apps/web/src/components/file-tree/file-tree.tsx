@@ -214,18 +214,39 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
                         key={favNode.id}
                         node={favNode as TreeNode}
                         depth={0}
-                        isExpanded={false}
+                        isExpanded={expandedNodes.has(favNode.id)}
                         isSelected={selectedNodeId === favNode.id}
                         isLoading={false}
-                        onToggle={() => {}}
+                        onToggle={toggleNode}
                         onSelect={onSelectNode}
                         onContextMenu={onContextMenu}
                         onRename={onRenameNode}
+                        onDrop={onMoveNode}
                         onToggleFavorite={onToggleFavorite}
                         onAddToContext={onAddToContext}
                         isInContext={contextNodeIds?.has(favNode.id)}
                         isChecked={selectedNodeIds?.has(favNode.id)}
                         onToggleChecked={onToggleNodeSelected}
+                        renderChildren={(childParentId, childDepth) => (
+                          <ChildrenList
+                            parentId={childParentId}
+                            depth={childDepth}
+                            expandedNodes={expandedNodes}
+                            selectedNodeId={selectedNodeId}
+                            onToggle={toggleNode}
+                            onSelect={onSelectNode}
+                            onContextMenu={onContextMenu}
+                            onRename={onRenameNode}
+                            onDrop={onMoveNode}
+                            filterNodeIds={filterNodeIds}
+                            attributionFilter={attributionFilter}
+                            onAddToContext={onAddToContext}
+                            contextNodeIds={contextNodeIds}
+                            onToggleFavorite={onToggleFavorite}
+                            selectedNodeIds={selectedNodeIds}
+                            onToggleNodeSelected={onToggleNodeSelected}
+                          />
+                        )}
                       />
                     ))
                   )}
