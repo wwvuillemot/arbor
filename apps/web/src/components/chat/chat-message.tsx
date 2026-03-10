@@ -88,6 +88,14 @@ function SaveImageToNode({
   const moveToNode = trpc.media.moveToNode.useMutation({
     onSuccess: () => utils.media.getByNode.invalidate(),
   });
+
+  const invalidateTree = React.useCallback(
+    (targetParentId: string) => {
+      utils.nodes.getChildren.invalidate({ parentId: targetParentId });
+      utils.nodes.getDescendants.invalidate({ nodeId: projectId });
+    },
+    [utils, projectId],
+  );
   const createNode = trpc.nodes.create.useMutation();
   const updateNode = trpc.nodes.update.useMutation();
 
@@ -128,6 +136,7 @@ function SaveImageToNode({
       createdBy: "llm:ai",
     });
     await moveToNode.mutateAsync({ attachmentId, nodeId: node.id });
+    invalidateTree(parentId);
     setSavedName(name);
     setSavedNodeId(node.id);
     setMode("idle");
