@@ -80,8 +80,10 @@ function SaveImageToNode({
   const utils = trpc.useUtils();
   const [mode, setMode] = React.useState<"idle" | "new" | "existing">("idle");
   const [noteName, setNoteName] = React.useState("Generated Image");
+  const [parentId, setParentId] = React.useState(projectId);
   const [search, setSearch] = React.useState("");
   const [savedNodeId, setSavedNodeId] = React.useState<string | null>(null);
+  const [savedName, setSavedName] = React.useState("");
 
   const moveToNode = trpc.media.moveToNode.useMutation({
     onSuccess: () => utils.media.getByNode.invalidate(),
@@ -91,10 +93,15 @@ function SaveImageToNode({
 
   const nodesQuery = trpc.nodes.getDescendants.useQuery(
     { nodeId: projectId },
-    { enabled: mode === "existing" },
+    { enabled: mode === "new" || mode === "existing" },
   );
 
-  const filteredNodes = React.useMemo(() => {
+  const folders = React.useMemo(
+    () => nodesQuery.data?.filter((n) => n.type === "folder") ?? [],
+    [nodesQuery.data],
+  );
+
+  const filteredNotes = React.useMemo(() => {
     if (!nodesQuery.data) return [];
     return nodesQuery.data.filter(
       (n) =>
@@ -104,10 +111,11 @@ function SaveImageToNode({
   }, [nodesQuery.data, search]);
 
   const handleCreateNew = async () => {
+    const name = noteName.trim() || "Generated Image";
     const node = await createNode.mutateAsync({
       type: "note",
-      name: noteName.trim() || "Generated Image",
-      parentId: projectId,
+      name,
+      parentId,
       content: {
         type: "doc",
         content: [
@@ -120,12 +128,12 @@ function SaveImageToNode({
       createdBy: "llm:ai",
     });
     await moveToNode.mutateAsync({ attachmentId, nodeId: node.id });
+    setSavedName(name);
     setSavedNodeId(node.id);
     setMode("idle");
   };
 
   const handleAddToExisting = async (nodeId: string, nodeName: string) => {
-    // Fetch current content and append the image node
     const existingContent = nodesQuery.data?.find((n) => n.id === nodeId)?.content;
     type TipTapDoc = { type: string; content?: unknown[] };
     const doc: TipTapDoc =
@@ -144,8 +152,8 @@ function SaveImageToNode({
     };
     await updateNode.mutateAsync({ id: nodeId, data: { content: updated } });
     await moveToNode.mutateAsync({ attachmentId, nodeId });
+    setSavedName(nodeName);
     setSavedNodeId(nodeId);
-    setNoteName(nodeName);
     setMode("idle");
   };
 
@@ -156,7 +164,7 @@ function SaveImageToNode({
     return (
       <div className="flex items-center gap-1 text-xs text-green-700 dark:text-green-400">
         <CheckCircle className="w-3 h-3" />
-        <span>Saved to &ldquo;{noteName}&rdquo;</span>
+        <span>Saved to &ldquo;{savedName}&rdquo;</span>
       </div>
     );
   }
@@ -181,30 +189,45 @@ function SaveImageToNode({
       )}
 
       {mode === "new" && (
-        <div className="flex items-center gap-2">
+        <div className="space-y-1.5">
           <input
             autoFocus
+            placeholder="Note name"
             value={noteName}
             onChange={(e) => setNoteName(e.target.value)}
-            className="text-xs px-2 py-1 rounded border border-input bg-background flex-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="text-xs px-2 py-1 rounded border border-input bg-background w-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             onKeyDown={(e) => {
               if (e.key === "Enter") handleCreateNew();
               if (e.key === "Escape") setMode("idle");
             }}
           />
-          <button
-            onClick={handleCreateNew}
-            disabled={isPending}
-            className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          <select
+            value={parentId}
+            onChange={(e) => setParentId(e.target.value)}
+            className="text-xs px-2 py-1 rounded border border-input bg-background w-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
-            {isPending ? "Saving…" : "Save"}
-          </button>
-          <button
-            onClick={() => setMode("idle")}
-            className="text-xs px-2 py-1 rounded border border-border hover:bg-muted"
-          >
-            Cancel
-          </button>
+            <option value={projectId}>Project root</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCreateNew}
+              disabled={isPending}
+              className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {isPending ? "Saving…" : "Save"}
+            </button>
+            <button
+              onClick={() => setMode("idle")}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
@@ -219,12 +242,12 @@ function SaveImageToNode({
             className="text-xs px-2 py-1 rounded border border-input bg-background w-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           <div className="max-h-36 overflow-y-auto rounded border border-border bg-background divide-y divide-border">
-            {filteredNodes.length === 0 ? (
+            {filteredNotes.length === 0 ? (
               <div className="text-xs text-muted-foreground px-2 py-2 italic">
                 {nodesQuery.isLoading ? "Loading…" : "No notes found"}
               </div>
             ) : (
-              filteredNodes.map((node) => (
+              filteredNotes.map((node) => (
                 <button
                   key={node.id}
                   onClick={() => handleAddToExisting(node.id, node.name)}
