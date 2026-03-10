@@ -20,6 +20,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+import { getMediaAttachmentUrl } from "@/lib/media-url";
 
 export interface ChatMessageData {
   id: string;
@@ -224,6 +225,24 @@ function ToolResultDisplay({ content }: { content: string }) {
             {node.id.slice(0, 8)}…
           </span>
         </span>
+      </div>
+    );
+  }
+
+  // Generated image (MediaAttachment with mimeType image/*)
+  if (parsed && parsed.id && parsed.mimeType?.startsWith("image/")) {
+    return (
+      <div className="space-y-2">
+        <img
+          src={getMediaAttachmentUrl(parsed.id)}
+          alt={parsed.filename ?? "Generated image"}
+          className="rounded-md max-w-full max-h-96 object-contain border border-border"
+        />
+        {parsed.metadata?.prompt && (
+          <p className="text-xs text-muted-foreground italic">
+            {String(parsed.metadata.prompt)}
+          </p>
+        )}
       </div>
     );
   }
