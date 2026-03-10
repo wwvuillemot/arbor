@@ -127,6 +127,7 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
       onClose={handleCancel}
       title={isEditing ? t("editMode") : t("createMode")}
       maxWidth="2xl"
+      fillHeight
       footer={footer}
     >
       <form

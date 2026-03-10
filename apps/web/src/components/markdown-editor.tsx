@@ -74,7 +74,8 @@ export function MarkdownEditor({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const current = (editor as any).storage?.markdown?.getMarkdown?.();
     if (typeof current === "string" && current === value) return;
-    editor.commands.setContent(value, false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor.commands as any).setContent(value, false);
   }, [editor, value]);
 
   if (!editor) {

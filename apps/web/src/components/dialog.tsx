@@ -14,6 +14,8 @@ export interface DialogProps {
   showFullscreenToggle?: boolean;
   className?: string;
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl" | "4xl" | "6xl";
+  /** Forces the dialog to h-[90vh] so flex-1 chains inside work correctly */
+  fillHeight?: boolean;
 }
 
 const maxWidthClasses = {
@@ -35,6 +37,7 @@ export function Dialog({
   showFullscreenToggle = true,
   className,
   maxWidth = "2xl",
+  fillHeight = false,
 }: DialogProps) {
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const utils = trpc.useUtils();
@@ -80,7 +83,7 @@ export function Dialog({
           "relative bg-background rounded-lg shadow-lg overflow-hidden flex flex-col",
           isFullscreen
             ? "w-full h-full max-w-none max-h-none"
-            : `w-full ${maxWidthClasses[maxWidth]} max-h-[90vh]`,
+            : `w-full ${maxWidthClasses[maxWidth]} ${fillHeight ? "h-[90vh]" : "max-h-[90vh]"}`,
           className,
         )}
       >
