@@ -606,7 +606,7 @@ export function ChatPanel({
               {t("noMessages")}
             </div>
           ) : (
-            messages.map((msg) => <ChatMessage key={msg.id} message={msg} />)
+            messages.map((msg) => <ChatMessage key={msg.id} message={msg} projectId={projectId} />)
           )}
           {/* Optimistic user message — shown immediately on submit */}
           {sendMessage.isPending && sendMessage.variables?.content && (

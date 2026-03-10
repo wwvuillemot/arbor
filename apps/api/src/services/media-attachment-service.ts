@@ -159,6 +159,24 @@ export class MediaAttachmentService {
   }
 
   /**
+   * Re-point an attachment to a different node (e.g. after AI generation).
+   */
+  async moveToNode(
+    attachmentId: string,
+    nodeId: string,
+  ): Promise<MediaAttachment> {
+    const [updated] = await db
+      .update(mediaAttachments)
+      .set({ nodeId })
+      .where(eq(mediaAttachments.id, attachmentId))
+      .returning();
+    if (!updated) {
+      throw new Error(`Attachment not found: ${attachmentId}`);
+    }
+    return updated;
+  }
+
+  /**
    * Generate a presigned download URL for an attachment.
    * Throws if the attachment does not exist.
    */

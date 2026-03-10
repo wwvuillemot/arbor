@@ -127,6 +127,21 @@ export const mediaRouter = router({
     }),
 
   /**
+   * Re-point an attachment to a different node (e.g. after AI generation,
+   * move it from the project root to a specific note or folder).
+   */
+  moveToNode: publicProcedure
+    .input(
+      z.object({
+        attachmentId: z.string().uuid(),
+        nodeId: z.string().uuid(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      return await mediaService.moveToNode(input.attachmentId, input.nodeId);
+    }),
+
+  /**
    * Get a presigned download URL for an attachment.
    */
   getDownloadUrl: publicProcedure

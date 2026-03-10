@@ -21,6 +21,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
+import { trpc } from "@/lib/trpc";
 
 export interface ChatMessageData {
   id: string;
@@ -42,6 +43,7 @@ export interface ChatMessageData {
 
 export interface ChatMessageProps {
   message: ChatMessageData;
+  projectId?: string | null;
   className?: string;
 }
 
@@ -68,7 +70,191 @@ type NodeRecord = {
 };
 type TagRecord = { id: string; name: string; type?: string };
 
-function ToolResultDisplay({ content }: { content: string }) {
+function SaveImageToNode({
+  attachmentId,
+  projectId,
+}: {
+  attachmentId: string;
+  projectId: string;
+}) {
+  const utils = trpc.useUtils();
+  const [mode, setMode] = React.useState<"idle" | "new" | "existing">("idle");
+  const [noteName, setNoteName] = React.useState("Generated Image");
+  const [search, setSearch] = React.useState("");
+  const [savedNodeId, setSavedNodeId] = React.useState<string | null>(null);
+
+  const moveToNode = trpc.media.moveToNode.useMutation({
+    onSuccess: () => utils.media.getByNode.invalidate(),
+  });
+  const createNode = trpc.nodes.create.useMutation();
+  const updateNode = trpc.nodes.update.useMutation();
+
+  const nodesQuery = trpc.nodes.getChildren.useQuery(
+    { parentId: projectId },
+    { enabled: mode === "existing" },
+  );
+
+  const filteredNodes = React.useMemo(() => {
+    if (!nodesQuery.data) return [];
+    return nodesQuery.data.filter(
+      (n) =>
+        n.type === "note" &&
+        n.name.toLowerCase().includes(search.toLowerCase()),
+    );
+  }, [nodesQuery.data, search]);
+
+  const handleCreateNew = async () => {
+    const node = await createNode.mutateAsync({
+      type: "note",
+      name: noteName.trim() || "Generated Image",
+      parentId: projectId,
+      content: {
+        type: "doc",
+        content: [
+          {
+            type: "image",
+            attrs: { src: getMediaAttachmentUrl(attachmentId), alt: null, title: null },
+          },
+        ],
+      },
+      createdBy: "llm:ai",
+    });
+    await moveToNode.mutateAsync({ attachmentId, nodeId: node.id });
+    setSavedNodeId(node.id);
+    setMode("idle");
+  };
+
+  const handleAddToExisting = async (nodeId: string, nodeName: string) => {
+    // Fetch current content and append the image node
+    const existingContent = nodesQuery.data?.find((n) => n.id === nodeId)?.content;
+    type TipTapDoc = { type: string; content?: unknown[] };
+    const doc: TipTapDoc =
+      existingContent && typeof existingContent === "object" && (existingContent as TipTapDoc).type === "doc"
+        ? (existingContent as TipTapDoc)
+        : { type: "doc", content: [] };
+    const updated: TipTapDoc = {
+      ...doc,
+      content: [
+        ...(doc.content ?? []),
+        {
+          type: "image",
+          attrs: { src: getMediaAttachmentUrl(attachmentId), alt: null, title: null },
+        },
+      ],
+    };
+    await updateNode.mutateAsync({ id: nodeId, data: { content: updated } });
+    await moveToNode.mutateAsync({ attachmentId, nodeId });
+    setSavedNodeId(nodeId);
+    setNoteName(nodeName);
+    setMode("idle");
+  };
+
+  const isPending =
+    createNode.isPending || moveToNode.isPending || updateNode.isPending;
+
+  if (savedNodeId) {
+    return (
+      <div className="flex items-center gap-1 text-xs text-green-700 dark:text-green-400">
+        <CheckCircle className="w-3 h-3" />
+        <span>Saved to &ldquo;{noteName}&rdquo;</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {mode === "idle" && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setMode("new")}
+            className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+          >
+            Save as new note
+          </button>
+          <button
+            onClick={() => setMode("existing")}
+            className="text-xs px-2 py-1 rounded border border-border hover:bg-muted transition-colors"
+          >
+            Add to existing note
+          </button>
+        </div>
+      )}
+
+      {mode === "new" && (
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            value={noteName}
+            onChange={(e) => setNoteName(e.target.value)}
+            className="text-xs px-2 py-1 rounded border border-input bg-background flex-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleCreateNew();
+              if (e.key === "Escape") setMode("idle");
+            }}
+          />
+          <button
+            onClick={handleCreateNew}
+            disabled={isPending}
+            className="text-xs px-2 py-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {isPending ? "Saving…" : "Save"}
+          </button>
+          <button
+            onClick={() => setMode("idle")}
+            className="text-xs px-2 py-1 rounded border border-border hover:bg-muted"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {mode === "existing" && (
+        <div className="space-y-1">
+          <input
+            autoFocus
+            placeholder="Search notes…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setMode("idle")}
+            className="text-xs px-2 py-1 rounded border border-input bg-background w-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <div className="max-h-36 overflow-y-auto rounded border border-border bg-background divide-y divide-border">
+            {filteredNodes.length === 0 ? (
+              <div className="text-xs text-muted-foreground px-2 py-2 italic">
+                {nodesQuery.isLoading ? "Loading…" : "No notes found"}
+              </div>
+            ) : (
+              filteredNodes.map((node) => (
+                <button
+                  key={node.id}
+                  onClick={() => handleAddToExisting(node.id, node.name)}
+                  disabled={isPending}
+                  className="w-full text-left text-xs px-2 py-1.5 hover:bg-muted transition-colors disabled:opacity-50"
+                >
+                  {node.name}
+                </button>
+              ))
+            )}
+          </div>
+          <button
+            onClick={() => setMode("idle")}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ToolResultDisplay({
+  content,
+  projectId,
+}: {
+  content: string;
+  projectId?: string | null;
+}) {
   const parsed = React.useMemo(() => {
     try {
       return JSON.parse(content);
@@ -243,6 +429,9 @@ function ToolResultDisplay({ content }: { content: string }) {
             {String(parsed.metadata.prompt)}
           </p>
         )}
+        {projectId && (
+          <SaveImageToNode attachmentId={String(parsed.id)} projectId={projectId} />
+        )}
       </div>
     );
   }
@@ -275,7 +464,7 @@ function ToolResultDisplay({ content }: { content: string }) {
 /**
  * ChatMessage - Renders a single chat message with role badge, content, and metadata.
  */
-export function ChatMessage({ message, className }: ChatMessageProps) {
+export function ChatMessage({ message, projectId, className }: ChatMessageProps) {
   const t = useTranslations("chat");
   const router = useRouter();
   const [copied, setCopied] = React.useState(false);
@@ -603,7 +792,7 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
                 <span>{message.toolName}</span>
               </div>
             )}
-            <ToolResultDisplay content={message.content} />
+            <ToolResultDisplay content={message.content} projectId={projectId} />
           </div>
         )}
 
