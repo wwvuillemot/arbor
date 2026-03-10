@@ -89,8 +89,8 @@ function SaveImageToNode({
   const createNode = trpc.nodes.create.useMutation();
   const updateNode = trpc.nodes.update.useMutation();
 
-  const nodesQuery = trpc.nodes.getChildren.useQuery(
-    { parentId: projectId },
+  const nodesQuery = trpc.nodes.getDescendants.useQuery(
+    { nodeId: projectId },
     { enabled: mode === "existing" },
   );
 
