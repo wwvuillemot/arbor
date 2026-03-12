@@ -91,6 +91,36 @@ describe("NodeService - Extended Operations (Phase 1.1)", () => {
         ),
       ).rejects.toThrow();
     });
+
+    it("should reject moving a locked node", async () => {
+      const project = await createTestProject("Project");
+      const sourceFolder = await createTestFolder("Source Folder", project.id);
+      const targetFolder = await createTestFolder("Target Folder", project.id);
+      const note = await createTestNote("Locked Note", sourceFolder.id);
+
+      await nodeService.updateNode(note.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(
+        nodeService.moveNode(note.id, targetFolder.id),
+      ).rejects.toThrow("Node is locked");
+    });
+
+    it("should reject moving a node into a locked parent", async () => {
+      const project = await createTestProject("Project");
+      const sourceFolder = await createTestFolder("Source Folder", project.id);
+      const targetFolder = await createTestFolder("Locked Target", project.id);
+      const note = await createTestNote("Movable Note", sourceFolder.id);
+
+      await nodeService.updateNode(targetFolder.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(
+        nodeService.moveNode(note.id, targetFolder.id),
+      ).rejects.toThrow("Target parent is locked");
+    });
   });
 
   describe("copyNode", () => {
@@ -243,6 +273,20 @@ describe("NodeService - Extended Operations (Phase 1.1)", () => {
       await expect(
         nodeService.reorderChildren("00000000-0000-0000-0000-000000000000", []),
       ).rejects.toThrow();
+    });
+
+    it("should reject reordering children under a locked parent", async () => {
+      const project = await createTestProject("Project");
+      const noteA = await createTestNote("Note A", project.id);
+      const noteB = await createTestNote("Note B", project.id);
+
+      await nodeService.updateNode(project.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(
+        nodeService.reorderChildren(project.id, [noteB.id, noteA.id]),
+      ).rejects.toThrow("Parent node is locked");
     });
   });
 

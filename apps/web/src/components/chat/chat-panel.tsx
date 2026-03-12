@@ -22,6 +22,100 @@ import { AgentModeSelector } from "./agent-mode-selector";
 import { McpToolsPanel } from "./mcp-tools-panel";
 
 const COMPACTION_THRESHOLD = 24_000;
+const CHAT_COMPOSER_MIN_HEIGHT_PX = 72;
+const CHAT_COMPOSER_MAX_HEIGHT_PX = 192;
+
+interface ChatComposerProps {
+  hasMasterKey: boolean;
+  isBusy: boolean;
+  onSend: (draftValue: string) => boolean;
+  placeholder: string;
+  sendTitle: string;
+}
+
+const ChatComposer = React.memo(function ChatComposer({
+  hasMasterKey,
+  isBusy,
+  onSend,
+  placeholder,
+  sendTitle,
+}: ChatComposerProps) {
+  const [draftValue, setDraftValue] = React.useState("");
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const resizeTextarea = React.useCallback(() => {
+    const textareaElement = textareaRef.current;
+    if (!textareaElement) {
+      return;
+    }
+
+    textareaElement.style.height = "0px";
+    const nextHeight = Math.min(
+      Math.max(textareaElement.scrollHeight, CHAT_COMPOSER_MIN_HEIGHT_PX),
+      CHAT_COMPOSER_MAX_HEIGHT_PX,
+    );
+    textareaElement.style.maxHeight = `${CHAT_COMPOSER_MAX_HEIGHT_PX}px`;
+    textareaElement.style.height = `${nextHeight}px`;
+    textareaElement.style.overflowY =
+      textareaElement.scrollHeight > CHAT_COMPOSER_MAX_HEIGHT_PX
+        ? "auto"
+        : "hidden";
+  }, []);
+
+  React.useLayoutEffect(() => {
+    resizeTextarea();
+  }, [draftValue, resizeTextarea]);
+
+  const handleSend = React.useCallback(() => {
+    if (!draftValue.trim() || !hasMasterKey || isBusy) {
+      return;
+    }
+
+    const didSend = onSend(draftValue);
+    if (didSend) {
+      setDraftValue("");
+    }
+  }, [draftValue, hasMasterKey, isBusy, onSend]);
+
+  const handleKeyDown = React.useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        handleSend();
+      }
+    },
+    [handleSend],
+  );
+
+  return (
+    <div className="flex items-end gap-2">
+      <textarea
+        ref={textareaRef}
+        data-testid="chat-input"
+        value={draftValue}
+        onChange={(event) => setDraftValue(event.target.value)}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        rows={3}
+        className="flex-1 min-h-[72px] text-sm border rounded px-3 py-2 resize-none bg-background focus:outline-none focus:ring-1 focus:ring-ring font-mono"
+      />
+
+      <button
+        data-testid="send-btn"
+        onClick={handleSend}
+        disabled={!draftValue.trim() || !hasMasterKey || isBusy}
+        className="p-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        title={sendTitle}
+      >
+        {isBusy ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Send className="w-4 h-4" />
+        )}
+      </button>
+    </div>
+  );
+});
 
 function ContextWindowIndicator({ messages }: { messages: ChatMessageData[] }) {
   const [showTooltip, setShowTooltip] = React.useState(false);
@@ -112,6 +206,7 @@ export interface ChatPanelProps {
   projectName?: string | null;
   contextNodes?: { id: string; name: string; type: string }[];
   onRemoveContext?: (id: string) => void;
+  onAgentResponseSuccess?: () => void;
 }
 
 /**
@@ -129,6 +224,7 @@ export function ChatPanel({
   projectName,
   contextNodes = [],
   onRemoveContext,
+  onAgentResponseSuccess,
 }: ChatPanelProps) {
   const t = useTranslations("chat");
   const { addToast } = useToast();
@@ -147,12 +243,13 @@ export function ChatPanel({
   const [sidebarTab, setSidebarTab] = React.useState<"threads" | "tools">(
     "threads",
   );
-  const [inputValue, setInputValue] = React.useState("");
   const [agentMode, setAgentMode] = React.useState<string>("assistant");
   const [selectedModel, setSelectedModel] = React.useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = React.useState<string | null>(
     null,
   );
+  const [optimisticMessageBaselineCount, setOptimisticMessageBaselineCount] =
+    React.useState<number | null>(null);
   // Tracks whether a sendMessage mutation is in-flight so the messages query
   // can poll for live tool-call updates without a forward-reference to sendMessage.
   const [isAwaitingResponse, setIsAwaitingResponse] = React.useState(false);
@@ -235,12 +332,16 @@ export function ChatPanel({
       // Invalidate node cache so UI reflects any node changes made by LLM tools
       utils.nodes.getById.invalidate();
       utils.nodes.getChildren.invalidate();
+      onAgentResponseSuccess?.();
     },
     onError: (error) => {
       setIsAwaitingResponse(false);
+      setOptimisticMessageBaselineCount(null);
       addToast(error.message || t("error"), "error");
     },
   });
+
+  const rawMessages = (messagesQuery.data ?? []) as Record<string, unknown>[];
 
   // ─── Auto-scroll ─────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -303,6 +404,7 @@ export function ChatPanel({
     // If we have a pending message and a thread was just created, send it
     if (pendingMessage && selectedThreadId && masterKey) {
       setIsAwaitingResponse(true);
+      setOptimisticMessageBaselineCount(rawMessages.length);
       sendMessage.mutate({
         threadId: selectedThreadId,
         content: pendingMessage,
@@ -319,6 +421,8 @@ export function ChatPanel({
     sendMessage,
     projectId,
     contextNodes,
+    rawMessages.length,
+    onAgentResponseSuccess,
   ]);
 
   // ─── Handlers ────────────────────────────────────────────────────────
@@ -343,63 +447,58 @@ export function ChatPanel({
     [deleteThread],
   );
 
-  const handleSend = React.useCallback(() => {
-    if (!inputValue.trim() || !masterKey) return;
-
-    // If no thread is selected, create one first and save the message as pending
-    if (!selectedThreadId) {
-      setPendingMessage(inputValue.trim());
-      setInputValue(""); // Clear input immediately
-      createThread.mutate({
-        name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
-        agentMode: agentMode as
-          | "assistant"
-          | "planner"
-          | "editor"
-          | "researcher"
-          | "art_director",
-        model: selectedModel,
-        projectId: projectId ?? null,
-      });
-      // The message will be sent after the thread is created (see useEffect above)
-      return;
-    }
-
-    const content = inputValue.trim();
-    setInputValue(""); // Clear immediately so the input feels responsive
-    setIsAwaitingResponse(true);
-    sendMessage.mutate({
-      threadId: selectedThreadId,
-      content,
-      masterKey,
-      projectId: projectId ?? null,
-      contextNodeIds: contextNodes.map((n) => n.id),
-    });
-  }, [
-    inputValue,
-    selectedThreadId,
-    masterKey,
-    sendMessage,
-    createThread,
-    agentMode,
-    selectedModel,
-    t,
-    projectId,
-    contextNodes,
-  ]);
-
-  const handleKeyDown = React.useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
+  const handleSend = React.useCallback(
+    (draftValue: string) => {
+      const trimmedDraftValue = draftValue.trim();
+      if (!trimmedDraftValue || !masterKey) {
+        return false;
       }
+
+      // If no thread is selected, create one first and save the message as pending
+      if (!selectedThreadId) {
+        setPendingMessage(trimmedDraftValue);
+        createThread.mutate({
+          name: `${t(`mode.${agentMode}`)} - ${new Date().toLocaleDateString()}`,
+          agentMode: agentMode as
+            | "assistant"
+            | "planner"
+            | "editor"
+            | "researcher"
+            | "art_director",
+          model: selectedModel,
+          projectId: projectId ?? null,
+        });
+        // The message will be sent after the thread is created (see useEffect above)
+        return true;
+      }
+
+      setIsAwaitingResponse(true);
+      setOptimisticMessageBaselineCount(rawMessages.length);
+      sendMessage.mutate({
+        threadId: selectedThreadId,
+        content: trimmedDraftValue,
+        masterKey,
+        projectId: projectId ?? null,
+        contextNodeIds: contextNodes.map((n) => n.id),
+      });
+
+      return true;
     },
-    [handleSend],
+    [
+      selectedThreadId,
+      masterKey,
+      sendMessage,
+      createThread,
+      agentMode,
+      selectedModel,
+      t,
+      projectId,
+      contextNodes,
+      rawMessages.length,
+    ],
   );
 
   const threads = threadsQuery.data ?? [];
-  const rawMessages = (messagesQuery.data ?? []) as Record<string, unknown>[];
 
   // Mirror the server's compaction logic: measure only messages accumulated
   // SINCE the last summary (the summary itself is fixed overhead, not counted).
@@ -442,6 +541,18 @@ export function ChatPanel({
       createdAt: (msg.createdAt as string) ?? new Date().toISOString(),
     }),
   );
+
+  const optimisticMessageContent = sendMessage.variables?.content;
+  const optimisticMessageStartIndex = optimisticMessageBaselineCount ?? 0;
+  const hasFetchedOptimisticMessage =
+    typeof optimisticMessageContent === "string" &&
+    optimisticMessageContent.length > 0 &&
+    rawMessages.slice(optimisticMessageStartIndex).some((msg) => {
+      return (
+        msg.role === "user" &&
+        ((msg.content as string | null) ?? null) === optimisticMessageContent
+      );
+    });
 
   return (
     <div data-testid="chat-panel" className={cn("flex h-full", className)}>
@@ -606,24 +717,28 @@ export function ChatPanel({
               {t("noMessages")}
             </div>
           ) : (
-            messages.map((msg) => <ChatMessage key={msg.id} message={msg} projectId={projectId} />)
+            messages.map((msg) => (
+              <ChatMessage key={msg.id} message={msg} projectId={projectId} />
+            ))
           )}
           {/* Optimistic user message — shown immediately on submit */}
-          {sendMessage.isPending && sendMessage.variables?.content && (
-            <ChatMessage
-              key="optimistic-user"
-              message={{
-                id: "optimistic-user",
-                role: "user",
-                content: sendMessage.variables.content,
-                model: null,
-                tokensUsed: null,
-                toolCalls: undefined,
-                toolName: undefined,
-                createdAt: new Date().toISOString(),
-              }}
-            />
-          )}
+          {sendMessage.isPending &&
+            optimisticMessageContent &&
+            !hasFetchedOptimisticMessage && (
+              <ChatMessage
+                key="optimistic-user"
+                message={{
+                  id: "optimistic-user",
+                  role: "user",
+                  content: optimisticMessageContent,
+                  model: null,
+                  tokensUsed: null,
+                  toolCalls: undefined,
+                  toolName: undefined,
+                  createdAt: new Date().toISOString(),
+                }}
+              />
+            )}
           {sendMessage.isPending && (
             <div className="flex gap-3 p-3 rounded-lg bg-green-50/50 dark:bg-green-950/20 border border-green-100 dark:border-green-900">
               <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
@@ -686,38 +801,13 @@ export function ChatPanel({
           )}
 
           {/* Text input and send button */}
-          <div className="flex items-end gap-2">
-            {/* Text input */}
-            <textarea
-              data-testid="chat-input"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={t("inputPlaceholder")}
-              rows={3}
-              className="flex-1 text-sm border rounded px-3 py-2 resize-none bg-background focus:outline-none focus:ring-1 focus:ring-ring font-mono"
-            />
-
-            {/* Send button — shows spinner while pending */}
-            <button
-              data-testid="send-btn"
-              onClick={handleSend}
-              disabled={
-                !inputValue.trim() ||
-                !masterKey ||
-                sendMessage.isPending ||
-                createThread.isPending
-              }
-              className="p-2 rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              title={t("send")}
-            >
-              {sendMessage.isPending || createThread.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </button>
-          </div>
+          <ChatComposer
+            hasMasterKey={Boolean(masterKey)}
+            isBusy={sendMessage.isPending || createThread.isPending}
+            onSend={handleSend}
+            placeholder={t("inputPlaceholder")}
+            sendTitle={t("send")}
+          />
 
           {/* Selectors row */}
           <div className="flex items-center gap-2">

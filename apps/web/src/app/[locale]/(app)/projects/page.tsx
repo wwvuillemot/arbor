@@ -2,10 +2,12 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Plus,
   FolderTree,
+  History,
+  Lock,
   Pencil,
   Trash2,
   X,
@@ -40,7 +42,7 @@ import {
   LinkPickerDialog,
 } from "@/components/editor";
 import { TagManager, TagPicker } from "@/components/tags";
-import { NodeAttribution } from "@/components/provenance";
+import { NodeAttribution, VersionHistory } from "@/components/provenance";
 import { ChatSidebar } from "@/components/chat";
 import { Dialog } from "@/components/dialog";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
@@ -127,9 +129,12 @@ function FolderCardView({
 
 // ── End folder card view ──────────────────────────────────────────────────────
 
+const NOTE_AUTO_SAVE_DEBOUNCE_MS = 5000;
+
 export default function ProjectsPage() {
   const utils = trpc.useUtils();
   const t = useTranslations("projects");
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const tFileTree = useTranslations("fileTree");
   const tCommon = useTranslations("common");
@@ -151,6 +156,8 @@ export default function ProjectsPage() {
   } | null>(null);
 
   const router = useRouter();
+  const searchParamsString =
+    typeof searchParams?.toString === "function" ? searchParams.toString() : "";
 
   // Current project selection
   const { currentProjectId, setCurrentProject } = useCurrentProject();
@@ -167,6 +174,26 @@ export default function ProjectsPage() {
   // Sync selectedNodeId when the URL ?node= param changes — e.g. the user clicks
   // a node link in the chat sidebar while already on the projects page.
   const nodeParam = searchParams?.get("node") ?? null;
+  const pathnameRef = React.useRef(pathname);
+  const nodeParamRef = React.useRef(nodeParam);
+  const searchParamsStringRef = React.useRef(searchParamsString);
+  const replaceRouteRef = React.useRef(router.replace);
+  const selectedNodeIdRef = React.useRef(selectedNodeId);
+  const refreshSelectedNodeRef = React.useRef(
+    async (_nodeId: string): Promise<void> => undefined,
+  );
+
+  React.useEffect(() => {
+    pathnameRef.current = pathname;
+    nodeParamRef.current = nodeParam;
+    searchParamsStringRef.current = searchParamsString;
+    replaceRouteRef.current = router.replace;
+  }, [nodeParam, pathname, router.replace, searchParamsString]);
+
+  React.useEffect(() => {
+    selectedNodeIdRef.current = selectedNodeId;
+  }, [selectedNodeId]);
+
   React.useEffect(() => {
     if (nodeParam !== selectedNodeId) {
       setSelectedNodeId(nodeParam);
@@ -178,19 +205,28 @@ export default function ProjectsPage() {
   // Update the URL when a node is selected so the page is deep-linkable and
   // reloading restores the open node. Also update state directly so callers
   // don't depend on the URL round-trip (which doesn't work in tests).
-  const navigateToNode = React.useCallback(
-    (nodeId: string | null) => {
-      setSelectedNodeId(nodeId);
-      const params = new URLSearchParams(searchParams?.toString() ?? "");
+  const navigateToNode = React.useCallback((nodeId: string | null) => {
+    setIsNoteEditing(false);
+    setSelectedNodeId(nodeId);
+    if (selectedNodeIdRef.current === nodeId) {
       if (nodeId) {
-        params.set("node", nodeId);
-      } else {
-        params.delete("node");
+        void refreshSelectedNodeRef.current(nodeId);
       }
-      router.replace(`/projects?${params.toString()}`);
-    },
-    [router, searchParams],
-  );
+      return;
+    }
+
+    const params = new URLSearchParams(searchParamsStringRef.current);
+    if (nodeId) {
+      params.set("node", nodeId);
+    } else {
+      params.delete("node");
+    }
+    const nextQueryString = params.toString();
+    const nextHref = nextQueryString
+      ? `${pathnameRef.current}?${nextQueryString}`
+      : pathnameRef.current;
+    replaceRouteRef.current(nextHref);
+  }, []);
 
   // Chat context nodes — files/folders the user has pinned to add to LLM context
   const [chatContextNodes, setChatContextNodes] = React.useState<
@@ -238,7 +274,9 @@ export default function ProjectsPage() {
     string,
     unknown
   > | null>(null);
+  const editorContentNodeIdRef = React.useRef<string | null>(null);
   const tEditor = useTranslations("editor");
+  const tProvenance = useTranslations("provenance");
   const editorInstanceRef = React.useRef<Editor | null>(null);
   // Saved selection range — captured before the link picker dialog steals focus
   const savedSelectionRef = React.useRef<{ from: number; to: number } | null>(
@@ -252,6 +290,11 @@ export default function ProjectsPage() {
   const [showLinkPicker, setShowLinkPicker] = React.useState(false);
   const [linkPickerSearch, setLinkPickerSearch] = React.useState("");
   const [showExportMenu, setShowExportMenu] = React.useState(false);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = React.useState(false);
+  const [historyCompareVersions, setHistoryCompareVersions] = React.useState<{
+    versionA: number;
+    versionB: number;
+  } | null>(null);
   const exportMenuRef = React.useRef<HTMLDivElement>(null);
 
   // Tag panel resize/collapse state — persisted in localStorage
@@ -377,6 +420,16 @@ export default function ProjectsPage() {
     { id: selectedNodeId! },
     { enabled: !!selectedNodeId, refetchOnWindowFocus: false },
   );
+  const normalizedSelectedNoteContent = React.useMemo(() => {
+    if (selectedNodeQuery.data?.type !== "note") {
+      return null;
+    }
+
+    return normalizeTiptapContent(selectedNodeQuery.data.content);
+  }, [selectedNodeQuery.data?.content, selectedNodeQuery.data?.type]);
+  const isSelectedNodeLocked =
+    (selectedNodeQuery.data?.metadata as Record<string, unknown> | null)
+      ?.isLocked === true;
 
   const forceList = searchParams?.get("list") === "1";
   const currentProject = projectsQuery.data?.find(
@@ -615,8 +668,8 @@ export default function ProjectsPage() {
         | undefined;
       const siblingNodes = targetNode?.parentId
         ? (utils.nodes.getChildren.getData({
-            parentId: targetNode.parentId,
-          }) ?? [])
+          parentId: targetNode.parentId,
+        }) ?? [])
         : [];
       const moveInput = deriveNodeMoveMutationInput(
         draggedNodeId,
@@ -656,6 +709,17 @@ export default function ProjectsPage() {
       addToast(err.message || tCommon("error"), "error");
     },
   });
+  const toggleLockMutation = trpc.nodes.toggleLock.useMutation({
+    onSuccess: () => {
+      utils.nodes.getAllProjects.invalidate();
+      utils.nodes.getById.invalidate();
+      utils.nodes.getChildren.invalidate();
+      utils.nodes.getFavorites.invalidate();
+    },
+    onError: (err) => {
+      addToast(err.message || tCommon("error"), "error");
+    },
+  });
   const handleToggleFavorite = React.useCallback(
     (nodeId: string) => {
       toggleFavoriteMutation.mutate({ nodeId });
@@ -674,6 +738,7 @@ export default function ProjectsPage() {
 
   const projectMeta =
     (currentProject?.metadata as Record<string, unknown> | null) ?? {};
+  const isCurrentProjectLocked = projectMeta.isLocked === true;
 
   // Project settings dialog
   const [settingsOpen, setSettingsOpen] = React.useState(false);
@@ -774,8 +839,8 @@ export default function ProjectsPage() {
   );
 
   const navigateToProjects = React.useCallback(() => {
-    router.push("/projects");
-  }, [router]);
+    router.push(pathname);
+  }, [pathname, router]);
 
   const updateImportedNodeContent = React.useCallback(
     async ({ id, content }: { id: string; content: Record<string, unknown> }) =>
@@ -837,8 +902,8 @@ export default function ProjectsPage() {
         currentProject?.id,
         forceList,
         selectedNodeQuery.data as
-          | { id: string; type: string; parentId: string | null }
-          | undefined,
+        | { id: string; type: string; parentId: string | null }
+        | undefined,
       );
     },
     [currentProject?.id, forceList, selectedNodeQuery.data],
@@ -1119,24 +1184,172 @@ export default function ProjectsPage() {
         id: nodeId,
         data: { content },
       });
+
+      utils.nodes.getById.setData({ id: nodeId }, (currentNode) => {
+        if (!currentNode || currentNode.type !== "note") {
+          return currentNode;
+        }
+
+        return {
+          ...currentNode,
+          content,
+        };
+      });
     },
-    [autoSaveMutation],
+    [autoSaveMutation, utils.nodes.getById],
   );
 
-  const { status: autoSaveStatus } = useAutoSave({
+  const autoSaveContent =
+    isNoteEditing &&
+      selectedNodeId !== null &&
+      editorContentNodeIdRef.current === selectedNodeId
+      ? editorContent
+      : null;
+
+  const { status: autoSaveStatus, markSaved } = useAutoSave({
     nodeId: selectedNodeId,
-    content: editorContent,
+    content: autoSaveContent,
     onSave: handleAutoSave,
+    debounceMs: NOTE_AUTO_SAVE_DEBOUNCE_MS,
   });
 
-  // Sync editor content when selected node changes
   React.useEffect(() => {
-    if (selectedNodeQuery.data?.type === "note") {
-      setEditorContent(normalizeTiptapContent(selectedNodeQuery.data.content));
-    } else {
-      setEditorContent(null);
+    refreshSelectedNodeRef.current = async (nodeId: string) => {
+      const refreshedNode = await utils.nodes.getById.fetch({ id: nodeId });
+      if (!refreshedNode || selectedNodeIdRef.current !== nodeId) {
+        return;
+      }
+
+      if (refreshedNode.type !== "note") {
+        setEditorContent(null);
+        editorContentNodeIdRef.current = nodeId;
+        markSaved(null);
+        void utils.nodes.getChildren.invalidate({ parentId: nodeId });
+        return;
+      }
+
+      const normalizedRefreshedContent = normalizeTiptapContent(
+        refreshedNode.content,
+      );
+      setEditorContent(normalizedRefreshedContent);
+      editorContentNodeIdRef.current = nodeId;
+      markSaved(normalizedRefreshedContent);
+    };
+  }, [markSaved, utils.nodes.getById, utils.nodes.getChildren]);
+
+  const handleAgentResponseSuccess = React.useCallback(() => {
+    if (!selectedNodeId) {
+      return;
     }
-  }, [selectedNodeQuery.data]);
+
+    void (async () => {
+      const refreshedNode = await utils.nodes.getById.fetch({
+        id: selectedNodeId,
+      });
+      if (!refreshedNode || isNoteEditing) {
+        return;
+      }
+
+      if (refreshedNode.type !== "note") {
+        setEditorContent(null);
+        editorContentNodeIdRef.current = selectedNodeId;
+        markSaved(null);
+        return;
+      }
+
+      const normalizedRefreshedContent = normalizeTiptapContent(
+        refreshedNode.content,
+      );
+      setEditorContent(normalizedRefreshedContent);
+      editorContentNodeIdRef.current = selectedNodeId;
+      markSaved(normalizedRefreshedContent);
+    })();
+  }, [isNoteEditing, markSaved, selectedNodeId, utils.nodes.getById]);
+
+  const closeHistoryDialog = React.useCallback(() => {
+    setIsHistoryDialogOpen(false);
+    setHistoryCompareVersions(null);
+  }, []);
+
+  const handleHistoryCompare = React.useCallback(
+    (versionA: number, versionB: number) => {
+      setHistoryCompareVersions({ versionA, versionB });
+    },
+    [],
+  );
+
+  const historyCompareCurrentContent =
+    selectedNodeId !== null && editorContentNodeIdRef.current === selectedNodeId
+      ? editorContent
+      : normalizedSelectedNoteContent;
+
+  const clearHistoryCompare = React.useCallback(() => {
+    setHistoryCompareVersions(null);
+  }, []);
+
+  const handleHistoryRestoreSuccess = React.useCallback(
+    (restoredContent: unknown, _restoredVersion: number) => {
+      if (!selectedNodeId) {
+        return;
+      }
+
+      const normalizedRestoredContent = normalizeTiptapContent(restoredContent);
+
+      setEditorContent(normalizedRestoredContent);
+      editorContentNodeIdRef.current = selectedNodeId;
+
+      utils.nodes.getById.setData({ id: selectedNodeId }, (currentNode) => {
+        if (!currentNode || currentNode.type !== "note") {
+          return currentNode;
+        }
+
+        return {
+          ...currentNode,
+          content: normalizedRestoredContent,
+        };
+      });
+
+      markSaved(normalizedRestoredContent);
+      void utils.nodes.getById.invalidate({ id: selectedNodeId });
+      closeHistoryDialog();
+    },
+    [closeHistoryDialog, markSaved, selectedNodeId, utils.nodes.getById],
+  );
+
+  // Sync editor content when the selected note changes or when a note first
+  // loads. Do not overwrite local editor state just because edit mode toggled
+  // off, otherwise stale query data can clobber a freshly autosaved note.
+  React.useEffect(() => {
+    if (!selectedNodeId) {
+      setEditorContent(null);
+      editorContentNodeIdRef.current = null;
+      markSaved(null);
+      return;
+    }
+
+    if (selectedNodeQuery.data?.type !== "note") {
+      if (selectedNodeQuery.data) {
+        setEditorContent(null);
+        editorContentNodeIdRef.current = selectedNodeId;
+        markSaved(null);
+      }
+      return;
+    }
+
+    const isNewlySelectedNote =
+      editorContentNodeIdRef.current !== selectedNodeId;
+    if (isNewlySelectedNote || editorContent === null) {
+      setEditorContent(normalizedSelectedNoteContent);
+      editorContentNodeIdRef.current = selectedNodeId;
+      markSaved(normalizedSelectedNoteContent);
+    }
+  }, [
+    markSaved,
+    selectedNodeId,
+    selectedNodeQuery.data,
+    normalizedSelectedNoteContent,
+    editorContent,
+  ]);
 
   // Reset title editing when selected node changes
   React.useEffect(() => {
@@ -1151,9 +1364,21 @@ export default function ProjectsPage() {
     }
   }, [isTitleEditing]);
 
+  React.useEffect(() => {
+    if (!isSelectedNodeLocked) return;
+
+    setIsTitleEditing(false);
+    setIsNoteEditing(false);
+  }, [isSelectedNodeLocked]);
+
   const handleTitleSave = React.useCallback(() => {
     const trimmed = titleEditValue.trim();
-    if (trimmed && trimmed !== selectedNodeQuery.data?.name && selectedNodeId) {
+    if (
+      !isSelectedNodeLocked &&
+      trimmed &&
+      trimmed !== selectedNodeQuery.data?.name &&
+      selectedNodeId
+    ) {
       nodeUpdateMutation.mutate({
         id: selectedNodeId,
         data: { name: trimmed },
@@ -1162,6 +1387,7 @@ export default function ProjectsPage() {
     setIsTitleEditing(false);
   }, [
     titleEditValue,
+    isSelectedNodeLocked,
     selectedNodeQuery.data?.name,
     selectedNodeId,
     nodeUpdateMutation,
@@ -1181,17 +1407,41 @@ export default function ProjectsPage() {
   };
 
   const handleNodeRename = (nodeId: string, newName: string) => {
+    const renameTargetIsLocked =
+      (nodeId === selectedNodeId && isSelectedNodeLocked) ||
+      (nodeId === currentProject?.id && isCurrentProjectLocked);
+
+    if (renameTargetIsLocked) {
+      setRenameDialog({ open: false, nodeId: "", currentName: "" });
+      addToast("Node is locked", "error");
+      return;
+    }
+
     nodeUpdateMutation.mutate({ id: nodeId, data: { name: newName } });
   };
 
   const handleNodeDelete = () => {
     if (!nodeDeleteConfirm.node) return;
+
+    const isDeleteTargetLocked =
+      (nodeDeleteConfirm.node.metadata as Record<string, unknown> | null)
+        ?.isLocked === true;
+    if (isDeleteTargetLocked) {
+      setNodeDeleteConfirm({ open: false, node: null });
+      return;
+    }
+
     nodeDeleteMutation.mutate({ id: nodeDeleteConfirm.node.id });
   };
 
   const handleContextMenuAction = (action: ContextMenuAction) => {
+    const isActionNodeLocked =
+      (action.node.metadata as Record<string, unknown> | null)?.isLocked ===
+      true;
+
     switch (action.type) {
       case "newFolder":
+        if (isActionNodeLocked) break;
         setNodeCreateDialog({
           open: true,
           type: "folder",
@@ -1199,6 +1449,7 @@ export default function ProjectsPage() {
         });
         break;
       case "newNote":
+        if (isActionNodeLocked) break;
         setNodeCreateDialog({
           open: true,
           type: "note",
@@ -1206,13 +1457,18 @@ export default function ProjectsPage() {
         });
         break;
       case "rename":
+        if (isActionNodeLocked) break;
         setRenameDialog({
           open: true,
           nodeId: action.node.id,
           currentName: action.node.name,
         });
         break;
+      case "toggleLock":
+        toggleLockMutation.mutate({ nodeId: action.node.id });
+        break;
       case "delete":
+        if (isActionNodeLocked) break;
         setNodeDeleteConfirm({ open: true, node: action.node });
         break;
       case "tagSelection":
@@ -1229,6 +1485,8 @@ export default function ProjectsPage() {
   if (currentProjectId && currentProject && !forceList) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const selNode = selectedNodeQuery.data as any;
+    const isEditorEditable =
+      selNode?.type === "note" && !isSelectedNodeLocked ? isNoteEditing : false;
     return (
       <>
         {/* Hidden directory import input — rendered in ALL views so the import button always works */}
@@ -1389,8 +1647,14 @@ export default function ProjectsPage() {
                       />
                     ) : (
                       <h1
-                        className="text-2xl font-bold cursor-pointer"
+                        className={cn(
+                          "text-2xl font-bold",
+                          isSelectedNodeLocked
+                            ? "cursor-default"
+                            : "cursor-pointer",
+                        )}
                         onDoubleClick={() => {
+                          if (isSelectedNodeLocked) return;
                           setTitleEditValue(selNode?.name || "");
                           setIsTitleEditing(true);
                         }}
@@ -1400,16 +1664,27 @@ export default function ProjectsPage() {
                       </h1>
                     )}
                     <div className="flex items-center gap-2">
+                      {isSelectedNodeLocked && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded bg-muted px-2 py-1 text-xs text-muted-foreground"
+                          title={tFileTree("locked")}
+                          aria-label={tFileTree("locked")}
+                          data-testid="selected-node-lock-indicator"
+                        >
+                          <Lock className="h-3 w-3" />
+                          {tFileTree("locked")}
+                        </span>
+                      )}
                       {selNode?.type === "note" && isNoteEditing && (
                         <span
                           className={cn(
                             "text-xs px-2 py-1 rounded",
                             autoSaveStatus === "saving" &&
-                              "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
+                            "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
                             autoSaveStatus === "saved" &&
-                              "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
+                            "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
                             autoSaveStatus === "error" &&
-                              "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
+                            "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
                             autoSaveStatus === "idle" && "hidden",
                           )}
                           data-testid="auto-save-status"
@@ -1421,16 +1696,33 @@ export default function ProjectsPage() {
                       )}
                       {selNode?.type === "note" && (
                         <button
-                          onClick={() => setIsNoteEditing((v) => !v)}
+                          onClick={() => {
+                            setHistoryCompareVersions(null);
+                            setIsHistoryDialogOpen(true);
+                          }}
+                          className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                          data-testid="note-history-button"
+                        >
+                          <History className="w-3 h-3" />
+                          {tProvenance("versionHistory.title")}
+                        </button>
+                      )}
+                      {selNode?.type === "note" && (
+                        <button
+                          onClick={() => {
+                            if (isSelectedNodeLocked) return;
+                            setIsNoteEditing((value) => !value);
+                          }}
                           className={cn(
-                            "flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors",
-                            isNoteEditing
+                            "flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                            isEditorEditable
                               ? "bg-primary text-primary-foreground hover:bg-primary/90"
                               : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                           )}
+                          disabled={isSelectedNodeLocked}
                           data-testid="note-edit-toggle"
                         >
-                          {isNoteEditing ? (
+                          {isEditorEditable ? (
                             <>
                               <Check className="w-3 h-3" />
                               {tEditor("doneEditing")}
@@ -1494,15 +1786,18 @@ export default function ProjectsPage() {
                         )}
                       </div>
                       <button
-                        onClick={() =>
+                        onClick={() => {
+                          if (isSelectedNodeLocked) return;
+
                           setNodeDeleteConfirm({
                             open: true,
                             node: selNode as TreeNode,
-                          })
-                        }
-                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          });
+                        }}
+                        className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                         title={tCommon("delete")}
                         aria-label={tCommon("delete")}
+                        disabled={isSelectedNodeLocked}
                         data-testid="content-delete-button"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1531,7 +1826,8 @@ export default function ProjectsPage() {
                       content?: unknown;
                       name?: string;
                     };
-                    const parsed = normalizeTiptapContent(nodeData.content);
+                    const parsed = normalizedSelectedNoteContent;
+                    const renderedEditorContent = editorContent ?? parsed;
                     const doc = parsed as {
                       type?: string;
                       content?: {
@@ -1564,24 +1860,26 @@ export default function ProjectsPage() {
                       <div
                         className="flex-1 min-h-0"
                         onDoubleClick={() => {
-                          if (!isNoteEditing) setIsNoteEditing(true);
+                          if (!isSelectedNodeLocked && !isNoteEditing) {
+                            setIsNoteEditing(true);
+                          }
                         }}
                       >
                         <TiptapEditor
-                          content={parsed}
+                          content={renderedEditorContent}
                           nodeId={selectedNodeId ?? undefined}
-                          editable={isNoteEditing}
+                          editable={isEditorEditable}
                           onChange={
-                            isNoteEditing ? setEditorContent : undefined
+                            isEditorEditable ? setEditorContent : undefined
                           }
                           editorRef={editorInstanceRef}
                           onInsertImage={
-                            isNoteEditing
+                            isEditorEditable
                               ? () => setShowImageUpload((prev) => !prev)
                               : undefined
                           }
                           onInsertLink={
-                            isNoteEditing ? handleOpenLinkPicker : undefined
+                            isEditorEditable ? handleOpenLinkPicker : undefined
                           }
                           onLinkClick={handleEditorLinkClick}
                         />
@@ -1639,8 +1937,8 @@ export default function ProjectsPage() {
                                         Loading images...
                                       </p>
                                     ) : (projectImagesQuery.data ?? []).filter(
-                                        (a) => a.mimeType.startsWith("image/"),
-                                      ).length === 0 ? (
+                                      (a) => a.mimeType.startsWith("image/"),
+                                    ).length === 0 ? (
                                       <p className="text-sm text-muted-foreground text-center py-4">
                                         {tEditor("imageUpload.noImagesYet")}
                                       </p>
@@ -1787,6 +2085,27 @@ export default function ProjectsPage() {
               </div>
             )}
           </div>
+
+          {selectedNodeId && selNode?.type === "note" && (
+            <Dialog
+              open={isHistoryDialogOpen}
+              onClose={closeHistoryDialog}
+              title={tProvenance("versionHistory.title")}
+              maxWidth="4xl"
+              fillHeight
+            >
+              <VersionHistory
+                nodeId={selectedNodeId}
+                onCompare={handleHistoryCompare}
+                onClearCompare={clearHistoryCompare}
+                compareVersions={historyCompareVersions}
+                currentContent={historyCompareCurrentContent}
+                currentVersionLabel={tProvenance("diffViewer.current")}
+                onRestoreSuccess={handleHistoryRestoreSuccess}
+                className="flex-1"
+              />
+            </Dialog>
+          )}
 
           {/* File tree dialogs */}
           <CreateNodeDialog
@@ -1986,6 +2305,7 @@ export default function ProjectsPage() {
             onRemoveContext={(id) =>
               setChatContextNodes((prev) => prev.filter((n) => n.id !== id))
             }
+            onAgentResponseSuccess={handleAgentResponseSuccess}
           />
         </div>
 

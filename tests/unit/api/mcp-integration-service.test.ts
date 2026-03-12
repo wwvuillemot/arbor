@@ -142,4 +142,26 @@ describe("mcp-integration-service", () => {
     expect(parsedResult.toolName).toBe("not_a_real_tool");
     expect(parsedResult.args).toEqual({ sample: true });
   });
+
+  it("returns structured lock errors for locked node updates", async () => {
+    const project = await createTestProject("Locked Project");
+    const note = await createTestNote("Locked Note", project.id, "content");
+
+    await nodeService.updateNode(note.id, {
+      metadata: { isLocked: true },
+    });
+
+    const rawResult = await executeMCPTool("update_node", {
+      id: note.id,
+      name: "Blocked Rename",
+    });
+    const parsedResult = JSON.parse(rawResult);
+
+    expect(parsedResult.error).toBe("Node is locked");
+    expect(parsedResult.toolName).toBe("update_node");
+    expect(parsedResult.args).toEqual({
+      id: note.id,
+      name: "Blocked Rename",
+    });
+  });
 });

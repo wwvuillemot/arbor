@@ -2,11 +2,25 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { FolderPlus, FilePlus, Pencil, Trash2, Tag } from "lucide-react";
+import {
+  FolderPlus,
+  FilePlus,
+  Pencil,
+  Trash2,
+  Tag,
+  Lock,
+  Unlock,
+} from "lucide-react";
 import type { TreeNode } from "./file-tree-node";
 
 export interface ContextMenuAction {
-  type: "newFolder" | "newNote" | "rename" | "delete" | "tagSelection";
+  type:
+    | "newFolder"
+    | "newNote"
+    | "rename"
+    | "toggleLock"
+    | "delete"
+    | "tagSelection";
   node: TreeNode;
 }
 
@@ -58,6 +72,8 @@ export function NodeContextMenu({
   if (!open || !node) return null;
 
   const isContainer = expandableTypes.has(node.type);
+  const isLocked =
+    (node.metadata as Record<string, unknown> | null)?.isLocked === true;
 
   const menuItems = [
     ...(isContainer
@@ -78,6 +94,11 @@ export function NodeContextMenu({
       type: "rename" as const,
       label: t("rename"),
       icon: Pencil,
+    },
+    {
+      type: "toggleLock" as const,
+      label: isLocked ? t("unlock") : t("lock"),
+      icon: isLocked ? Unlock : Lock,
     },
     {
       type: "delete" as const,

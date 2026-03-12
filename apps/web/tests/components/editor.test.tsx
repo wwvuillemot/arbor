@@ -17,10 +17,40 @@ vi.mock("next-intl", () => ({
 }));
 
 // Mock TipTap - since jsdom doesn't support contenteditable/ProseMirror well
+const mockSelectionRestoreRun = vi.fn();
+const mockSetTextSelection = vi.fn().mockReturnValue({
+  run: mockSelectionRestoreRun,
+});
+const mockFocusedChain = {
+  toggleBold: vi.fn().mockReturnValue({ run: vi.fn() }),
+  toggleItalic: vi.fn().mockReturnValue({ run: vi.fn() }),
+  toggleStrike: vi.fn().mockReturnValue({ run: vi.fn() }),
+  toggleCode: vi.fn().mockReturnValue({ run: vi.fn() }),
+  toggleHeading: vi.fn().mockReturnValue({ run: vi.fn() }),
+  toggleBulletList: vi.fn().mockReturnValue({ run: vi.fn() }),
+  toggleOrderedList: vi.fn().mockReturnValue({ run: vi.fn() }),
+  toggleBlockquote: vi.fn().mockReturnValue({ run: vi.fn() }),
+  setHorizontalRule: vi.fn().mockReturnValue({ run: vi.fn() }),
+  setImage: vi.fn().mockReturnValue({ run: vi.fn() }),
+  undo: vi.fn().mockReturnValue({ run: vi.fn() }),
+  redo: vi.fn().mockReturnValue({ run: vi.fn() }),
+  clearNodes: vi.fn().mockReturnValue({
+    unsetAllMarks: vi.fn().mockReturnValue({ run: vi.fn() }),
+  }),
+};
+const mockChain = {
+  focus: vi.fn().mockReturnValue(mockFocusedChain),
+  setTextSelection: mockSetTextSelection,
+};
+
 const mockEditor = {
   getJSON: vi.fn().mockReturnValue({ type: "doc", content: [] }),
   commands: {
     setContent: vi.fn(),
+  },
+  state: {
+    selection: { from: 1, to: 1 },
+    doc: { content: { size: 1 } },
   },
   isEditable: true,
   setEditable: vi.fn(),
@@ -29,25 +59,7 @@ const mockEditor = {
     undo: vi.fn().mockReturnValue(false),
     redo: vi.fn().mockReturnValue(false),
   }),
-  chain: vi.fn().mockReturnValue({
-    focus: vi.fn().mockReturnValue({
-      toggleBold: vi.fn().mockReturnValue({ run: vi.fn() }),
-      toggleItalic: vi.fn().mockReturnValue({ run: vi.fn() }),
-      toggleStrike: vi.fn().mockReturnValue({ run: vi.fn() }),
-      toggleCode: vi.fn().mockReturnValue({ run: vi.fn() }),
-      toggleHeading: vi.fn().mockReturnValue({ run: vi.fn() }),
-      toggleBulletList: vi.fn().mockReturnValue({ run: vi.fn() }),
-      toggleOrderedList: vi.fn().mockReturnValue({ run: vi.fn() }),
-      toggleBlockquote: vi.fn().mockReturnValue({ run: vi.fn() }),
-      setHorizontalRule: vi.fn().mockReturnValue({ run: vi.fn() }),
-      setImage: vi.fn().mockReturnValue({ run: vi.fn() }),
-      undo: vi.fn().mockReturnValue({ run: vi.fn() }),
-      redo: vi.fn().mockReturnValue({ run: vi.fn() }),
-      clearNodes: vi.fn().mockReturnValue({
-        unsetAllMarks: vi.fn().mockReturnValue({ run: vi.fn() }),
-      }),
-    }),
-  }),
+  chain: vi.fn().mockReturnValue(mockChain),
   on: vi.fn(),
   off: vi.fn(),
   destroy: vi.fn(),
@@ -58,6 +70,7 @@ let capturedOnUpdate: ((args: { editor: typeof mockEditor }) => void) | null =
 let capturedUseEditorConfig: {
   content?: unknown;
   onUpdate?: (args: { editor: typeof mockEditor }) => void;
+  extensions?: unknown[];
 } | null = null;
 
 vi.mock("@tiptap/react", () => ({
@@ -90,6 +103,22 @@ vi.mock("@tiptap/extension-placeholder", () => ({
   default: {
     configure: vi.fn().mockReturnValue({}),
   },
+}));
+
+vi.mock("@tiptap/extension-table", () => ({
+  Table: { name: "table" },
+}));
+
+vi.mock("@tiptap/extension-table-cell", () => ({
+  TableCell: { name: "tableCell" },
+}));
+
+vi.mock("@tiptap/extension-table-header", () => ({
+  TableHeader: { name: "tableHeader" },
+}));
+
+vi.mock("@tiptap/extension-table-row", () => ({
+  TableRow: { name: "tableRow" },
 }));
 
 vi.mock("@tiptap/extension-image", () => ({
@@ -336,7 +365,10 @@ describe("TiptapEditor", () => {
     vi.clearAllMocks();
     capturedOnUpdate = null;
     capturedUseEditorConfig = null;
+    mockEditor.chain.mockReturnValue(mockChain);
     mockEditor.getJSON.mockReturnValue({ type: "doc", content: [] });
+    mockEditor.state.selection = { from: 1, to: 1 };
+    mockEditor.state.doc.content.size = 1;
     vi.mocked(trpc.provenance.getHistory.useQuery).mockReturnValue(
       createHistoryQueryResult([]),
     );
@@ -345,6 +377,19 @@ describe("TiptapEditor", () => {
   it("should render the editor container", () => {
     render(<TiptapEditor content={null} />);
     expect(screen.getByTestId("tiptap-editor")).toBeInTheDocument();
+  });
+
+  it("should register table extensions in the editor configuration", () => {
+    render(<TiptapEditor content={null} />);
+
+    expect(capturedUseEditorConfig?.extensions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "table" }),
+        expect.objectContaining({ name: "tableRow" }),
+        expect.objectContaining({ name: "tableHeader" }),
+        expect.objectContaining({ name: "tableCell" }),
+      ]),
+    );
   });
 
   it("should render the toolbar", () => {
@@ -374,6 +419,142 @@ describe("TiptapEditor", () => {
       capturedOnUpdate({ editor: mockEditor });
       expect(handleChange).toHaveBeenCalledWith(newContent);
     }
+  });
+
+  it("should use the latest onChange after switching into edit mode", () => {
+    const handleChange = vi.fn();
+    const { rerender } = render(
+      <TiptapEditor content={null} editable={false} />,
+    );
+
+    const initialOnUpdate = capturedOnUpdate;
+
+    rerender(
+      <TiptapEditor content={null} editable={true} onChange={handleChange} />,
+    );
+
+    expect(initialOnUpdate).not.toBeNull();
+
+    const changedContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Edited after toggle" }],
+        },
+      ],
+    };
+
+    mockEditor.getJSON.mockReturnValueOnce(changedContent);
+    initialOnUpdate?.({ editor: mockEditor });
+
+    expect(handleChange).toHaveBeenCalledWith(changedContent);
+  });
+
+  it("should not reapply parent-echoed local content while editable", () => {
+    const handleChange = vi.fn();
+    const initialContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Original note" }],
+        },
+      ],
+    };
+    const locallyEditedContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Original note with edit" }],
+        },
+      ],
+    };
+
+    const { rerender } = render(
+      <TiptapEditor
+        content={initialContent}
+        editable={true}
+        onChange={handleChange}
+      />,
+    );
+
+    mockEditor.commands.setContent.mockClear();
+    mockEditor.getJSON.mockReturnValue(locallyEditedContent);
+
+    capturedOnUpdate?.({ editor: mockEditor });
+
+    rerender(
+      <TiptapEditor
+        content={locallyEditedContent}
+        editable={true}
+        onChange={handleChange}
+      />,
+    );
+
+    expect(mockEditor.commands.setContent).not.toHaveBeenCalled();
+    expect(handleChange).toHaveBeenCalledWith(locallyEditedContent);
+  });
+
+  it("should preserve the current selection during same-node external content syncs", () => {
+    const initialContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Hello brave world" }],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "AI helper note" }],
+        },
+      ],
+    };
+    const externallySyncedContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Hello brave world" }],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "AI helper note refreshed" }],
+        },
+      ],
+    };
+
+    mockEditor.state.selection = { from: 12, to: 12 };
+    mockEditor.state.doc.content.size = 40;
+    mockEditor.getJSON.mockReturnValue(initialContent);
+
+    const { rerender } = render(
+      <TiptapEditor
+        content={initialContent}
+        nodeId="11111111-1111-1111-1111-111111111111"
+        editable={true}
+      />,
+    );
+
+    mockEditor.commands.setContent.mockClear();
+    mockSetTextSelection.mockClear();
+    mockSelectionRestoreRun.mockClear();
+
+    rerender(
+      <TiptapEditor
+        content={externallySyncedContent}
+        nodeId="11111111-1111-1111-1111-111111111111"
+        editable={true}
+      />,
+    );
+
+    expect(mockEditor.commands.setContent).toHaveBeenCalledWith(
+      externallySyncedContent,
+      { emitUpdate: false },
+    );
+    expect(mockSetTextSelection).toHaveBeenCalledWith({ from: 12, to: 12 });
+    expect(mockSelectionRestoreRun).toHaveBeenCalled();
   });
 
   it("should fetch provenance history when nodeId is provided", () => {
@@ -418,6 +599,132 @@ describe("TiptapEditor", () => {
     };
     render(<TiptapEditor content={content} />);
     expect(screen.getByTestId("tiptap-editor")).toBeInTheDocument();
+  });
+
+  it("should not reset equivalent table content when TipTap adds default cell attrs", () => {
+    const markdownTableDocument = {
+      type: "doc",
+      content: [
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableHeader",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Name" }],
+                    },
+                  ],
+                },
+                {
+                  type: "tableHeader",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Role" }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableCell",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Aria" }],
+                    },
+                  ],
+                },
+                {
+                  type: "tableCell",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Scout" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const editorTableDocumentWithDefaultAttrs = {
+      type: "doc",
+      content: [
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableHeader",
+                  attrs: { colspan: 1, rowspan: 1, colwidth: null },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Name" }],
+                    },
+                  ],
+                },
+                {
+                  type: "tableHeader",
+                  attrs: { colspan: 1, rowspan: 1, colwidth: null },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Role" }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableCell",
+                  attrs: { colspan: 1, rowspan: 1, colwidth: null },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Aria" }],
+                    },
+                  ],
+                },
+                {
+                  type: "tableCell",
+                  attrs: { colspan: 1, rowspan: 1, colwidth: null },
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Scout" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    mockEditor.getJSON.mockReturnValue(editorTableDocumentWithDefaultAttrs);
+
+    render(<TiptapEditor content={markdownTableDocument} />);
+
+    expect(mockEditor.commands.setContent).not.toHaveBeenCalled();
   });
 
   it("should pass AI-attributed content to TipTap when llm history matches the current block", () => {
@@ -837,14 +1144,33 @@ describe("useAutoSave", () => {
     content,
     onSave,
     debounceMs,
+    savedContent,
   }: {
     nodeId: string | null;
     content: Record<string, unknown> | null;
     onSave: (nodeId: string, content: Record<string, unknown>) => Promise<void>;
     debounceMs?: number;
+    savedContent?: Record<string, unknown> | null;
   }) {
-    const { status } = useAutoSave({ nodeId, content, onSave, debounceMs });
-    return <div data-testid="status">{status}</div>;
+    const { status, markSaved } = useAutoSave({
+      nodeId,
+      content,
+      onSave,
+      debounceMs,
+    });
+
+    return (
+      <>
+        <div data-testid="status">{status}</div>
+        <button
+          type="button"
+          data-testid="mark-saved"
+          onClick={() => markSaved(savedContent ?? content)}
+        >
+          Mark saved
+        </button>
+      </>
+    );
   }
 
   it("should start with idle status", () => {
@@ -984,6 +1310,59 @@ describe("useAutoSave", () => {
       />,
     );
 
+    expect(screen.getByTestId("status").textContent).toBe("idle");
+  });
+
+  it("should not save restored content after markSaved is called", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const restoredContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Restored note" }],
+        },
+      ],
+    };
+
+    const { rerender } = render(
+      <TestComponent
+        nodeId="node-1"
+        content={null}
+        onSave={onSave}
+        debounceMs={100}
+        savedContent={restoredContent}
+      />,
+    );
+
+    rerender(
+      <TestComponent
+        nodeId="node-1"
+        content={restoredContent}
+        onSave={onSave}
+        debounceMs={100}
+        savedContent={restoredContent}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("mark-saved"));
+
+    rerender(
+      <TestComponent
+        nodeId="node-1"
+        content={restoredContent}
+        onSave={onSave}
+        debounceMs={100}
+        savedContent={restoredContent}
+      />,
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(100);
+      await Promise.resolve();
+    });
+
+    expect(onSave).not.toHaveBeenCalled();
     expect(screen.getByTestId("status").textContent).toBe("idle");
   });
 });

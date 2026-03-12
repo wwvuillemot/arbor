@@ -92,6 +92,15 @@ export const provenanceRouter = router({
     }),
 
   /**
+   * Delete a specific version entry for a node
+   */
+  deleteVersion: publicProcedure
+    .input(getVersionInputSchema)
+    .mutation(async ({ input }) => {
+      return await provenanceService.deleteVersion(input.nodeId, input.version);
+    }),
+
+  /**
    * Compare two versions of a node
    */
   compareVersions: publicProcedure

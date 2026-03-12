@@ -380,6 +380,54 @@ describe("ProvenanceService", () => {
     });
   });
 
+  describe("deleteVersion", () => {
+    it("should delete an existing version and return the deleted entry", async () => {
+      const projectId = await createTestProject();
+      const noteId = await createTestNoteWithParent(projectId);
+
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        action: "create",
+        contentAfter: { text: "v1" },
+      });
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        action: "update",
+        contentBefore: { text: "v1" },
+        contentAfter: { text: "v2" },
+      });
+      await provenanceService.recordChange({
+        nodeId: noteId,
+        actorType: "user",
+        action: "update",
+        contentBefore: { text: "v2" },
+        contentAfter: { text: "v3" },
+      });
+
+      const deletedEntry = await provenanceService.deleteVersion(noteId, 2);
+
+      expect(deletedEntry.version).toBe(2);
+
+      const remainingHistory = await provenanceService.getHistory({
+        nodeId: noteId,
+      });
+      expect(remainingHistory.map((entry) => entry.version)).toEqual([3, 1]);
+      expect(await provenanceService.getVersionCount(noteId)).toBe(2);
+      expect(await provenanceService.getVersion(noteId, 2)).toBeNull();
+    });
+
+    it("should throw when deleting a missing version", async () => {
+      const projectId = await createTestProject();
+      const noteId = await createTestNoteWithParent(projectId);
+
+      await expect(provenanceService.deleteVersion(noteId, 99)).rejects.toThrow(
+        `Version 99 not found for node ${noteId}`,
+      );
+    });
+  });
+
   // ─── Filtering ──────────────────────────────────────────────────────
 
   describe("getHistoryByActor", () => {

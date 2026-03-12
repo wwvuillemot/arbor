@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import {
   ChevronRight,
   ChevronDown,
@@ -12,6 +13,7 @@ import {
   Mic,
   MessageSquarePlus,
   Image,
+  Lock,
   Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -120,8 +122,11 @@ export function FileTreeNode({
   isChecked,
   onToggleChecked,
 }: FileTreeNodeProps) {
+  const t = useTranslations("fileTree");
   const isFavorite =
     (node.metadata as Record<string, unknown> | null)?.isFavorite === true;
+  const isLocked =
+    (node.metadata as Record<string, unknown> | null)?.isLocked === true;
   const isExpandable = expandableTypes.has(node.type);
   const Icon = getNodeIcon(node.type, isExpanded, node.content);
 
@@ -146,7 +151,7 @@ export function FileTreeNode({
 
   const handleSave = () => {
     const trimmed = editValue.trim();
-    if (trimmed && trimmed !== node.name && onRename) {
+    if (!isLocked && trimmed && trimmed !== node.name && onRename) {
       onRename(node.id, trimmed);
     }
     setIsEditing(false);
@@ -168,7 +173,7 @@ export function FileTreeNode({
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onRename) {
+    if (onRename && !isLocked) {
       setEditValue(node.name);
       setIsEditing(true);
     }
@@ -195,8 +200,8 @@ export function FileTreeNode({
 
   // Drag-and-drop handlers
   const handleDragStart = (e: React.DragEvent) => {
-    // Don't drag while editing
-    if (isEditing) {
+    // Don't drag while editing or while locked
+    if (isEditing || isLocked) {
       e.preventDefault();
       return;
     }
@@ -231,8 +236,9 @@ export function FileTreeNode({
   };
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
     e.stopPropagation();
+    if (isLocked) return;
+    e.preventDefault();
     const draggedId = e.dataTransfer.types.includes(
       "application/arbor-node-id",
     );
@@ -259,6 +265,7 @@ export function FileTreeNode({
     e.preventDefault();
     e.stopPropagation();
     setDropIndicator(null);
+    if (isLocked) return;
     const draggedNodeId = e.dataTransfer.getData("application/arbor-node-id");
     if (!draggedNodeId || draggedNodeId === node.id || !onDrop) return;
     const position = getDropPosition(e);
@@ -280,7 +287,7 @@ export function FileTreeNode({
     }
   };
 
-  const canDrag = node.type !== "project";
+  const canDrag = node.type !== "project" && !isLocked;
 
   return (
     <div data-testid={`tree-node-${node.id}`}>
@@ -341,6 +348,17 @@ export function FileTreeNode({
             isExpandable ? "text-amber-500" : "text-blue-500",
           )}
         />
+
+        {isLocked && (
+          <span
+            className="flex-shrink-0 text-muted-foreground"
+            title={t("locked")}
+            aria-label={t("locked")}
+            data-testid={`tree-node-lock-${node.id}`}
+          >
+            <Lock className="w-3.5 h-3.5" />
+          </span>
+        )}
 
         {/* Node name */}
         {isEditing ? (

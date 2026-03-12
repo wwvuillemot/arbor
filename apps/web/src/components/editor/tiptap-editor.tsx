@@ -5,6 +5,10 @@ import { useTranslations } from "next-intl";
 import { Mark, mergeAttributes } from "@tiptap/core";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { Table } from "@tiptap/extension-table";
+import { TableCell } from "@tiptap/extension-table-cell";
+import { TableHeader } from "@tiptap/extension-table-header";
+import { TableRow } from "@tiptap/extension-table-row";
 import Placeholder from "@tiptap/extension-placeholder";
 import { ResizableImage } from "./resizable-image";
 import Link from "@tiptap/extension-link";
@@ -14,6 +18,7 @@ import { EditorToolbar } from "./editor-toolbar";
 const AI_ATTRIBUTION_MARK_TYPE = "aiAttribution";
 const EMPTY_NODE_ID = "00000000-0000-0000-0000-000000000000";
 const EMPTY_TIPTAP_DOC: Record<string, unknown> = { type: "doc", content: [] };
+const TABLE_CELL_NODE_TYPES = new Set(["tableCell", "tableHeader"]);
 
 type TiptapMarkJson = {
   type?: string;
@@ -94,14 +99,101 @@ function stripAiAttributionFromContent(
   return stripAiAttributionFromNode(content as TiptapNodeJson);
 }
 
+function normalizeComparableNode(node: TiptapNodeJson): TiptapNodeJson {
+  const normalizedNode: TiptapNodeJson = { ...node };
+
+  if (Array.isArray(node.marks)) {
+    const comparableMarks = node.marks.filter(
+      (mark) => mark.type !== AI_ATTRIBUTION_MARK_TYPE,
+    );
+
+    if (comparableMarks.length > 0) {
+      normalizedNode.marks = comparableMarks;
+    } else {
+      delete normalizedNode.marks;
+    }
+  }
+
+  if (isRecord(node.attrs)) {
+    const normalizedAttrs = { ...node.attrs };
+
+    if (TABLE_CELL_NODE_TYPES.has(node.type ?? "")) {
+      if (normalizedAttrs.colspan === 1) {
+        delete normalizedAttrs.colspan;
+      }
+      if (normalizedAttrs.rowspan === 1) {
+        delete normalizedAttrs.rowspan;
+      }
+      if (normalizedAttrs.colwidth === null) {
+        delete normalizedAttrs.colwidth;
+      }
+    }
+
+    if (Object.keys(normalizedAttrs).length > 0) {
+      normalizedNode.attrs = normalizedAttrs;
+    } else {
+      delete normalizedNode.attrs;
+    }
+  }
+
+  if (Array.isArray(node.content)) {
+    normalizedNode.content = node.content.map(normalizeComparableNode);
+  }
+
+  return normalizedNode;
+}
+
+function getComparableContentKey(content: unknown): string {
+  return JSON.stringify(
+    normalizeComparableNode(toTiptapDoc(content) as TiptapNodeJson),
+  );
+}
+
 function getComparableNodeKey(node: unknown): string | null {
   if (!isRecord(node)) {
     return null;
   }
 
-  return JSON.stringify(
-    stripAiAttributionFromNode(cloneJson(node) as TiptapNodeJson),
-  );
+  return JSON.stringify(normalizeComparableNode(node as TiptapNodeJson));
+}
+
+type EditorSelectionRange = {
+  from: number;
+  to: number;
+};
+
+function getEditorSelectionRange(editor: Editor): EditorSelectionRange | null {
+  const selection = editor.state.selection;
+
+  if (!selection) {
+    return null;
+  }
+
+  return {
+    from: selection.from,
+    to: selection.to,
+  };
+}
+
+function restoreEditorSelection(
+  editor: Editor,
+  selectionRange: EditorSelectionRange | null,
+): void {
+  if (!selectionRange) {
+    return;
+  }
+
+  const maxPosition = Math.max(0, editor.state.doc.content.size);
+  const clampedSelection = {
+    from: Math.max(0, Math.min(selectionRange.from, maxPosition)),
+    to: Math.max(0, Math.min(selectionRange.to, maxPosition)),
+  };
+
+  try {
+    editor.chain().setTextSelection(clampedSelection).run();
+  } catch {
+    // Ignore invalid selection restoration attempts for incompatible synced docs.
+  }
 }
 
 function getModelName(historyEntry: ProvenanceHistoryEntry): string {
@@ -352,6 +444,10 @@ export function TiptapEditor({
       ),
     [content, historyQuery.data],
   );
+  const onChangeRef = React.useRef(onChange);
+  onChangeRef.current = onChange;
+  const lastLocallyEmittedContentKeyRef = React.useRef<string | null>(null);
+  const lastSyncedNodeIdRef = React.useRef<string | null>(nodeId ?? null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -372,17 +468,23 @@ export function TiptapEditor({
       Placeholder.configure({
         placeholder: placeholderText,
       }),
+      Table,
+      TableRow,
+      TableHeader,
+      TableCell,
       ResizableImage,
     ],
     content: renderedContent ?? undefined,
     editable,
     onUpdate: ({ editor: currentEditor }) => {
-      if (onChange) {
-        onChange(
-          stripAiAttributionFromContent(
-            currentEditor.getJSON() as Record<string, unknown>,
-          ),
-        );
+      const strippedContent = stripAiAttributionFromContent(
+        currentEditor.getJSON() as Record<string, unknown>,
+      );
+      lastLocallyEmittedContentKeyRef.current =
+        getComparableContentKey(strippedContent);
+
+      if (onChangeRef.current) {
+        onChangeRef.current(strippedContent);
       }
     },
   });
@@ -398,14 +500,31 @@ export function TiptapEditor({
   React.useEffect(() => {
     if (!editor) return;
 
+    const nextNodeId = nodeId ?? null;
     const nextContent = renderedContent ?? EMPTY_TIPTAP_DOC;
-    const currentJson = JSON.stringify(editor.getJSON());
-    const nextJson = JSON.stringify(nextContent);
+    const currentContentKey = getComparableContentKey(editor.getJSON());
+    const nextContentKey = getComparableContentKey(nextContent);
+    const didNodeChange = lastSyncedNodeIdRef.current !== nextNodeId;
+    const isParentEchoingLocalEdit =
+      editable &&
+      !didNodeChange &&
+      lastLocallyEmittedContentKeyRef.current === nextContentKey;
+    const shouldPreserveSelectionAcrossSync = editable && !didNodeChange;
 
-    if (currentJson !== nextJson) {
+    if (!isParentEchoingLocalEdit && currentContentKey !== nextContentKey) {
+      const selectionBeforeSync = shouldPreserveSelectionAcrossSync
+        ? getEditorSelectionRange(editor)
+        : null;
+
       editor.commands.setContent(nextContent, { emitUpdate: false });
+
+      if (shouldPreserveSelectionAcrossSync) {
+        restoreEditorSelection(editor, selectionBeforeSync);
+      }
     }
-  }, [editor, renderedContent]);
+
+    lastSyncedNodeIdRef.current = nextNodeId;
+  }, [editor, editable, nodeId, renderedContent]);
 
   // Sync editable prop
   React.useEffect(() => {

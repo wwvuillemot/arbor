@@ -1,7 +1,8 @@
 /**
  * Convert a Markdown string to TipTap/ProseMirror JSON format.
  * Handles: headings, paragraphs, bold, italic, inline code, code blocks,
- * bullet lists, ordered lists, blockquotes, horizontal rules, links, images.
+ * bullet lists, ordered lists, blockquotes, horizontal rules, links, images,
+ * and GitHub-style pipe tables.
  */
 
 type Mark = { type: string; attrs?: Record<string, unknown> };
@@ -12,6 +13,57 @@ type Node = {
   marks?: Mark[];
   text?: string;
 };
+
+function parseMarkdownTableCells(line: string): string[] | null {
+  const trimmedLine = line.trim();
+  if (!trimmedLine.includes("|")) return null;
+
+  const rawCells = trimmedLine.split("|");
+  if (trimmedLine.startsWith("|")) rawCells.shift();
+  if (trimmedLine.endsWith("|")) rawCells.pop();
+
+  if (rawCells.length < 2) return null;
+  return rawCells.map((cellText) => cellText.trim());
+}
+
+function isMarkdownTableDelimiter(
+  line: string,
+  expectedColumnCount: number,
+): boolean {
+  const cells = parseMarkdownTableCells(line);
+  if (!cells || cells.length !== expectedColumnCount) return false;
+
+  return cells.every((cellText) => /^:?-{3,}:?$/.test(cellText));
+}
+
+function createTableCellNode(
+  cellText: string,
+  cellType: "tableCell" | "tableHeader",
+  imageMap?: Map<string, string>,
+): Node {
+  return {
+    type: cellType,
+    content: [
+      {
+        type: "paragraph",
+        content: parseInline(cellText, imageMap),
+      },
+    ],
+  };
+}
+
+function createTableRowNode(
+  cellTexts: string[],
+  cellType: "tableCell" | "tableHeader",
+  imageMap?: Map<string, string>,
+): Node {
+  return {
+    type: "tableRow",
+    content: cellTexts.map((cellText) =>
+      createTableCellNode(cellText, cellType, imageMap),
+    ),
+  };
+}
 
 // ─── Inline parser ───────────────────────────────────────────────────────────
 
@@ -181,6 +233,31 @@ export function markdownToTipTap(
         content: parseInline(line, imageMap),
       });
       i += 2;
+      continue;
+    }
+
+    const tableHeaderCells = parseMarkdownTableCells(line);
+    if (
+      tableHeaderCells &&
+      i + 1 < lines.length &&
+      isMarkdownTableDelimiter(lines[i + 1], tableHeaderCells.length)
+    ) {
+      const tableRows: Node[] = [
+        createTableRowNode(tableHeaderCells, "tableHeader", imageMap),
+      ];
+      i += 2;
+
+      while (i < lines.length) {
+        const bodyCells = parseMarkdownTableCells(lines[i]);
+        if (!bodyCells || bodyCells.length !== tableHeaderCells.length) {
+          break;
+        }
+
+        tableRows.push(createTableRowNode(bodyCells, "tableCell", imageMap));
+        i++;
+      }
+
+      content.push({ type: "table", content: tableRows });
       continue;
     }
 

@@ -9,6 +9,8 @@ interface UseAutoSaveOptions {
   debounceMs?: number;
 }
 
+type AutoSaveContent = Record<string, unknown> | null;
+
 export function useAutoSave({
   nodeId,
   content,
@@ -83,8 +85,18 @@ export function useAutoSave({
     lastSavedRef.current = null;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
   }, []);
 
-  return { status, reset };
+  const markSaved = useCallback((savedContent: AutoSaveContent) => {
+    setStatus("idle");
+    lastSavedRef.current = savedContent ? JSON.stringify(savedContent) : null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  return { status, reset, markSaved };
 }

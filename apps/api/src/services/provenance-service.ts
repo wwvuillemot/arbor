@@ -9,6 +9,7 @@ import {
   countAuditLogEntries,
   countNodeHistoryVersions,
   createNodeHistoryEntry,
+  deleteNodeHistoryEntry,
   getLatestNodeHistoryVersion,
   getNextNodeHistoryVersion,
   getNodeById,
@@ -50,6 +51,11 @@ export type {
  * Supports version history retrieval, rollback, and audit queries.
  */
 export class ProvenanceService {
+  private isNodeLocked(node: { metadata: unknown }): boolean {
+    const metadata = (node.metadata as Record<string, unknown> | null) ?? {};
+    return metadata.isLocked === true;
+  }
+
   // ─── Recording Changes ──────────────────────────────────────────────
 
   /**
@@ -104,6 +110,29 @@ export class ProvenanceService {
    */
   async getVersionCount(nodeId: string): Promise<number> {
     return countNodeHistoryVersions(nodeId);
+  }
+
+  /**
+   * Delete a specific version entry for a node.
+   */
+  async deleteVersion(nodeId: string, version: number): Promise<NodeHistory> {
+    const currentNode = await getNodeById(nodeId);
+
+    if (!currentNode) {
+      throw new Error(`Node ${nodeId} not found`);
+    }
+
+    if (this.isNodeLocked(currentNode)) {
+      throw new Error("Node is locked");
+    }
+
+    const entry = await getNodeHistoryVersion(nodeId, version);
+    if (!entry) {
+      throw new Error(`Version ${version} not found for node ${nodeId}`);
+    }
+
+    await deleteNodeHistoryEntry(entry.id);
+    return entry;
   }
 
   // ─── Filtering ──────────────────────────────────────────────────────
@@ -220,6 +249,10 @@ export class ProvenanceService {
 
     if (!currentNode) {
       throw new Error(`Node ${nodeId} not found`);
+    }
+
+    if (this.isNodeLocked(currentNode)) {
+      throw new Error("Node is locked");
     }
 
     const restoredContent = targetEntry.contentAfter;

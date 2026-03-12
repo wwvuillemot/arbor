@@ -72,6 +72,212 @@ describe("projects-page-helpers", () => {
     expect(normalizeTiptapContent(42)).toBeNull();
   });
 
+  it("normalizes legacy strict markdown table paragraphs into a table node", () => {
+    const legacyTableDocument = {
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Before" }] },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "| Name | Role |" }],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "| --- | --- |" }],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "| Ada | Admin |" }],
+        },
+        { type: "paragraph", content: [{ type: "text", text: "After" }] },
+      ],
+    };
+
+    expect(normalizeTiptapContent(legacyTableDocument)).toEqual({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Before" }] },
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableHeader",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Name" }],
+                    },
+                  ],
+                },
+                {
+                  type: "tableHeader",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Role" }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableCell",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Ada" }],
+                    },
+                  ],
+                },
+                {
+                  type: "tableCell",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Admin" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { type: "paragraph", content: [{ type: "text", text: "After" }] },
+      ],
+    });
+  });
+
+  it("leaves non-table paragraphs containing pipes unchanged", () => {
+    const plainPipeDocument = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "A | B but not really a table" }],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Still plain text" }],
+        },
+      ],
+    };
+
+    expect(normalizeTiptapContent(plainPipeDocument)).toEqual(
+      plainPipeDocument,
+    );
+  });
+
+  it("does not normalize marked paragraph content as a legacy table", () => {
+    const markedTableLikeDocument = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "| Name | Role |",
+              marks: [{ type: "bold" }],
+            },
+          ],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "| --- | --- |" }],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "| Ada | Admin |" }],
+        },
+      ],
+    };
+
+    expect(normalizeTiptapContent(markedTableLikeDocument)).toEqual(
+      markedTableLikeDocument,
+    );
+  });
+
+  it("normalizes a single paragraph with hardBreak-separated table lines into a table node", () => {
+    const legacyHardBreakTableDocument = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "| Name | Role |" },
+            { type: "hardBreak" },
+            { type: "text", text: "| --- | --- |" },
+            { type: "hardBreak" },
+            { type: "text", text: "| Ada | Admin |" },
+          ],
+        },
+      ],
+    };
+
+    expect(normalizeTiptapContent(legacyHardBreakTableDocument)).toEqual({
+      type: "doc",
+      content: [
+        {
+          type: "table",
+          content: [
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableHeader",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Name" }],
+                    },
+                  ],
+                },
+                {
+                  type: "tableHeader",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Role" }],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              type: "tableRow",
+              content: [
+                {
+                  type: "tableCell",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Ada" }],
+                    },
+                  ],
+                },
+                {
+                  type: "tableCell",
+                  content: [
+                    {
+                      type: "paragraph",
+                      content: [{ type: "text", text: "Admin" }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
   it("transforms TipTap content without mutating the original value", () => {
     const tiptapDocument = {
       type: "doc",

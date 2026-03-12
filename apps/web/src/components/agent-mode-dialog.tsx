@@ -149,7 +149,10 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
 
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
             {/* Overview Tab */}
-            <TabsContent value="overview" className="flex-1 overflow-y-auto p-6 space-y-6 mt-0">
+            <TabsContent
+              value="overview"
+              className="flex-1 overflow-y-auto p-6 space-y-6 mt-0"
+            >
               {/* Name (only for create) */}
               {!isEditing && (
                 <div>
@@ -343,7 +346,10 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
             </TabsContent>
 
             {/* Guidelines Tab — fills height, editor scrolls internally */}
-            <TabsContent value="guidelines" className="flex-1 flex flex-col p-6 pt-4 gap-2 mt-0 min-h-0">
+            <TabsContent
+              value="guidelines"
+              className="flex-1 flex flex-col p-6 pt-4 gap-2 mt-0 min-h-0"
+            >
               <label className="flex-shrink-0 block text-sm font-medium">
                 {t("form.guidelines")}{" "}
                 <span className="text-destructive">*</span>
@@ -367,7 +373,10 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
             </TabsContent>
 
             {/* Tools Tab */}
-            <TabsContent value="tools" className="flex-1 overflow-y-auto p-6 space-y-4 mt-0">
+            <TabsContent
+              value="tools"
+              className="flex-1 overflow-y-auto p-6 space-y-4 mt-0"
+            >
               <div>
                 <label className="block text-sm font-medium mb-2">
                   {t("form.allowedTools")}
@@ -383,7 +392,6 @@ export function AgentModeDialog({ open, mode, onClose }: AgentModeDialogProps) {
                 </div>
               )}
             </TabsContent>
-
           </div>
         </Tabs>
       </form>

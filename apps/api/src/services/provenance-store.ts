@@ -100,6 +100,10 @@ export async function getLatestNodeHistoryVersion(
   return entry ?? null;
 }
 
+export async function deleteNodeHistoryEntry(entryId: string): Promise<void> {
+  await db.delete(nodeHistory).where(eq(nodeHistory.id, entryId));
+}
+
 export async function countNodeHistoryVersions(
   nodeId: string,
 ): Promise<number> {

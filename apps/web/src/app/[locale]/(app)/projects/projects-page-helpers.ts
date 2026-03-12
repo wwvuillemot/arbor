@@ -549,6 +549,197 @@ export function getNoteFileNameCandidates(node: ImportHealingNode): string[] {
   return [...fileNameCandidates];
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseMarkdownTableCells(line: string): string[] | null {
+  const trimmedLine = line.trim();
+  if (!trimmedLine.includes("|")) return null;
+
+  const rawCells = trimmedLine.split("|");
+  if (trimmedLine.startsWith("|")) rawCells.shift();
+  if (trimmedLine.endsWith("|")) rawCells.pop();
+
+  if (rawCells.length < 2) return null;
+  return rawCells.map((cellText) => cellText.trim());
+}
+
+function isMarkdownTableDelimiter(
+  line: string,
+  expectedColumnCount: number,
+): boolean {
+  const cells = parseMarkdownTableCells(line);
+  if (!cells || cells.length !== expectedColumnCount) return false;
+
+  return cells.every((cellText) => /^:?-{3,}:?$/.test(cellText));
+}
+
+function extractUnmarkedTextContent(node: unknown): string | null {
+  if (!isRecord(node)) return null;
+
+  if (node.type === "text") {
+    if (typeof node.text !== "string") return null;
+    if (Array.isArray(node.marks) && node.marks.length > 0) return null;
+    return node.text;
+  }
+
+  if (node.type === "hardBreak") {
+    return "\n";
+  }
+
+  if (!Array.isArray(node.content)) {
+    return null;
+  }
+
+  let combinedText = "";
+  for (const childNode of node.content) {
+    const childText = extractUnmarkedTextContent(childNode);
+    if (childText === null) return null;
+    combinedText += childText;
+  }
+
+  return combinedText;
+}
+
+function getLegacyMarkdownTableLine(block: unknown): string | null {
+  if (!isRecord(block) || block.type !== "paragraph") {
+    return null;
+  }
+
+  return extractUnmarkedTextContent(block);
+}
+
+function parseSingleParagraphLegacyMarkdownTable(
+  block: unknown,
+): Record<string, unknown> | null {
+  const paragraphText = getLegacyMarkdownTableLine(block);
+  if (!paragraphText || !paragraphText.includes("\n")) {
+    return null;
+  }
+
+  const tableLines = paragraphText
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (tableLines.length < 3) {
+    return null;
+  }
+
+  const headerCells = parseMarkdownTableCells(tableLines[0]);
+  if (
+    !headerCells ||
+    !isMarkdownTableDelimiter(tableLines[1], headerCells.length)
+  ) {
+    return null;
+  }
+
+  const hasOnlyValidBodyRows = tableLines.slice(2).every((line) => {
+    const bodyCells = parseMarkdownTableCells(line);
+    return Boolean(bodyCells && bodyCells.length === headerCells.length);
+  });
+  if (!hasOnlyValidBodyRows) {
+    return null;
+  }
+
+  const reparsedDocument = markdownToTipTap(tableLines.join("\n"));
+  const reparsedBlock = reparsedDocument.content[0];
+
+  if (
+    reparsedDocument.content.length !== 1 ||
+    !isRecord(reparsedBlock) ||
+    reparsedBlock.type !== "table"
+  ) {
+    return null;
+  }
+
+  return reparsedBlock;
+}
+
+function normalizeLegacyMarkdownTableParagraphs(
+  content: Record<string, unknown>,
+): Record<string, unknown> {
+  if (content.type !== "doc" || !Array.isArray(content.content)) {
+    return content;
+  }
+
+  let changed = false;
+  const normalizedBlocks: unknown[] = [];
+
+  for (let index = 0; index < content.content.length; ) {
+    const singleParagraphTable = parseSingleParagraphLegacyMarkdownTable(
+      content.content[index],
+    );
+    if (singleParagraphTable) {
+      changed = true;
+      normalizedBlocks.push(singleParagraphTable);
+      index += 1;
+      continue;
+    }
+
+    const headerLine = getLegacyMarkdownTableLine(content.content[index]);
+    const separatorLine = getLegacyMarkdownTableLine(
+      content.content[index + 1],
+    );
+    const headerCells = headerLine ? parseMarkdownTableCells(headerLine) : null;
+
+    if (
+      !headerCells ||
+      !separatorLine ||
+      !isMarkdownTableDelimiter(separatorLine, headerCells.length)
+    ) {
+      normalizedBlocks.push(content.content[index]);
+      index += 1;
+      continue;
+    }
+
+    const tableLines = [headerLine, separatorLine];
+    let nextIndex = index + 2;
+
+    while (nextIndex < content.content.length) {
+      const bodyLine = getLegacyMarkdownTableLine(content.content[nextIndex]);
+      const bodyCells = bodyLine ? parseMarkdownTableCells(bodyLine) : null;
+      if (!bodyCells || bodyCells.length !== headerCells.length) {
+        break;
+      }
+
+      tableLines.push(bodyLine);
+      nextIndex += 1;
+    }
+
+    if (tableLines.length < 3) {
+      normalizedBlocks.push(content.content[index]);
+      index += 1;
+      continue;
+    }
+
+    const reparsedDocument = markdownToTipTap(tableLines.join("\n"));
+    const reparsedBlock = reparsedDocument.content[0];
+    if (
+      reparsedDocument.content.length !== 1 ||
+      !isRecord(reparsedBlock) ||
+      reparsedBlock.type !== "table"
+    ) {
+      normalizedBlocks.push(content.content[index]);
+      index += 1;
+      continue;
+    }
+
+    changed = true;
+    normalizedBlocks.push(reparsedBlock);
+    index = nextIndex;
+  }
+
+  if (!changed) {
+    return content;
+  }
+
+  return {
+    ...content,
+    content: normalizedBlocks,
+  };
+}
+
 export function normalizeTiptapContent(
   rawContent: unknown,
 ): Record<string, unknown> | null {
@@ -558,7 +749,9 @@ export function normalizeTiptapContent(
     try {
       const parsedContent = JSON.parse(rawContent) as unknown;
       return parsedContent && typeof parsedContent === "object"
-        ? (parsedContent as Record<string, unknown>)
+        ? normalizeLegacyMarkdownTableParagraphs(
+            parsedContent as Record<string, unknown>,
+          )
         : null;
     } catch {
       return null;
@@ -566,7 +759,9 @@ export function normalizeTiptapContent(
   }
 
   return typeof rawContent === "object"
-    ? (rawContent as Record<string, unknown>)
+    ? normalizeLegacyMarkdownTableParagraphs(
+        rawContent as Record<string, unknown>,
+      )
     : null;
 }
 

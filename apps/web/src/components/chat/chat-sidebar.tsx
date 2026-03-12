@@ -21,6 +21,7 @@ export interface ChatSidebarProps {
   projectName?: string | null;
   contextNodes?: { id: string; name: string; type: string }[];
   onRemoveContext?: (id: string) => void;
+  onAgentResponseSuccess?: () => void;
 }
 
 /**
@@ -36,6 +37,7 @@ export function ChatSidebar({
   projectName,
   contextNodes,
   onRemoveContext,
+  onAgentResponseSuccess,
 }: ChatSidebarProps) {
   const t = useTranslations("chat");
   const [width, setWidth] = React.useState(DEFAULT_WIDTH);
@@ -150,6 +152,7 @@ export function ChatSidebar({
               projectName={projectName}
               contextNodes={contextNodes}
               onRemoveContext={onRemoveContext}
+              onAgentResponseSuccess={onAgentResponseSuccess}
             />
           </div>
         </>

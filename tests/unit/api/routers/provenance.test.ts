@@ -377,6 +377,70 @@ describe("Provenance Router", () => {
     });
   });
 
+  describe("deleteVersion endpoint", () => {
+    it("should delete a specific version via tRPC", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("DeleteVersion");
+
+      await nodeService.updateNode(project.id, {
+        content: { text: "version 2 content" },
+        updatedBy: "user:test",
+      });
+      await nodeService.updateNode(project.id, {
+        content: { text: "version 3 content" },
+        updatedBy: "user:test",
+      });
+
+      const deletedEntry = await caller.provenance.deleteVersion({
+        nodeId: project.id,
+        version: 2,
+      });
+
+      expect(deletedEntry.version).toBe(2);
+
+      const history = await caller.provenance.getHistory({
+        nodeId: project.id,
+      });
+      expect(history.map((entry) => entry.version)).toEqual([3, 1]);
+
+      const versionCount = await caller.provenance.getVersionCount({
+        nodeId: project.id,
+      });
+      expect(versionCount).toBe(2);
+
+      await expect(
+        caller.provenance.getVersion({ nodeId: project.id, version: 2 }),
+      ).rejects.toThrow("Version 2 not found");
+    });
+
+    it("should throw when the version does not exist", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("DeleteMissingVersion");
+
+      await expect(
+        caller.provenance.deleteVersion({ nodeId: project.id, version: 99 }),
+      ).rejects.toThrow(`Version 99 not found for node ${project.id}`);
+    });
+
+    it("should reject deleting a version for a locked node", async () => {
+      const caller = createCaller();
+      const project = await createTestProject("Locked DeleteVersion");
+
+      await nodeService.updateNode(project.id, {
+        content: { text: "version 2 content" },
+        updatedBy: "user:test",
+      });
+
+      await nodeService.updateNode(project.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(
+        caller.provenance.deleteVersion({ nodeId: project.id, version: 1 }),
+      ).rejects.toThrow("Node is locked");
+    });
+  });
+
   describe("rollback endpoint", () => {
     it("should rollback a node to a previous version via tRPC", async () => {
       const caller = createCaller();

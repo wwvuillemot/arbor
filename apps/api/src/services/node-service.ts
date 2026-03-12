@@ -25,6 +25,7 @@ import {
 } from "./node-service-tree";
 
 const provenanceService = new ProvenanceService();
+const LOCKED_NODE_ERROR = "Node is locked";
 
 export interface CreateNodeParams {
   type: NodeType;
@@ -52,11 +53,73 @@ export interface UpdateNodeParams {
 }
 
 export class NodeService {
+  private getNodeMetadata(
+    node: Pick<Node, "metadata">,
+  ): Record<string, unknown> {
+    return (node.metadata as Record<string, unknown> | null) ?? {};
+  }
+
+  private isNodeLocked(node: Pick<Node, "metadata">): boolean {
+    return this.getNodeMetadata(node).isLocked === true;
+  }
+
+  private assertNodeUnlocked(
+    node: Pick<Node, "metadata">,
+    errorMessage = LOCKED_NODE_ERROR,
+  ): void {
+    if (this.isNodeLocked(node)) {
+      throw new Error(errorMessage);
+    }
+  }
+
+  private isAllowedLockedNodeUpdate(
+    existingNode: Node,
+    updates: UpdateNodeParams,
+  ): boolean {
+    const updateFieldNames = Object.keys(updates).filter(
+      (fieldName) => fieldName !== "updatedBy",
+    );
+
+    if (updateFieldNames.length !== 1 || updateFieldNames[0] !== "metadata") {
+      return false;
+    }
+
+    const existingMetadata = this.getNodeMetadata(existingNode);
+    const nextMetadata = updates.metadata ?? {};
+    const allowedMetadataKeys = new Set(["isFavorite", "isLocked"]);
+    const comparedMetadataKeys = new Set([
+      ...Object.keys(existingMetadata),
+      ...Object.keys(nextMetadata),
+    ]);
+
+    for (const metadataKey of comparedMetadataKeys) {
+      const previousValue = existingMetadata[metadataKey];
+      const nextValue = nextMetadata[metadataKey];
+      const valueDidChange =
+        JSON.stringify(previousValue) !== JSON.stringify(nextValue);
+
+      if (valueDidChange && !allowedMetadataKeys.has(metadataKey)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   /**
    * Create a new node with validation
    */
   async createNode(params: CreateNodeParams): Promise<Node> {
     validateCreateNodeParams(params);
+
+    if (params.parentId) {
+      const parentNode = await this.getNodeById(params.parentId);
+      if (!parentNode) {
+        throw new Error("Parent node not found");
+      }
+
+      this.assertNodeUnlocked(parentNode, "Parent node is locked");
+    }
 
     const node = await createNodeRecord(params);
 
@@ -118,6 +181,13 @@ export class NodeService {
       throw new Error("Node not found");
     }
 
+    if (
+      this.isNodeLocked(existing) &&
+      !this.isAllowedLockedNodeUpdate(existing, updates)
+    ) {
+      throw new Error(LOCKED_NODE_ERROR);
+    }
+
     const updated = await updateNodeRecord(id, updates);
 
     // Record provenance for content or name changes
@@ -143,6 +213,8 @@ export class NodeService {
     // Capture content before deletion for provenance
     const existing = await this.getNodeById(id);
     if (existing) {
+      this.assertNodeUnlocked(existing);
+
       await recordNodeDeleted({
         provenanceService,
         node: existing,
@@ -242,7 +314,16 @@ export class NodeService {
       throw new Error("Node not found");
     }
 
+    this.assertNodeUnlocked(node);
+
     await validateMoveNode(this, node, newParentId);
+
+    const targetParentNode = await this.getNodeById(newParentId);
+    if (!targetParentNode) {
+      throw new Error("Target parent not found");
+    }
+
+    this.assertNodeUnlocked(targetParentNode, "Target parent is locked");
 
     const oldParentId = node.parentId;
 
@@ -271,11 +352,15 @@ export class NodeService {
       throw new Error("Source node not found");
     }
 
+    this.assertNodeUnlocked(sourceNode);
+
     // Check target parent exists
     const targetParent = await this.getNodeById(targetParentId);
     if (!targetParent) {
       throw new Error("Target parent not found");
     }
+
+    this.assertNodeUnlocked(targetParent, "Target parent is locked");
 
     return deepCopyNodeTree(this, sourceNode, targetParentId);
   }
@@ -328,6 +413,24 @@ export class NodeService {
 
     return this.updateNode(nodeId, {
       metadata: { ...meta, isFavorite: !isFavorite },
+    });
+  }
+
+  /**
+   * Toggle the isLocked flag in a node's metadata.
+   * Returns the updated node.
+   */
+  async toggleLock(nodeId: string): Promise<Node> {
+    const node = await this.getNodeById(nodeId);
+    if (!node) {
+      throw new Error("Node not found");
+    }
+
+    const metadata = this.getNodeMetadata(node);
+    const isLocked = metadata.isLocked === true;
+
+    return this.updateNode(nodeId, {
+      metadata: { ...metadata, isLocked: !isLocked },
     });
   }
 
@@ -433,6 +536,8 @@ export class NodeService {
     if (!parent) {
       throw new Error("Parent not found");
     }
+
+    this.assertNodeUnlocked(parent, "Parent node is locked");
 
     await reorderNodeChildren(childIds);
   }

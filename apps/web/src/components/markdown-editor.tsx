@@ -198,7 +198,10 @@ export function MarkdownEditor({
 
       {/* Editor Content — scrolls */}
       <div className="flex-1 overflow-y-auto" style={{ minHeight }}>
-        <EditorContent editor={editor} className="markdown-editor-content h-full" />
+        <EditorContent
+          editor={editor}
+          className="markdown-editor-content h-full"
+        />
       </div>
 
       {/* Markdown Hints — pinned */}

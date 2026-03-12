@@ -178,6 +178,37 @@ describe("FileTreeNode", () => {
     expect(screen.getByTestId("tree-node-edit-node-1")).toBeInTheDocument();
   });
 
+  it("should not enter edit mode on double-click when the node is locked", () => {
+    const onRename = vi.fn();
+    const lockedNode = makeNode({ metadata: { isLocked: true } });
+
+    render(
+      <FileTreeNode {...defaultProps} node={lockedNode} onRename={onRename} />,
+    );
+
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+
+    expect(
+      screen.queryByTestId("tree-node-edit-node-1"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("should render a lock indicator for locked nodes", () => {
+    const lockedNode = makeNode({ metadata: { isLocked: true } });
+
+    render(<FileTreeNode {...defaultProps} node={lockedNode} />);
+
+    expect(screen.getByTestId("tree-node-lock-node-1")).toBeInTheDocument();
+  });
+
+  it("should not render a lock indicator for unlocked nodes", () => {
+    render(<FileTreeNode {...defaultProps} />);
+
+    expect(
+      screen.queryByTestId("tree-node-lock-node-1"),
+    ).not.toBeInTheDocument();
+  });
+
   it("should not enter edit mode on double-click when onRename is not provided", () => {
     render(<FileTreeNode {...defaultProps} />);
     fireEvent.doubleClick(screen.getByText("Test Node"));
@@ -249,6 +280,29 @@ describe("FileTreeNode", () => {
     const input = screen.getByTestId("tree-node-edit-node-1");
     fireEvent.change(input, { target: { value: "   " } });
     fireEvent.keyDown(input, { key: "Enter" });
+    expect(onRename).not.toHaveBeenCalled();
+  });
+
+  it("should not call onRename if the node becomes locked before save", () => {
+    const onRename = vi.fn();
+    const { rerender } = render(
+      <FileTreeNode {...defaultProps} onRename={onRename} />,
+    );
+
+    fireEvent.doubleClick(screen.getByText("Test Node"));
+    const input = screen.getByTestId("tree-node-edit-node-1");
+    fireEvent.change(input, { target: { value: "Blocked Rename" } });
+
+    rerender(
+      <FileTreeNode
+        {...defaultProps}
+        onRename={onRename}
+        node={makeNode({ metadata: { isLocked: true } })}
+      />,
+    );
+
+    fireEvent.blur(screen.getByTestId("tree-node-edit-node-1"));
+
     expect(onRename).not.toHaveBeenCalled();
   });
 
@@ -459,23 +513,39 @@ describe("NodeContextMenu", () => {
   it("should show New Folder, New Note, Rename, Delete for folders", () => {
     render(<NodeContextMenu {...defaultProps} node={folderNode} />);
     const menuItems = screen.getAllByRole("menuitem");
-    expect(menuItems).toHaveLength(5);
+    expect(menuItems).toHaveLength(6);
     expect(screen.getByText("tagNode")).toBeInTheDocument();
     expect(screen.getByText("newFolder")).toBeInTheDocument();
     expect(screen.getByText("newNote")).toBeInTheDocument();
     expect(screen.getByText("rename")).toBeInTheDocument();
+    expect(screen.getByText("lock")).toBeInTheDocument();
     expect(screen.getByText("delete")).toBeInTheDocument();
   });
 
-  it("should show only Rename and Delete for notes", () => {
+  it("should show Rename, Lock, and Delete for notes", () => {
     render(<NodeContextMenu {...defaultProps} node={noteNode} />);
     const menuItems = screen.getAllByRole("menuitem");
-    expect(menuItems).toHaveLength(3);
+    expect(menuItems).toHaveLength(4);
     expect(screen.getByText("tagNode")).toBeInTheDocument();
     expect(screen.getByText("rename")).toBeInTheDocument();
+    expect(screen.getByText("lock")).toBeInTheDocument();
     expect(screen.getByText("delete")).toBeInTheDocument();
     expect(screen.queryByText("newFolder")).not.toBeInTheDocument();
     expect(screen.queryByText("newNote")).not.toBeInTheDocument();
+  });
+
+  it("should show unlock for locked nodes", () => {
+    const lockedNoteNode = makeNode({
+      id: "locked-note-1",
+      type: "note",
+      name: "Locked Note",
+      metadata: { isLocked: true },
+    });
+
+    render(<NodeContextMenu {...defaultProps} node={lockedNoteNode} />);
+
+    expect(screen.getByText("unlock")).toBeInTheDocument();
+    expect(screen.queryByText("lock")).not.toBeInTheDocument();
   });
 
   it("should call onAction and onClose when menu item is clicked", () => {
@@ -502,6 +572,15 @@ describe("NodeContextMenu", () => {
     fireEvent.click(screen.getByText("delete"));
     expect(defaultProps.onAction).toHaveBeenCalledWith({
       type: "delete",
+      node: folderNode,
+    });
+  });
+
+  it("should call onAction with toggleLock action", () => {
+    render(<NodeContextMenu {...defaultProps} />);
+    fireEvent.click(screen.getByText("lock"));
+    expect(defaultProps.onAction).toHaveBeenCalledWith({
+      type: "toggleLock",
       node: folderNode,
     });
   });
@@ -550,6 +629,19 @@ describe("FileTreeNode - Drag and Drop", () => {
     expect(treeitem).toHaveAttribute("draggable", "false");
   });
 
+  it("should not make locked nodes draggable", () => {
+    const lockedNode = makeNode({
+      type: "note",
+      id: "locked-note-1",
+      metadata: { isLocked: true },
+    });
+
+    render(<FileTreeNode {...defaultProps} node={lockedNode} />);
+
+    const treeitem = screen.getByRole("treeitem");
+    expect(treeitem).toHaveAttribute("draggable", "false");
+  });
+
   it("should set node id in dataTransfer on dragStart", () => {
     const noteNode = makeNode({ type: "note", id: "note-1" });
     render(<FileTreeNode {...defaultProps} node={noteNode} />);
@@ -572,6 +664,25 @@ describe("FileTreeNode - Drag and Drop", () => {
       dataTransfer: { setData, effectAllowed: "" },
     });
     // setData should NOT be called because the handler prevents drag for projects
+    expect(setData).not.toHaveBeenCalled();
+  });
+
+  it("should prevent dragStart for locked nodes", () => {
+    const lockedNode = makeNode({
+      type: "note",
+      id: "locked-note-1",
+      metadata: { isLocked: true },
+    });
+
+    render(<FileTreeNode {...defaultProps} node={lockedNode} />);
+
+    const treeitem = screen.getByRole("treeitem");
+    const setData = vi.fn();
+
+    fireEvent.dragStart(treeitem, {
+      dataTransfer: { setData, effectAllowed: "" },
+    });
+
     expect(setData).not.toHaveBeenCalled();
   });
 
@@ -647,6 +758,24 @@ describe("FileTreeNode - Drag and Drop", () => {
       },
       clientY: 50,
     });
+    expect(defaultProps.onDrop).not.toHaveBeenCalled();
+  });
+
+  it("should not call onDrop when the target node is locked", () => {
+    const lockedNode = makeNode({ metadata: { isLocked: true } });
+
+    render(<FileTreeNode {...defaultProps} node={lockedNode} />);
+
+    const treeitem = screen.getByRole("treeitem");
+
+    fireEvent.drop(treeitem, {
+      dataTransfer: {
+        getData: (type: string) =>
+          type === "application/arbor-node-id" ? "dragged-id" : "",
+      },
+      clientY: 50,
+    });
+
     expect(defaultProps.onDrop).not.toHaveBeenCalled();
   });
 

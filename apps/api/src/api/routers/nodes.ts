@@ -218,6 +218,13 @@ export const nodesRouter = router({
       return await nodeService.toggleFavorite(input.nodeId);
     }),
 
+  // Toggle isLocked on a node's metadata
+  toggleLock: publicProcedure
+    .input(z.object({ nodeId: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      return await nodeService.toggleLock(input.nodeId);
+    }),
+
   // Get all favorited nodes for a project
   getFavorites: publicProcedure
     .input(z.object({ projectId: z.string().uuid() }))

@@ -129,7 +129,11 @@ function SaveImageToNode({
         content: [
           {
             type: "image",
-            attrs: { src: getMediaAttachmentUrl(attachmentId), alt: null, title: null },
+            attrs: {
+              src: getMediaAttachmentUrl(attachmentId),
+              alt: null,
+              title: null,
+            },
           },
         ],
       },
@@ -143,10 +147,14 @@ function SaveImageToNode({
   };
 
   const handleAddToExisting = async (nodeId: string, nodeName: string) => {
-    const existingContent = nodesQuery.data?.find((n) => n.id === nodeId)?.content;
+    const existingContent = nodesQuery.data?.find(
+      (n) => n.id === nodeId,
+    )?.content;
     type TipTapDoc = { type: string; content?: unknown[] };
     const doc: TipTapDoc =
-      existingContent && typeof existingContent === "object" && (existingContent as TipTapDoc).type === "doc"
+      existingContent &&
+      typeof existingContent === "object" &&
+      (existingContent as TipTapDoc).type === "doc"
         ? (existingContent as TipTapDoc)
         : { type: "doc", content: [] };
     const updated: TipTapDoc = {
@@ -155,7 +163,11 @@ function SaveImageToNode({
         ...(doc.content ?? []),
         {
           type: "image",
-          attrs: { src: getMediaAttachmentUrl(attachmentId), alt: null, title: null },
+          attrs: {
+            src: getMediaAttachmentUrl(attachmentId),
+            alt: null,
+            title: null,
+          },
         },
       ],
     };
@@ -462,7 +474,10 @@ function ToolResultDisplay({
           </p>
         )}
         {projectId && (
-          <SaveImageToNode attachmentId={String(parsed.id)} projectId={projectId} />
+          <SaveImageToNode
+            attachmentId={String(parsed.id)}
+            projectId={projectId}
+          />
         )}
       </div>
     );
@@ -496,7 +511,11 @@ function ToolResultDisplay({
 /**
  * ChatMessage - Renders a single chat message with role badge, content, and metadata.
  */
-export function ChatMessage({ message, projectId, className }: ChatMessageProps) {
+export function ChatMessage({
+  message,
+  projectId,
+  className,
+}: ChatMessageProps) {
   const t = useTranslations("chat");
   const router = useRouter();
   const [copied, setCopied] = React.useState(false);
@@ -824,7 +843,10 @@ export function ChatMessage({ message, projectId, className }: ChatMessageProps)
                 <span>{message.toolName}</span>
               </div>
             )}
-            <ToolResultDisplay content={message.content} projectId={projectId} />
+            <ToolResultDisplay
+              content={message.content}
+              projectId={projectId}
+            />
           </div>
         )}
 

@@ -38,27 +38,19 @@ const mockDeleteThreadMutate = vi.fn();
 const mockAddMessageMutate = vi.fn();
 const mockSendMessageMutate = vi.fn();
 
-// Mock data
-const mockThreads = [
-  {
-    id: "thread-1",
-    name: "Assistant - 1/1/2024",
-    agentMode: "assistant",
-    projectId: null,
-    createdAt: "2024-01-01T10:00:00Z",
-    updatedAt: "2024-01-01T12:00:00Z",
-  },
-  {
-    id: "thread-2",
-    name: "Researcher Session",
-    agentMode: "researcher",
-    projectId: null,
-    createdAt: "2024-01-02T10:00:00Z",
-    updatedAt: "2024-01-02T12:00:00Z",
-  },
-];
+type MockChatMessageRecord = {
+  id: string;
+  threadId: string;
+  role: string;
+  content: string | null;
+  model: string | null;
+  tokensUsed: number | null;
+  toolCalls: unknown;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
 
-const mockMessages = [
+const buildMockMessages = (): MockChatMessageRecord[] => [
   {
     id: "msg-1",
     threadId: "thread-1",
@@ -91,6 +83,43 @@ const mockMessages = [
     toolCalls: [{ id: "tc-1", name: "search_nodes" }],
     metadata: {},
     createdAt: "2024-01-01T10:02:00Z",
+  },
+];
+
+let mockMessages = buildMockMessages();
+const mockSendMessageState: {
+  isPending: boolean;
+  variables?: {
+    threadId: string;
+    content: string;
+    masterKey: string;
+    contextNodeIds: string[];
+    projectId: string | null;
+  };
+  autoResolve: boolean;
+} = {
+  isPending: false,
+  variables: undefined,
+  autoResolve: true,
+};
+
+// Mock data
+const mockThreads = [
+  {
+    id: "thread-1",
+    name: "Assistant - 1/1/2024",
+    agentMode: "assistant",
+    projectId: null,
+    createdAt: "2024-01-01T10:00:00Z",
+    updatedAt: "2024-01-01T12:00:00Z",
+  },
+  {
+    id: "thread-2",
+    name: "Researcher Session",
+    agentMode: "researcher",
+    projectId: null,
+    createdAt: "2024-01-02T10:00:00Z",
+    updatedAt: "2024-01-02T12:00:00Z",
   },
 ];
 
@@ -171,9 +200,26 @@ vi.mock("@/lib/trpc", () => {
         useMutation: vi.fn((options?: MutationOptions) => ({
           mutate: (...mutationArgs: unknown[]) => {
             mockSendMessageMutate(...mutationArgs);
-            options?.onSuccess?.();
+            const [variables] = mutationArgs as [
+              {
+                threadId: string;
+                content: string;
+                masterKey: string;
+                contextNodeIds: string[];
+                projectId: string | null;
+              },
+            ];
+            mockSendMessageState.variables = variables;
+            if (mockSendMessageState.autoResolve) {
+              options?.onSuccess?.();
+            }
           },
-          isPending: false,
+          get isPending() {
+            return mockSendMessageState.isPending;
+          },
+          get variables() {
+            return mockSendMessageState.variables;
+          },
         })),
       },
     },
@@ -521,6 +567,10 @@ describe("ChatMessage", () => {
 describe("ChatPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMessages = buildMockMessages();
+    mockSendMessageState.isPending = false;
+    mockSendMessageState.variables = undefined;
+    mockSendMessageState.autoResolve = true;
   });
 
   it("should render the chat panel", () => {
@@ -651,6 +701,53 @@ describe("ChatPanel", () => {
       contextNodeIds: [],
       projectId: null,
     });
+  });
+
+  it("should notify listeners after a successful agent response", () => {
+    const handleAgentResponseSuccess = vi.fn();
+
+    render(<ChatPanel onAgentResponseSuccess={handleAgentResponseSuccess} />);
+
+    fireEvent.click(screen.getAllByTestId("thread-item")[0]);
+    fireEvent.change(screen.getByTestId("chat-input"), {
+      target: { value: "Refresh the selected note" },
+    });
+    fireEvent.click(screen.getByTestId("send-btn"));
+
+    expect(handleAgentResponseSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it("should not render a duplicate optimistic user message when the fetched messages already include it", () => {
+    const submittedMessageContent = "This should only render once";
+
+    mockMessages = [
+      ...buildMockMessages(),
+      {
+        id: "msg-4",
+        threadId: "thread-1",
+        role: "user",
+        content: submittedMessageContent,
+        model: null,
+        tokensUsed: null,
+        toolCalls: null,
+        metadata: {},
+        createdAt: "2024-01-01T10:03:00Z",
+      },
+    ];
+    mockSendMessageState.isPending = true;
+    mockSendMessageState.variables = {
+      threadId: "thread-1",
+      content: submittedMessageContent,
+      masterKey: "mock-master-key-for-testing",
+      contextNodeIds: [],
+      projectId: null,
+    };
+
+    render(<ChatPanel />);
+
+    fireEvent.click(screen.getAllByTestId("thread-item")[0]);
+
+    expect(screen.getAllByText(submittedMessageContent)).toHaveLength(1);
   });
 
   it("should send a message on Enter key", () => {

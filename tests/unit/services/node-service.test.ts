@@ -78,6 +78,22 @@ describe("NodeService", () => {
         }),
       ).rejects.toThrow("Only projects can be top-level nodes");
     });
+
+    it("should reject creating a child under a locked parent", async () => {
+      const project = await createTestProject("Locked Project");
+
+      await nodeService.updateNode(project.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(
+        nodeService.createNode({
+          type: "note",
+          name: "Blocked Note",
+          parentId: project.id,
+        }),
+      ).rejects.toThrow("Parent node is locked");
+    });
   });
 
   describe("getNodeById", () => {
@@ -182,6 +198,35 @@ describe("NodeService", () => {
         }),
       ).rejects.toThrow("Node not found");
     });
+
+    it("should reject renaming a locked node", async () => {
+      const project = await createTestProject("Locked Project");
+
+      await nodeService.updateNode(project.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(
+        nodeService.updateNode(project.id, {
+          name: "Renamed Locked Project",
+        }),
+      ).rejects.toThrow("Node is locked");
+    });
+
+    it("should reject content updates on a locked node", async () => {
+      const project = await createTestProject("Locked Project");
+      const note = await createTestNote("Locked Note", project.id, "Original");
+
+      await nodeService.updateNode(note.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(
+        nodeService.updateNode(note.id, {
+          content: "Updated content",
+        }),
+      ).rejects.toThrow("Node is locked");
+    });
   });
 
   describe("deleteNode", () => {
@@ -251,6 +296,34 @@ describe("NodeService", () => {
       expect(preservedAttachment.nodeId).toBe(project.id);
       expect(await nodeService.getNodeById(imageOwnerNote.id)).toBeNull();
       expect(await nodeService.getNodeById(referencingNote.id)).not.toBeNull();
+    });
+
+    it("should reject deleting a locked node", async () => {
+      const node = await createTestProject("Locked Project");
+
+      await nodeService.updateNode(node.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(nodeService.deleteNode(node.id)).rejects.toThrow(
+        "Node is locked",
+      );
+    });
+  });
+
+  describe("copyNode", () => {
+    it("should reject copying from a locked source node", async () => {
+      const project = await createTestProject("My Novel");
+      const sourceFolder = await createTestFolder("Locked Folder", project.id);
+      const targetFolder = await createTestFolder("Target Folder", project.id);
+
+      await nodeService.updateNode(sourceFolder.id, {
+        metadata: { isLocked: true },
+      });
+
+      await expect(
+        nodeService.copyNode(sourceFolder.id, targetFolder.id),
+      ).rejects.toThrow("Node is locked");
     });
   });
 

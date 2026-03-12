@@ -124,6 +124,24 @@ describe("MCP Server", () => {
       expect(node.name).toBe("Updated Name");
       expect(node.updatedBy).toBe("llm:mcp-client");
     });
+
+    it("should surface a locked-node error", async () => {
+      const project = await createTestProject("Locked Project");
+      const nodeService = new NodeService();
+
+      await nodeService.updateNode(project.id, {
+        metadata: { isLocked: true },
+      });
+
+      const result = await client.callTool({
+        name: "update_node",
+        arguments: { id: project.id, name: "Blocked Rename" },
+      });
+
+      expect(result.isError).toBe(true);
+      const content = result.content as Array<{ type: string; text: string }>;
+      expect(content[0]?.text).toContain("Node is locked");
+    });
   });
 
   // ─── search_nodes Tool ──────────────────────────────────────────────
