@@ -21,6 +21,9 @@ export function useAutoSave({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedRef = useRef<string | null>(null);
   const isMountedRef = useRef(true);
+  const nodeIdRef = useRef(nodeId);
+  const contentRef = useRef<AutoSaveContent>(content);
+  const onSaveRef = useRef(onSave);
 
   // Track mounted state
   useEffect(() => {
@@ -30,11 +33,61 @@ export function useAutoSave({
     };
   }, []);
 
+  useEffect(() => {
+    nodeIdRef.current = nodeId;
+    contentRef.current = content;
+    onSaveRef.current = onSave;
+  }, [content, nodeId, onSave]);
+
   // Reset status when node changes
   useEffect(() => {
     setStatus("idle");
     lastSavedRef.current = null;
   }, [nodeId]);
+
+  const saveContent = useCallback(
+    async (targetNodeId: string | null, targetContent: AutoSaveContent) => {
+      if (!targetNodeId || !targetContent) {
+        return;
+      }
+
+      const contentJson = JSON.stringify(targetContent);
+
+      if (contentJson === lastSavedRef.current) {
+        return;
+      }
+
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      if (!isMountedRef.current) {
+        return;
+      }
+
+      setStatus("saving");
+
+      try {
+        await onSaveRef.current(targetNodeId, targetContent);
+        if (isMountedRef.current) {
+          lastSavedRef.current = contentJson;
+          setStatus("saved");
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              setStatus("idle");
+            }
+          }, 2000);
+        }
+      } catch (error) {
+        if (isMountedRef.current) {
+          setStatus("error");
+        }
+        throw error;
+      }
+    },
+    [],
+  );
 
   // Debounced save effect
   useEffect(() => {
@@ -51,25 +104,11 @@ export function useAutoSave({
     }
 
     timerRef.current = setTimeout(async () => {
-      if (!isMountedRef.current) return;
-
-      setStatus("saving");
+      timerRef.current = null;
       try {
-        await onSave(nodeId, content);
-        if (isMountedRef.current) {
-          lastSavedRef.current = contentJson;
-          setStatus("saved");
-          // Reset to idle after a delay
-          setTimeout(() => {
-            if (isMountedRef.current) {
-              setStatus("idle");
-            }
-          }, 2000);
-        }
+        await saveContent(nodeId, content);
       } catch {
-        if (isMountedRef.current) {
-          setStatus("error");
-        }
+        // saveContent already updates status
       }
     }, debounceMs);
 
@@ -78,7 +117,7 @@ export function useAutoSave({
         clearTimeout(timerRef.current);
       }
     };
-  }, [nodeId, content, onSave, debounceMs]);
+  }, [nodeId, content, debounceMs, saveContent]);
 
   const reset = useCallback(() => {
     setStatus("idle");
@@ -98,5 +137,9 @@ export function useAutoSave({
     }
   }, []);
 
-  return { status, reset, markSaved };
+  const flush = useCallback(async () => {
+    await saveContent(nodeIdRef.current, contentRef.current);
+  }, [saveContent]);
+
+  return { status, reset, markSaved, flush };
 }

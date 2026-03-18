@@ -88,6 +88,68 @@ describe("Search Router", () => {
       });
     });
 
+    it("should include deeply nested project descendants", async () => {
+      const [topLevelFolder] = await db
+        .insert(nodes)
+        .values({
+          type: "folder",
+          name: "Research",
+          slug: "research",
+          parentId: testProjectId,
+          content: "",
+          authorType: "human",
+        })
+        .returning();
+      const [nestedFolder] = await db
+        .insert(nodes)
+        .values({
+          type: "folder",
+          name: "Simulations",
+          slug: "simulations",
+          parentId: topLevelFolder.id,
+          content: "",
+          authorType: "human",
+        })
+        .returning();
+      const [deepFolder] = await db
+        .insert(nodes)
+        .values({
+          type: "folder",
+          name: "Archived Runs",
+          slug: "archived-runs",
+          parentId: nestedFolder.id,
+          content: "",
+          authorType: "human",
+        })
+        .returning();
+      const [deeplyNestedNote] = await db
+        .insert(nodes)
+        .values({
+          type: "note",
+          name: "Simulation Results",
+          slug: "simulation-results",
+          parentId: deepFolder.id,
+          content: "simulation evidence from a deeply nested note",
+          authorType: "human",
+        })
+        .returning();
+
+      const caller = appRouter.createCaller({} as any);
+      const results = await caller.search.keywordSearch({
+        query: "simulation",
+        filters: { projectId: testProjectId },
+        options: { limit: 10 },
+      });
+
+      const deeplyNestedResult = results.find(
+        (result) => result.node.id === deeplyNestedNote.id,
+      );
+
+      expect(deeplyNestedResult).toBeDefined();
+      expect(deeplyNestedResult?.projectId).toBe(testProjectId);
+      expect(deeplyNestedResult?.projectName).toBe("Dragon Chronicles");
+    });
+
     it("should return empty array for no matches", async () => {
       const caller = appRouter.createCaller({} as any);
       const results = await caller.search.keywordSearch({

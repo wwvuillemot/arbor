@@ -1152,7 +1152,7 @@ describe("useAutoSave", () => {
     debounceMs?: number;
     savedContent?: Record<string, unknown> | null;
   }) {
-    const { status, markSaved } = useAutoSave({
+    const { status, markSaved, flush } = useAutoSave({
       nodeId,
       content,
       onSave,
@@ -1168,6 +1168,15 @@ describe("useAutoSave", () => {
           onClick={() => markSaved(savedContent ?? content)}
         >
           Mark saved
+        </button>
+        <button
+          type="button"
+          data-testid="flush-save"
+          onClick={() => {
+            void flush();
+          }}
+        >
+          Flush save
         </button>
       </>
     );
@@ -1217,6 +1226,34 @@ describe("useAutoSave", () => {
     });
 
     expect(onSave).toHaveBeenCalledWith("node-1", content);
+  });
+
+  it("should flush a pending save immediately", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const content = { type: "doc", content: [{ type: "paragraph" }] };
+
+    render(
+      <TestComponent
+        nodeId="node-1"
+        content={content}
+        onSave={onSave}
+        debounceMs={500}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("flush-save"));
+      await Promise.resolve();
+    });
+
+    expect(onSave).toHaveBeenCalledWith("node-1", content);
+
+    await act(async () => {
+      vi.advanceTimersByTime(500);
+      await Promise.resolve();
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
   });
 
   it("should show saving status during save", async () => {

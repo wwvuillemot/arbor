@@ -2,6 +2,19 @@ import { eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { nodes } from "../db/schema";
 import type { SearchFilters } from "./search-types";
 
+function buildProjectScopeCondition(projectId: string) {
+  return sql`${nodes.id} IN (
+    WITH RECURSIVE project_scope(id) AS (
+      SELECT ${projectId}::uuid
+      UNION ALL
+      SELECT child.id
+      FROM nodes child
+      INNER JOIN project_scope parent_scope ON child.parent_id = parent_scope.id
+    )
+    SELECT id FROM project_scope
+  )`;
+}
+
 export function buildSearchFilterConditions(filters: SearchFilters) {
   const conditions: ReturnType<typeof sql>[] = [];
 
@@ -10,18 +23,7 @@ export function buildSearchFilterConditions(filters: SearchFilters) {
   }
 
   if (filters.projectId) {
-    conditions.push(
-      or(
-        eq(nodes.id, filters.projectId),
-        eq(nodes.parentId, filters.projectId),
-        sql`${nodes.id} IN (
-          SELECT n2.id FROM nodes n2
-          WHERE n2.parent_id IN (
-            SELECT n3.id FROM nodes n3 WHERE n3.parent_id = ${filters.projectId}
-          )
-        )`,
-      )!,
-    );
+    conditions.push(buildProjectScopeCondition(filters.projectId));
   }
 
   if (filters.parentId) {

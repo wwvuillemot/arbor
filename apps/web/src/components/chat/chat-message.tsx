@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
 import { trpc } from "@/lib/trpc";
@@ -535,9 +536,8 @@ export function ChatMessage({
           ? t("role.system")
           : t("role.tool");
 
-  const handleCopy = React.useCallback(() => {
-    if (message.content) {
-      navigator.clipboard.writeText(message.content);
+  const handleCopy = React.useCallback(async () => {
+    if (message.content && (await copyTextToClipboard(message.content))) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }

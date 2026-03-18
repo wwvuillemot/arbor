@@ -29,6 +29,14 @@ export function wrapMarkdownInHtmlDocument(
     pre code { background: none; padding: 0; }
     blockquote { border-left: 3px solid #ddd; margin-left: 0; padding-left: 16px; color: #666; }
     img { max-width: 100%; height: auto; }
+    body > img,
+    h1 + img, h2 + img, h3 + img, h4 + img, h5 + img, h6 + img {
+      display: block;
+      margin: 1.25em auto 1.5em;
+      max-height: 420px;
+      object-fit: contain;
+      page-break-inside: avoid;
+    }
     hr { border: none; border-top: 1px solid #eee; margin: 2em 0; }
     ul, ol { margin: 0.5em 0; padding-left: 2em; }
     @media print {

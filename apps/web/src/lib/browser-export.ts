@@ -1,11 +1,6 @@
 const HTML_MIME_TYPE = "text/html";
 
-export function downloadTextFile(
-  fileContent: string,
-  fileName: string,
-  mimeType: string,
-): void {
-  const fileBlob = new Blob([fileContent], { type: mimeType });
+function downloadBlob(fileBlob: Blob, fileName: string): void {
   const fileUrl = URL.createObjectURL(fileBlob);
   const downloadAnchor = document.createElement("a");
 
@@ -14,6 +9,23 @@ export function downloadTextFile(
   downloadAnchor.click();
 
   URL.revokeObjectURL(fileUrl);
+}
+
+export function downloadTextFile(
+  fileContent: string,
+  fileName: string,
+  mimeType: string,
+): void {
+  downloadBlob(new Blob([fileContent], { type: mimeType }), fileName);
+}
+
+export function downloadBinaryFile(
+  fileBytes: Uint8Array,
+  fileName: string,
+  mimeType: string,
+): void {
+  const blobBytes = new Uint8Array(fileBytes);
+  downloadBlob(new Blob([blobBytes], { type: mimeType }), fileName);
 }
 
 export function openHtmlPrintWindow(htmlContent: string): Window | null {

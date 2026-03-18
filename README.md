@@ -89,6 +89,8 @@ arbor/
 
 See [`docs/README.md`](docs/README.md) for links to app-specific documentation.
 
+For Pandoc/Google Docs export notes, see [`docs/export/README.md`](docs/export/README.md).
+
 ## Development Principles
 
 - **TDD**: Write tests first, maintain high coverage

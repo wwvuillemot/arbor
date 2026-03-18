@@ -15,18 +15,17 @@ import { cn } from "@/lib/utils";
 import { HeroGradient } from "@/components/hero-gradient";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
 import { NoteCard } from "@/components/note-card";
-import { ProjectSettingsDialog } from "../projects/project-settings-dialog";
+import {
+  ProjectSettingsDialog,
+  type ProjectSettingsNode,
+} from "@/app/[locale]/(app)/projects/project-settings-dialog";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { setCurrentProject } = useCurrentProject();
 
-  const [settingsProject, setSettingsProject] = React.useState<{
-    id: string;
-    name: string;
-    summary?: string | null;
-    metadata: Record<string, unknown>;
-  } | null>(null);
+  const [settingsNode, setSettingsNode] =
+    React.useState<ProjectSettingsNode | null>(null);
   const projectsQuery = trpc.nodes.getAllProjects.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
@@ -90,14 +89,14 @@ export default function DashboardPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto space-y-10">
-      {settingsProject && (
+      {settingsNode && (
         <ProjectSettingsDialog
           open
-          onClose={() => setSettingsProject(null)}
-          project={settingsProject}
+          onClose={() => setSettingsNode(null)}
+          node={settingsNode}
           onDelete={() => {
-            deleteMutation.mutate({ id: settingsProject.id });
-            setSettingsProject(null);
+            deleteMutation.mutate({ id: settingsNode.id });
+            setSettingsNode(null);
           }}
         />
       )}
@@ -165,9 +164,11 @@ export default function DashboardPage() {
                   }
                   onClick={() => handleOpenProject(project.id)}
                   onSettings={() =>
-                    setSettingsProject({
+                    setSettingsNode({
                       id: project.id,
                       name: project.name,
+                      type: "project",
+                      projectId: project.id,
                       summary:
                         (project as { summary?: string | null }).summary ??
                         null,

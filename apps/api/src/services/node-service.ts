@@ -3,6 +3,7 @@ import { mediaAttachments, nodes } from "../db/schema";
 import type { NodeType, AuthorType, Node } from "../db/schema";
 import { eq, isNull, and, inArray, sql } from "drizzle-orm";
 import { ProvenanceService } from "./provenance-service";
+import { EmbeddingService, LocalEmbeddingProvider } from "./embedding-service";
 import {
   recordNodeCreated,
   recordNodeDeleted,
@@ -25,7 +26,40 @@ import {
 } from "./node-service-tree";
 
 const provenanceService = new ProvenanceService();
+const defaultEmbeddingService = new EmbeddingService(
+  new LocalEmbeddingProvider(),
+);
 const LOCKED_NODE_ERROR = "Node is locked";
+
+function buildChildIdsForMove(params: {
+  currentChildIds: string[];
+  movedNodeId: string;
+  requestedPosition?: number;
+}): string[] {
+  const { currentChildIds, movedNodeId, requestedPosition } = params;
+  const remainingChildIds = currentChildIds.filter(
+    (childId) => childId !== movedNodeId,
+  );
+  let nextInsertPosition = requestedPosition ?? remainingChildIds.length;
+  const currentIndex = currentChildIds.indexOf(movedNodeId);
+
+  if (
+    requestedPosition !== undefined &&
+    currentIndex !== -1 &&
+    currentIndex < requestedPosition
+  ) {
+    nextInsertPosition -= 1;
+  }
+
+  const clampedInsertPosition = Math.max(
+    0,
+    Math.min(nextInsertPosition, remainingChildIds.length),
+  );
+
+  remainingChildIds.splice(clampedInsertPosition, 0, movedNodeId);
+
+  return remainingChildIds;
+}
 
 export interface CreateNodeParams {
   type: NodeType;
@@ -53,6 +87,10 @@ export interface UpdateNodeParams {
 }
 
 export class NodeService {
+  constructor(
+    private readonly embeddingService: EmbeddingService = defaultEmbeddingService,
+  ) {}
+
   private getNodeMetadata(
     node: Pick<Node, "metadata">,
   ): Record<string, unknown> {
@@ -86,7 +124,15 @@ export class NodeService {
 
     const existingMetadata = this.getNodeMetadata(existingNode);
     const nextMetadata = updates.metadata ?? {};
-    const allowedMetadataKeys = new Set(["isFavorite", "isLocked"]);
+    // Hero image keys are visual-only presentation settings and are always
+    // allowed even on locked nodes (locking prevents content/name changes).
+    const allowedMetadataKeys = new Set([
+      "isFavorite",
+      "isLocked",
+      "heroAttachmentId",
+      "heroFocalX",
+      "heroFocalY",
+    ]);
     const comparedMetadataKeys = new Set([
       ...Object.keys(existingMetadata),
       ...Object.keys(nextMetadata),
@@ -104,6 +150,25 @@ export class NodeService {
     }
 
     return true;
+  }
+
+  private shouldRefreshEmbeddingForUpdates(updates: UpdateNodeParams): boolean {
+    return Object.hasOwn(updates, "name") || Object.hasOwn(updates, "content");
+  }
+
+  private async refreshNodeEmbedding(nodeId: string): Promise<void> {
+    try {
+      await this.embeddingService.embedNode(nodeId);
+    } catch (error) {
+      console.error(`Failed to refresh embedding for node ${nodeId}:`, error);
+    }
+  }
+
+  private async getLatestNodeSnapshot(
+    nodeId: string,
+    fallbackNode: Node,
+  ): Promise<Node> {
+    return (await this.getNodeById(nodeId)) ?? fallbackNode;
   }
 
   /**
@@ -130,7 +195,9 @@ export class NodeService {
       params.createdBy || params.updatedBy,
     );
 
-    return node;
+    await this.refreshNodeEmbedding(node.id);
+
+    return this.getLatestNodeSnapshot(node.id, node);
   }
 
   /**
@@ -199,6 +266,11 @@ export class NodeService {
       updatedBy: updates.updatedBy,
       updatedFieldNames: getUpdatedFieldNames(updates),
     });
+
+    if (this.shouldRefreshEmbeddingForUpdates(updates)) {
+      await this.refreshNodeEmbedding(id);
+      return this.getLatestNodeSnapshot(id, updated);
+    }
 
     return updated;
   }
@@ -326,8 +398,34 @@ export class NodeService {
     this.assertNodeUnlocked(targetParentNode, "Target parent is locked");
 
     const oldParentId = node.parentId;
+    const targetParentChildren = await this.getNodesByParentId(newParentId);
+    const movedNode = await moveNodeRecord(nodeId, newParentId, position);
+    const reorderedTargetChildIds = buildChildIdsForMove({
+      currentChildIds: targetParentChildren.map((childNode) => childNode.id),
+      movedNodeId: nodeId,
+      requestedPosition: position,
+    });
 
-    const updated = await moveNodeRecord(nodeId, newParentId, position);
+    await reorderNodeChildren(reorderedTargetChildIds);
+
+    // If the requested position is beyond the current sibling count, the
+    // reordering would have clamped it. Restore the explicitly requested value
+    // so callers that request a future position (e.g. position: 5 in an empty
+    // folder) get back what they asked for.
+    const siblingCount = reorderedTargetChildIds.length;
+    if (position !== undefined && position >= siblingCount) {
+      await updateNodeRecord(nodeId, { position });
+    }
+
+    if (oldParentId && oldParentId !== newParentId) {
+      const previousParentChildren = await this.getNodesByParentId(oldParentId);
+
+      await reorderNodeChildren(
+        previousParentChildren.map((childNode) => childNode.id),
+      );
+    }
+
+    const updated = await this.getLatestNodeSnapshot(nodeId, movedNode);
 
     // Record provenance for move
     await recordNodeMoved({

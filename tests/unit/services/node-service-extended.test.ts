@@ -53,6 +53,82 @@ describe("NodeService - Extended Operations (Phase 1.1)", () => {
       expect(moved.position).toBe(0);
     });
 
+    it("should renumber sibling positions when reordering within the same parent", async () => {
+      const project = await createTestProject("Project");
+      const noteA = await nodeService.createNode({
+        type: "note",
+        name: "Note A",
+        parentId: project.id,
+        position: 0,
+      });
+      const noteB = await nodeService.createNode({
+        type: "note",
+        name: "Note B",
+        parentId: project.id,
+        position: 1,
+      });
+      const noteC = await nodeService.createNode({
+        type: "note",
+        name: "Note C",
+        parentId: project.id,
+        position: 2,
+      });
+
+      await nodeService.moveNode(noteA.id, project.id, 2);
+
+      const children = await nodeService.getNodesByParentId(project.id);
+
+      expect(children.map((child) => child.id)).toEqual([
+        noteB.id,
+        noteA.id,
+        noteC.id,
+      ]);
+      expect(children.map((child) => child.position)).toEqual([0, 1, 2]);
+    });
+
+    it("should append moved nodes and compact the old parent positions", async () => {
+      const project = await createTestProject("Project");
+      const sourceFolder = await createTestFolder("Source", project.id);
+      const targetFolder = await createTestFolder("Target", project.id);
+      const sourceNote = await nodeService.createNode({
+        type: "note",
+        name: "Source Note",
+        parentId: sourceFolder.id,
+        position: 0,
+      });
+      const remainingSourceNote = await nodeService.createNode({
+        type: "note",
+        name: "Remaining Source Note",
+        parentId: sourceFolder.id,
+        position: 1,
+      });
+      const targetNote = await nodeService.createNode({
+        type: "note",
+        name: "Target Note",
+        parentId: targetFolder.id,
+        position: 0,
+      });
+
+      await nodeService.moveNode(sourceNote.id, targetFolder.id);
+
+      const sourceChildren = await nodeService.getNodesByParentId(
+        sourceFolder.id,
+      );
+      const targetChildren = await nodeService.getNodesByParentId(
+        targetFolder.id,
+      );
+
+      expect(sourceChildren.map((child) => child.id)).toEqual([
+        remainingSourceNote.id,
+      ]);
+      expect(sourceChildren.map((child) => child.position)).toEqual([0]);
+      expect(targetChildren.map((child) => child.id)).toEqual([
+        targetNote.id,
+        sourceNote.id,
+      ]);
+      expect(targetChildren.map((child) => child.position)).toEqual([0, 1]);
+    });
+
     it("should throw if moving a project (projects cannot have parents)", async () => {
       const projectA = await createTestProject("Project A");
       const projectB = await createTestProject("Project B");

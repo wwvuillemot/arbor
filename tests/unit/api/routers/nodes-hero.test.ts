@@ -143,5 +143,30 @@ describe("Nodes Hero Image and Summary", () => {
         }),
       ).rejects.toThrow("Node not found");
     });
+
+    it("should allow setting hero image on a locked node", async () => {
+      const project = await createTestProject("Locked Folder Parent");
+      const lockedFolder = await nodeService.createNode({
+        type: "folder",
+        name: "Locked Folder",
+        parentId: project.id,
+        metadata: { isLocked: true, isFavorite: false },
+        createdBy: "user:test",
+        updatedBy: "user:test",
+      });
+
+      const caller = createCaller();
+      const updated = await caller.nodes.setHeroImage({
+        nodeId: lockedFolder.id,
+        attachmentId: "44444444-4444-4444-4444-444444444444",
+      });
+
+      const meta = updated.metadata as Record<string, unknown>;
+      expect(meta.heroAttachmentId).toBe(
+        "44444444-4444-4444-4444-444444444444",
+      );
+      // Lock status must be preserved
+      expect(meta.isLocked).toBe(true);
+    });
   });
 });

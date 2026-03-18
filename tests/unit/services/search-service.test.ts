@@ -169,6 +169,35 @@ describe("SearchService.keywordSearch", () => {
     expect(results).toHaveLength(1);
     expect(results[0].node.name).toBe("Tagged Note");
   });
+
+  it("should include deeply nested descendants when filtering by projectId", async () => {
+    const project = await createTestProject("Simulation Project");
+    const topLevelFolder = await createTestFolder("Research", project.id);
+    const nestedFolder = await createTestFolder(
+      "Experiments",
+      topLevelFolder.id,
+    );
+    const deeplyNestedFolder = await createTestFolder("Runs", nestedFolder.id);
+    const shallowNote = await createTestNote(
+      "Simulation Summary",
+      project.id,
+      "simulation appears at the project root",
+    );
+    const deeplyNestedNote = await createTestNote(
+      "Simulation Findings",
+      deeplyNestedFolder.id,
+      "simulation appears in a deeply nested note",
+    );
+
+    const results = await searchService.keywordSearch("simulation", {
+      projectId: project.id,
+    });
+
+    const resultNodeIds = new Set(results.map((result) => result.node.id));
+    expect(resultNodeIds.has(project.id)).toBe(true);
+    expect(resultNodeIds.has(shallowNote.id)).toBe(true);
+    expect(resultNodeIds.has(deeplyNestedNote.id)).toBe(true);
+  });
 });
 
 describe("SearchService.vectorSearch", () => {

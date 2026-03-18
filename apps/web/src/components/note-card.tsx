@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import ReactMarkdown from "react-markdown";
-import { Pencil, Star, FolderTree, Settings, Check } from "lucide-react";
+import { Pencil, Star, FolderTree, Settings, Check, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HeroGradient } from "@/components/hero-gradient";
 import { extractHeroImageData, tiptapToMarkdown } from "@/lib/tiptap-utils";
@@ -112,8 +112,9 @@ export function NoteCard({
     [variant, description, node.content],
   );
 
-  const isFavorite =
-    (node.metadata as Record<string, unknown> | null)?.isFavorite === true;
+  const metadata = node.metadata as Record<string, unknown> | null;
+  const isFavorite = metadata?.isFavorite === true;
+  const isLocked = metadata?.isLocked === true;
 
   const heroHeight = variant === "compact" ? "h-32" : "h-40";
 
@@ -173,21 +174,19 @@ export function NoteCard({
           </React.Fragment>
         ) : null}
 
-        {/* Settings cog — top-right, always shown on hover */}
-        {onSettings && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onSettings();
-            }}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/30 backdrop-blur-sm text-white opacity-0 group-hover:opacity-100 hover:bg-black/50 transition-all"
-            title="Settings"
+        {/* Lock badge — top-left, visible when node is locked */}
+        {isLocked && (
+          <div
+            className="absolute top-2 left-2 p-1.5 rounded-full bg-black/40 backdrop-blur-sm text-white/90"
+            title="Locked"
+            aria-label="Locked"
+            data-testid="card-locked-badge"
           >
-            <Settings className="w-3.5 h-3.5" />
-          </button>
+            <Lock className="w-3.5 h-3.5" />
+          </div>
         )}
 
-        {/* Favorite star */}
+        {/* Favorite star — top-right */}
         {onToggleFavorite && (
           <button
             onClick={(e) => {
@@ -195,8 +194,7 @@ export function NoteCard({
               onToggleFavorite(node.id);
             }}
             className={cn(
-              "absolute top-2 p-1.5 rounded-full transition-all",
-              onSettings ? "right-10" : "right-2",
+              "absolute top-2 right-2 p-1.5 rounded-full transition-all",
               "bg-black/20 backdrop-blur-sm",
               isFavorite
                 ? "text-amber-400 opacity-100"
@@ -229,7 +227,7 @@ export function NoteCard({
       <div className="p-3 space-y-2">
         {/* Title row */}
         <div className="flex items-center gap-2">
-          {variant === "full" && !onSettings && (
+          {variant === "full" && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -241,7 +239,22 @@ export function NoteCard({
               <Pencil className="w-3 h-3 text-muted-foreground" />
             </button>
           )}
-          <span className="font-medium text-sm truncate">{node.name}</span>
+          <span className="font-medium text-sm truncate flex-1">
+            {node.name}
+          </span>
+          {onSettings && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSettings();
+              }}
+              className="p-1 rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-accent hover:text-accent-foreground transition-all shrink-0"
+              title="Settings"
+              data-testid="card-settings-button"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Project badge */}

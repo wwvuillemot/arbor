@@ -1,6 +1,6 @@
 # Makefile for Arbor API Server
 
-.PHONY: help setup install dev build start clean test coverage lint typecheck format db-push db-seed db-studio
+.PHONY: help setup install dev build start clean test coverage lint typecheck format db-push db-seed db-studio embeddings-backfill
 
 help:
 	@echo "========================================="
@@ -24,6 +24,7 @@ help:
 	@echo "  make db-push    - Push database schema"
 	@echo "  make db-seed    - Seed database with test data"
 	@echo "  make db-studio  - Open Drizzle Studio"
+	@echo "  make embeddings-backfill - Backfill or rebuild node embeddings"
 	@echo ""
 
 setup: install
@@ -92,6 +93,10 @@ db-seed:
 db-studio:
 	@echo "Opening Drizzle Studio..."
 	@cd ../.. && pnpm run db:studio
+
+embeddings-backfill:
+	@echo "Running embedding backfill..."
+	@cd ../.. && pnpm run embeddings:backfill
 
 clean:
 	@echo "Cleaning build artifacts..."

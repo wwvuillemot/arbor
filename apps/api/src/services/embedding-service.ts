@@ -1,6 +1,6 @@
 import { db } from "../db/index";
 import { nodes } from "../db/schema";
-import { eq, isNull, and, sql } from "drizzle-orm";
+import { eq, isNull, and, sql, asc } from "drizzle-orm";
 import {
   buildEmbeddingText,
   extractTextFromContent as extractEmbeddingTextFromContent,
@@ -11,6 +11,34 @@ export {
 } from "./embedding-providers";
 import type { EmbeddingProvider } from "./embedding-types";
 export type { EmbeddingProvider } from "./embedding-types";
+
+export type EmbeddingBackfillMode = "missing" | "all";
+
+export interface EmbeddingBackfillBatchProgress {
+  mode: EmbeddingBackfillMode;
+  batchNumber: number;
+  totalBatches: number;
+  batchSize: number;
+  batchEmbeddedCount: number;
+  batchStartIndex: number;
+  processedCount: number;
+  totalCandidates: number;
+}
+
+export interface EmbeddingBackfillOptions {
+  mode?: EmbeddingBackfillMode;
+  batchSize?: number;
+  onBatchComplete?: (progress: EmbeddingBackfillBatchProgress) => void;
+}
+
+export interface EmbeddingBackfillResult {
+  mode: EmbeddingBackfillMode;
+  batchSize: number;
+  totalCandidates: number;
+  processedCount: number;
+  embeddedCount: number;
+  batches: number;
+}
 
 /**
  * EmbeddingService
@@ -39,6 +67,33 @@ export class EmbeddingService {
    */
   extractTextFromContent(content: unknown): string {
     return extractEmbeddingTextFromContent(content);
+  }
+
+  private getBackfillWhereCondition(mode: EmbeddingBackfillMode) {
+    if (mode === "missing") {
+      return and(isNull(nodes.embedding), isNull(nodes.deletedAt));
+    }
+
+    return isNull(nodes.deletedAt);
+  }
+
+  private async getBackfillCandidateNodeIds(
+    mode: EmbeddingBackfillMode,
+  ): Promise<string[]> {
+    const candidateNodes = await db
+      .select({ id: nodes.id })
+      .from(nodes)
+      .where(this.getBackfillWhereCondition(mode))
+      .orderBy(asc(nodes.id));
+
+    return candidateNodes.map((node) => node.id);
+  }
+
+  async countBackfillCandidates(
+    mode: EmbeddingBackfillMode = "missing",
+  ): Promise<number> {
+    const candidateNodeIds = await this.getBackfillCandidateNodeIds(mode);
+    return candidateNodeIds.length;
   }
 
   /**
@@ -121,6 +176,70 @@ export class EmbeddingService {
     const nodeIds = unembeddedNodes.map((n) => n.id);
     await this.embedNodes(nodeIds);
     return nodeIds.length;
+  }
+
+  async backfillEmbeddings(
+    options: EmbeddingBackfillOptions = {},
+  ): Promise<EmbeddingBackfillResult> {
+    const mode = options.mode ?? "missing";
+    const batchSize = options.batchSize ?? 100;
+
+    if (!Number.isInteger(batchSize) || batchSize < 1) {
+      throw new Error("batchSize must be a positive integer");
+    }
+
+    const candidateNodeIds = await this.getBackfillCandidateNodeIds(mode);
+    const totalCandidates = candidateNodeIds.length;
+
+    if (totalCandidates === 0) {
+      return {
+        mode,
+        batchSize,
+        totalCandidates,
+        processedCount: 0,
+        embeddedCount: 0,
+        batches: 0,
+      };
+    }
+
+    const totalBatches = Math.ceil(totalCandidates / batchSize);
+    let processedCount = 0;
+    let embeddedCount = 0;
+
+    for (let batchNumber = 1; batchNumber <= totalBatches; batchNumber++) {
+      const batchStartIndex = (batchNumber - 1) * batchSize;
+      const batchNodeIds = candidateNodeIds.slice(
+        batchStartIndex,
+        batchStartIndex + batchSize,
+      );
+      const batchResults = await this.embedNodes(batchNodeIds);
+      const batchEmbeddedCount = Array.from(batchResults.values()).filter(
+        (embedding): embedding is number[] => embedding !== null,
+      ).length;
+
+      processedCount += batchNodeIds.length;
+      embeddedCount += batchEmbeddedCount;
+
+      options.onBatchComplete?.({
+        mode,
+        batchNumber,
+        totalBatches,
+        batchSize: batchNodeIds.length,
+        batchEmbeddedCount,
+        batchStartIndex,
+        processedCount,
+        totalCandidates,
+      });
+    }
+
+    return {
+      mode,
+      batchSize,
+      totalCandidates,
+      processedCount,
+      embeddedCount,
+      batches: totalBatches,
+    };
   }
 
   /**

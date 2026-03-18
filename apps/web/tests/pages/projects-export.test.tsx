@@ -67,15 +67,31 @@ interface MockTiptapEditorProps {
 interface MockFileTreeProps {
   onSelectNode: (id: string) => void;
   onContextMenu?: (event: React.MouseEvent, node: MockSelectedNodeData) => void;
+  onAddToContext?: (node: MockChatContextNode) => void;
+  contextNodeIds?: Set<string>;
+  onMoveNode?: (
+    draggedNodeId: string,
+    targetNodeId: string,
+    position: "before" | "inside" | "after",
+  ) => Promise<void> | void;
+}
+
+interface MockChatContextNode {
+  id: string;
+  name: string;
+  type: string;
+}
+
+interface MockChatSidebarProps {
+  contextNodes?: MockChatContextNode[];
+  onAgentResponseSuccess?: () => void;
+  onSelectedThreadIdChange?: (threadId: string | null) => void;
 }
 
 interface AutoSaveHookOptions {
   nodeId?: string | null;
   content: Record<string, unknown> | null;
-  onSave: (
-    nodeId: string,
-    content: Record<string, unknown>,
-  ) => Promise<void>;
+  onSave: (nodeId: string, content: Record<string, unknown>) => Promise<void>;
 }
 
 interface MockSelectedNodeData {
@@ -112,11 +128,19 @@ const {
   mockToggleLockMutate,
   mockTiptapEditor,
   mockUseAutoSave,
+  mockFlushAutoSave,
   mockMarkAutoSaveSaved,
   mockFetchExportMarkdown,
-  mockFetchExportHtml,
+  mockFetchExportPdf,
+  mockFetchExportDocx,
+  mockFetchExportEpub,
+  mockFetchExportZip,
+  mockPdfTemplatesData,
+  mockAppPreferencesData,
+  mockSetAppPreferenceMutateAsync,
   mockImportDirectoryMutateAsync,
   mockUpdateNodeMutateAsync,
+  mockMoveNodeMutateAsync,
   mockMediaUploadMutateAsync,
   mockRollbackMutateAsync,
   mockDeleteVersionMutateAsync,
@@ -129,13 +153,17 @@ const {
   mockInvalidateProvenanceHistory,
   mockInvalidateProvenanceVersionCount,
   mockSetGetByIdData,
+  firstImageByNodeData,
   folderChildrenData,
   provenanceCompareResult,
   provenanceHistoryData,
   provenanceVersionCount,
   projectImagesData,
+  epubCoverAttachmentsData,
   mockChatSidebarProps,
+  mockFileTreeProps,
   mockFileTreeSelection,
+  mockProjectSettingsDialogProps,
   selectedNodeData,
 } = vi.hoisted(() => {
   const selectedNodeData: MockSelectedNodeData = {
@@ -161,19 +189,61 @@ const {
     mockToggleLockMutate: vi.fn(),
     mockTiptapEditor: vi.fn(),
     mockMarkAutoSaveSaved,
+    mockFlushAutoSave: vi.fn().mockResolvedValue(undefined),
     mockUseAutoSave: vi.fn(() => ({
       status: "idle" as const,
       reset: vi.fn(),
       markSaved: mockMarkAutoSaveSaved,
+      flush: mockFlushAutoSave,
     })),
     mockFetchExportMarkdown: vi
       .fn()
       .mockResolvedValue({ content: "# Test\n\nContent" }),
-    mockFetchExportHtml: vi.fn().mockResolvedValue({
-      content: "<!DOCTYPE html><html><body><h1>Test</h1></body></html>",
+    mockFetchExportPdf: vi.fn().mockResolvedValue({
+      contentBase64: "JVBERg==",
+      fileName: "Test Export.pdf",
+      mimeType: "application/pdf",
     }),
+    mockFetchExportDocx: vi.fn().mockResolvedValue({
+      contentBase64: "UEsDBA==",
+      fileName: "Test Export.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }),
+    mockFetchExportEpub: vi.fn().mockResolvedValue({
+      contentBase64: "UEsDBA==",
+      fileName: "Test Export.epub",
+      mimeType: "application/epub+zip",
+    }),
+    mockFetchExportZip: vi.fn().mockResolvedValue({
+      contentBase64: "UEsDBA==",
+      fileName: "Test Export.zip",
+      mimeType: "application/zip",
+    }),
+    mockPdfTemplatesData: {
+      value: [
+        {
+          id: "standard",
+          label: "Standard",
+          description: "Clean PDF with balanced margins for everyday sharing.",
+          isDefault: true,
+        },
+        {
+          id: "book",
+          label: "Book",
+          description:
+            "Long-form layout with a table of contents and numbered sections.",
+          isDefault: false,
+        },
+      ],
+    },
+    mockAppPreferencesData: {
+      value: {} as Record<string, unknown>,
+    },
+    mockSetAppPreferenceMutateAsync: vi.fn().mockResolvedValue({}),
     mockImportDirectoryMutateAsync: vi.fn().mockResolvedValue({}),
     mockUpdateNodeMutateAsync: vi.fn().mockResolvedValue({}),
+    mockMoveNodeMutateAsync: vi.fn().mockResolvedValue({}),
     mockMediaUploadMutateAsync: vi.fn().mockResolvedValue({ id: "media-1" }),
     mockRollbackMutateAsync: vi.fn().mockResolvedValue({}),
     mockDeleteVersionMutateAsync: vi.fn().mockResolvedValue({ version: 2 }),
@@ -185,8 +255,12 @@ const {
     mockInvalidateGetDescendants: vi.fn(),
     mockInvalidateProvenanceHistory: vi.fn(),
     mockInvalidateProvenanceVersionCount: vi.fn(),
+    firstImageByNodeData: {} as Record<string, string>,
     mockFileTreeSelection: {
       current: null as ((id: string) => void) | null,
+    },
+    mockFileTreeProps: {
+      current: null as MockFileTreeProps | null,
     },
     mockSetGetByIdData: vi.fn(
       (
@@ -223,9 +297,28 @@ const {
       } | null,
     },
     mockChatSidebarProps: {
-      current: null as Record<string, unknown> | null,
+      current: null as MockChatSidebarProps | null,
+    },
+    mockProjectSettingsDialogProps: {
+      current: null as {
+        open: boolean;
+        node: {
+          id: string;
+          name: string;
+          type: "project" | "folder";
+          projectId: string;
+          summary?: string | null;
+          metadata: Record<string, unknown>;
+        };
+        onDelete?: (() => void) | undefined;
+      } | null,
     },
     projectImagesData: [] as Array<{
+      id: string;
+      filename: string;
+      mimeType: string;
+    }>,
+    epubCoverAttachmentsData: [] as Array<{
       id: string;
       filename: string;
       mimeType: string;
@@ -331,11 +424,25 @@ vi.mock("@/components/navigation", () => ({
 
 // Mock ChatSidebar component
 vi.mock("@/components/chat", () => ({
-  ChatSidebar: (props: { onAgentResponseSuccess?: () => void }) => {
+  ChatSidebar: (props: MockChatSidebarProps) => {
     mockChatSidebarProps.current = props;
 
     return (
       <div data-testid="chat-sidebar">
+        <button
+          type="button"
+          data-testid="chat-sidebar-select-thread-1"
+          onClick={() => props.onSelectedThreadIdChange?.("thread-1")}
+        >
+          Select thread 1
+        </button>
+        <button
+          type="button"
+          data-testid="chat-sidebar-select-thread-2"
+          onClick={() => props.onSelectedThreadIdChange?.("thread-2")}
+        >
+          Select thread 2
+        </button>
         <button
           type="button"
           data-testid="chat-sidebar-agent-response-success"
@@ -364,14 +471,13 @@ vi.mock("@/app/[locale]/(app)/projects/projects-import-directory", async () => {
 // Mock FileTree component - calls onSelectNode on mount to simulate selecting a node
 vi.mock("@/components/file-tree", () => ({
   FileTree: React.forwardRef<FileTreeHandle, MockFileTreeProps>(
-    function MockFileTree(
-      { onSelectNode, onContextMenu },
-      _ref: React.ForwardedRef<FileTreeHandle>,
-    ) {
+    function MockFileTree(props, _ref: React.ForwardedRef<FileTreeHandle>) {
+      const { onSelectNode, onContextMenu } = props;
       mockFileTreeSelection.current = onSelectNode;
+      mockFileTreeProps.current = props;
 
       React.useEffect(() => {
-        onSelectNode("node-1");
+        onSelectNode(selectedNodeData.id);
       }, [onSelectNode]);
 
       return (
@@ -402,19 +508,46 @@ vi.mock("@/components/file-tree", () => ({
     open,
     node,
     onAction,
+    onClose,
   }: {
     open: boolean;
     node: MockSelectedNodeData | null;
     onAction: (action: { type: string; node: MockSelectedNodeData }) => void;
+    onClose: () => void;
   }) {
     return open ? (
       <div data-testid="context-menu">
+        <button
+          type="button"
+          data-testid="context-menu-export"
+          onClick={() => {
+            if (node) {
+              onAction({ type: "export", node });
+              onClose();
+            }
+          }}
+        >
+          Export
+        </button>
+        <button
+          type="button"
+          data-testid="context-menu-settings"
+          onClick={() => {
+            if (node) {
+              onAction({ type: "settings", node });
+              onClose();
+            }
+          }}
+        >
+          Settings
+        </button>
         <button
           type="button"
           data-testid="context-menu-toggle-lock"
           onClick={() => {
             if (node) {
               onAction({ type: "toggleLock", node });
+              onClose();
             }
           }}
         >
@@ -424,6 +557,39 @@ vi.mock("@/components/file-tree", () => ({
     ) : null;
   },
   BulkTagBar: () => null,
+}));
+
+vi.mock("@/app/[locale]/(app)/projects/project-settings-dialog", () => ({
+  ProjectSettingsDialog: function MockProjectSettingsDialog({
+    open,
+    node,
+    onDelete,
+  }: {
+    open: boolean;
+    node: {
+      id: string;
+      name: string;
+      type: "project" | "folder";
+      projectId: string;
+      summary?: string | null;
+      metadata: Record<string, unknown>;
+    };
+    onDelete?: () => void;
+  }) {
+    mockProjectSettingsDialogProps.current = open
+      ? { open, node, onDelete }
+      : null;
+
+    return open ? (
+      <div data-testid="project-settings-dialog">
+        <span data-testid="project-settings-dialog-node-name">{node.name}</span>
+        <span data-testid="project-settings-dialog-node-type">{node.type}</span>
+        <span data-testid="project-settings-dialog-project-id">
+          {node.projectId}
+        </span>
+      </div>
+    ) : null;
+  },
 }));
 
 // Mock tRPC
@@ -483,6 +649,13 @@ vi.mock("@/lib/trpc", () => {
           error: null,
         })),
       },
+      getPdfTemplates: {
+        useQuery: vi.fn(() => ({
+          data: mockPdfTemplatesData.value,
+          isLoading: false,
+          error: null,
+        })),
+      },
       create: {
         useMutation: vi.fn(() =>
           makeMutation({ mutate: mockCreateProjectMutate }),
@@ -494,7 +667,11 @@ vi.mock("@/lib/trpc", () => {
         ),
       },
       delete: { useMutation: vi.fn(() => makeMutation()) },
-      move: { useMutation: vi.fn(() => makeMutation()) },
+      move: {
+        useMutation: vi.fn(() =>
+          makeMutation({ mutateAsync: mockMoveNodeMutateAsync }),
+        ),
+      },
       toggleLock: {
         useMutation: vi.fn(
           (
@@ -563,7 +740,18 @@ vi.mock("@/lib/trpc", () => {
       },
       generateImage: { useMutation: vi.fn(() => makeMutation()) },
       getFirstImageByNodes: {
-        useQuery: vi.fn(() => ({ data: {}, isLoading: false, error: null })),
+        useQuery: vi.fn(() => ({
+          data: firstImageByNodeData,
+          isLoading: false,
+          error: null,
+        })),
+      },
+      getByNode: {
+        useQuery: vi.fn(() => ({
+          data: epubCoverAttachmentsData,
+          isLoading: false,
+          error: null,
+        })),
       },
     },
     provenance: {
@@ -652,12 +840,34 @@ vi.mock("@/lib/trpc", () => {
       },
       getAllAppPreferences: {
         useQuery: vi.fn(() => ({
-          data: {},
+          data: mockAppPreferencesData.value,
           isLoading: false,
           error: null,
         })),
       },
-      setAppPreference: { useMutation: vi.fn(() => makeMutation()) },
+      setAppPreference: {
+        useMutation: vi.fn(
+          (
+            options: {
+              onSuccess?: (data: unknown) => void;
+              onError?: (error: unknown) => void;
+            } = {},
+          ) => {
+            const mutateAsync = vi.fn(async (input: unknown) => {
+              try {
+                const result = await mockSetAppPreferenceMutateAsync(input);
+                options.onSuccess?.(result);
+                return result;
+              } catch (error) {
+                options.onError?.(error);
+                throw error;
+              }
+            });
+
+            return makeMutation({ mutateAsync });
+          },
+        ),
+      },
       setAppPreferences: { useMutation: vi.fn(() => makeMutation()) },
       deleteAppPreference: { useMutation: vi.fn(() => makeMutation()) },
       getMasterKey: {
@@ -686,7 +896,10 @@ vi.mock("@/lib/trpc", () => {
           invalidate: mockInvalidateGetDescendants,
         },
         exportMarkdown: { fetch: mockFetchExportMarkdown },
-        exportHtml: { fetch: mockFetchExportHtml },
+        exportPdf: { fetch: mockFetchExportPdf },
+        exportDocx: { fetch: mockFetchExportDocx },
+        exportEpub: { fetch: mockFetchExportEpub },
+        exportZip: { fetch: mockFetchExportZip },
       },
       media: {
         getDownloadUrl: {
@@ -741,10 +954,28 @@ function getLatestTiptapEditorProps(): MockTiptapEditorProps {
 describe("ProjectsPage Export", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     currentProjectState.value = "proj-1";
+    mockAppPreferencesData.value = {};
+    mockPdfTemplatesData.value = [
+      {
+        id: "standard",
+        label: "Standard",
+        description: "Clean PDF with balanced margins for everyday sharing.",
+        isDefault: true,
+      },
+      {
+        id: "book",
+        label: "Book",
+        description:
+          "Long-form layout with a table of contents and numbered sections.",
+        isDefault: false,
+      },
+    ];
     mockSearchParamGet.mockImplementation(
       (_key: string): string | null => null,
     );
+    mockProjectSettingsDialogProps.current = null;
     mockCreateProjectMutate.mockReset();
     mockToggleLockMutate.mockReset();
     selectedNodeData.name = "Test Note";
@@ -754,23 +985,79 @@ describe("ProjectsPage Export", () => {
     selectedNodeData.content = null;
     selectedNodeData.metadata = null;
     folderChildrenData.length = 0;
+    Object.keys(firstImageByNodeData).forEach((nodeId) => {
+      delete firstImageByNodeData[nodeId];
+    });
     projectImagesData.length = 0;
+    epubCoverAttachmentsData.length = 0;
     mockImportDirectoryMutateAsync.mockReset();
     mockImportDirectoryMutateAsync.mockResolvedValue({});
     mockUpdateNodeMutateAsync.mockReset();
     mockUpdateNodeMutateAsync.mockResolvedValue({});
+    mockMoveNodeMutateAsync.mockReset();
+    mockMoveNodeMutateAsync.mockResolvedValue({});
     mockMediaUploadMutateAsync.mockReset();
     mockMediaUploadMutateAsync.mockResolvedValue({ id: "media-1" });
     mockRollbackMutateAsync.mockReset();
     mockRollbackMutateAsync.mockResolvedValue({});
     mockDeleteVersionMutateAsync.mockReset();
     mockDeleteVersionMutateAsync.mockResolvedValue({ version: 2 });
+    mockFetchExportMarkdown.mockReset();
+    mockFetchExportMarkdown.mockResolvedValue({ content: "# Test\n\nContent" });
+    mockFetchExportPdf.mockReset();
+    mockFetchExportPdf.mockResolvedValue({
+      contentBase64: "JVBERg==",
+      fileName: "Test Export.pdf",
+      mimeType: "application/pdf",
+    });
+    mockFetchExportDocx.mockReset();
+    mockFetchExportDocx.mockResolvedValue({
+      contentBase64: "UEsDBA==",
+      fileName: "Test Export.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    });
+    mockFetchExportEpub.mockReset();
+    mockFetchExportEpub.mockResolvedValue({
+      contentBase64: "UEsDBA==",
+      fileName: "Test Export.epub",
+      mimeType: "application/epub+zip",
+    });
+    mockFetchExportZip.mockReset();
+    mockFetchExportZip.mockResolvedValue({
+      contentBase64: "UEsDBA==",
+      fileName: "Test Export.zip",
+      mimeType: "application/zip",
+    });
+    mockSetAppPreferenceMutateAsync.mockReset();
+    mockSetAppPreferenceMutateAsync.mockResolvedValue({});
     mockGetByIdFetch.mockReset();
     mockGetByIdFetch.mockResolvedValue(null);
     mockGetDescendantsFetch.mockReset();
     mockGetDescendantsFetch.mockResolvedValue([]);
     mockUseAutoSave.mockClear();
+    mockFlushAutoSave.mockClear();
+    mockFlushAutoSave.mockImplementation(async () => {
+      const latestAutoSaveCall = mockUseAutoSave.mock.calls.at(-1) as
+        | readonly unknown[]
+        | undefined;
+      const latestAutoSaveOptions = getAutoSaveHookOptions(latestAutoSaveCall);
+
+      if (
+        !latestAutoSaveOptions?.nodeId ||
+        !latestAutoSaveOptions.content ||
+        !latestAutoSaveOptions.onSave
+      ) {
+        return;
+      }
+
+      await latestAutoSaveOptions.onSave(
+        latestAutoSaveOptions.nodeId,
+        latestAutoSaveOptions.content,
+      );
+    });
     mockMarkAutoSaveSaved.mockClear();
+    mockFileTreeProps.current = null;
     mockFileTreeSelection.current = null;
     mockSetGetByIdData.mockClear();
     mockInvalidateProvenanceHistory.mockClear();
@@ -779,6 +1066,51 @@ describe("ProjectsPage Export", () => {
     provenanceVersionCount.value = 0;
     provenanceCompareResult.value = null;
     mockChatSidebarProps.current = null;
+  });
+
+  it("should restore thread-scoped chat context after reload when the conversation is reselected", async () => {
+    window.localStorage.setItem("chatSidebarOpen", "true");
+
+    const pinnedContextNode: MockChatContextNode = {
+      id: "context-note-1",
+      name: "Pinned Research Note",
+      type: "note",
+    };
+
+    const firstRender = render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    fireEvent.click(screen.getByTestId("chat-sidebar-select-thread-1"));
+
+    await act(async () => {
+      mockFileTreeProps.current?.onAddToContext?.(pinnedContextNode);
+    });
+
+    await waitFor(() => {
+      expect(mockChatSidebarProps.current?.contextNodes).toEqual([
+        pinnedContextNode,
+      ]);
+      expect(
+        JSON.parse(
+          window.localStorage.getItem("arbor:chatContextNodes:thread-1") ??
+            "[]",
+        ),
+      ).toEqual([pinnedContextNode]);
+    });
+
+    firstRender.unmount();
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    fireEvent.click(screen.getByTestId("chat-sidebar-select-thread-1"));
+
+    await waitFor(() => {
+      expect(mockChatSidebarProps.current?.contextNodes).toEqual([
+        pinnedContextNode,
+      ]);
+      expect(
+        mockFileTreeProps.current?.contextNodeIds?.has("context-note-1"),
+      ).toBe(true);
+    });
   });
 
   it("should call the toggleLock mutation from the node context menu", async () => {
@@ -875,6 +1207,39 @@ describe("ProjectsPage Export", () => {
     expect(screen.getByText("Scene Two")).toBeInTheDocument();
   });
 
+  it("should prefer a folder card hero image saved in metadata over the first attached image", async () => {
+    selectedNodeData.name = "Story Folder";
+    selectedNodeData.type = "folder";
+    folderChildrenData.push({
+      id: "child-folder-1",
+      name: "Act One",
+      type: "folder",
+      parentId: "node-1",
+      content: { type: "doc", content: [] },
+      metadata: {
+        heroAttachmentId: "hero-folder-image",
+        heroFocalX: 25,
+        heroFocalY: 75,
+      },
+      position: 0,
+    });
+    firstImageByNodeData["child-folder-1"] = "fallback-image";
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    const folderCardHeroImage = await screen.findByRole("img", {
+      name: "Act One",
+    });
+
+    expect(folderCardHeroImage).toHaveAttribute(
+      "src",
+      getMediaAttachmentUrl("hero-folder-image"),
+    );
+    expect(folderCardHeroImage).toHaveStyle({
+      objectPosition: "25% 75%",
+    });
+  });
+
   it("should render image thumbnails in the existing image picker tab", async () => {
     projectImagesData.push({
       id: "media-existing-1",
@@ -901,7 +1266,7 @@ describe("ProjectsPage Export", () => {
     );
   });
 
-  it("should preserve edited note content after autosave when Done is clicked", async () => {
+  it("should flush edited note content when Done is clicked before debounce completes", async () => {
     const initialNoteContent = {
       type: "doc",
       content: [
@@ -944,35 +1309,78 @@ describe("ProjectsPage Export", () => {
       expect(getLatestTiptapEditorProps().content).toEqual(editedNoteContent);
     });
 
-    const latestAutoSaveCall = mockUseAutoSave.mock.calls.at(-1) as
-      | readonly unknown[]
-      | undefined;
-    expect(latestAutoSaveCall).toBeDefined();
-
-    const latestAutoSaveOptions = getAutoSaveHookOptions(latestAutoSaveCall);
-
-    expect(latestAutoSaveOptions?.onSave).toBeDefined();
-
-    if (!latestAutoSaveOptions?.onSave) {
-      throw new Error("Expected useAutoSave to receive onSave options");
-    }
-
-    const saveNoteContent = latestAutoSaveOptions.onSave;
-
-    await act(async () => {
-      await saveNoteContent("node-1", editedNoteContent);
-    });
-
-    expect(mockSetGetByIdData).toHaveBeenCalled();
-    expect(selectedNodeData.content).toEqual(editedNoteContent);
-
     fireEvent.click(screen.getByTestId("note-edit-toggle"));
 
     await waitFor(() => {
+      expect(mockFlushAutoSave).toHaveBeenCalledTimes(1);
+      expect(mockSetGetByIdData).toHaveBeenCalled();
+      expect(selectedNodeData.content).toEqual(editedNoteContent);
       const latestEditorProps = getLatestTiptapEditorProps();
       expect(latestEditorProps.editable).toBe(false);
       expect(latestEditorProps.content).toEqual(editedNoteContent);
     });
+  });
+
+  it("should flush edited note content when Cmd+S is pressed in edit mode", async () => {
+    const initialNoteContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Original note" }],
+        },
+      ],
+    };
+    const editedNoteContent = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Saved from shortcut" }],
+        },
+      ],
+    };
+    selectedNodeData.content = initialNoteContent;
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      expect(getLatestTiptapEditorProps().content).toEqual(initialNoteContent);
+    });
+
+    fireEvent.click(screen.getByTestId("note-edit-toggle"));
+
+    await waitFor(() => {
+      expect(getLatestTiptapEditorProps().editable).toBe(true);
+    });
+
+    await act(async () => {
+      getLatestTiptapEditorProps().onChange?.(editedNoteContent);
+    });
+
+    await waitFor(() => {
+      expect(getLatestTiptapEditorProps().content).toEqual(editedNoteContent);
+    });
+
+    const saveShortcutEvent = new KeyboardEvent("keydown", {
+      key: "s",
+      metaKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    window.dispatchEvent(saveShortcutEvent);
+
+    await waitFor(() => {
+      expect(mockFlushAutoSave).toHaveBeenCalledTimes(1);
+      expect(mockSetGetByIdData).toHaveBeenCalled();
+      expect(selectedNodeData.content).toEqual(editedNoteContent);
+      const latestEditorProps = getLatestTiptapEditorProps();
+      expect(latestEditorProps.editable).toBe(true);
+      expect(latestEditorProps.content).toEqual(editedNoteContent);
+    });
+
+    expect(saveShortcutEvent.defaultPrevented).toBe(true);
   });
 
   it("should baseline autosave when opening an existing note", async () => {
@@ -1074,7 +1482,9 @@ describe("ProjectsPage Export", () => {
 
     expect(nodeTwoAutoSaveCalls.length).toBeGreaterThan(0);
     expect(
-      nodeTwoAutoSaveCalls.every((options) => (options?.content ?? null) === null),
+      nodeTwoAutoSaveCalls.every(
+        (options) => (options?.content ?? null) === null,
+      ),
     ).toBe(true);
   });
 
@@ -1121,7 +1531,9 @@ describe("ProjectsPage Export", () => {
 
     await waitFor(() => {
       expect(mockGetByIdFetch).toHaveBeenCalledWith({ id: "node-1" });
-      expect(getLatestTiptapEditorProps().content).toEqual(refreshedNoteContent);
+      expect(getLatestTiptapEditorProps().content).toEqual(
+        refreshedNoteContent,
+      );
     });
   });
 
@@ -1417,7 +1829,51 @@ describe("ProjectsPage Export", () => {
     });
   });
 
-  it("should show export menu when export button is clicked", async () => {
+  it("should fetch the drop target and persist manual reordering through move", async () => {
+    mockGetByIdFetch.mockImplementation(async ({ id }: { id: string }) => {
+      if (id === "target-node") {
+        return {
+          id: "target-node",
+          name: "Target Node",
+          type: "note",
+          parentId: "proj-1",
+          position: 1,
+          content: null,
+          metadata: null,
+          createdAt: "2024-01-01T00:00:00Z",
+          updatedAt: "2024-01-01T00:00:00Z",
+        };
+      }
+
+      return null;
+    });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    await act(async () => {
+      await mockFileTreeProps.current?.onMoveNode?.(
+        "dragged-node",
+        "target-node",
+        "after",
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockGetByIdFetch).toHaveBeenCalledWith({ id: "target-node" });
+      expect(mockMoveNodeMutateAsync).toHaveBeenCalledWith({
+        id: "dragged-node",
+        newParentId: "proj-1",
+        position: 2,
+      });
+      expect(mockInvalidateGetChildren).toHaveBeenCalled();
+      expect(mockInvalidateGetById).toHaveBeenCalledWith({
+        id: "dragged-node",
+      });
+      expect(mockAddToast).toHaveBeenCalledWith("moveSuccess", "success");
+    });
+  });
+
+  it("should open export dialog when export button is clicked", async () => {
     render(<ProjectsPage />, { wrapper: TestWrapper });
     await waitFor(() => {
       expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
@@ -1425,25 +1881,28 @@ describe("ProjectsPage Export", () => {
 
     fireEvent.click(screen.getByTestId("content-export-button"));
 
-    expect(screen.getByTestId("export-menu")).toBeInTheDocument();
-    expect(screen.getByTestId("export-markdown")).toBeInTheDocument();
-    expect(screen.getByTestId("export-project-markdown")).toBeInTheDocument();
-    expect(screen.getByTestId("export-pdf")).toBeInTheDocument();
-    expect(screen.getByTestId("export-project-pdf")).toBeInTheDocument();
+    expect(screen.getByTestId("export-dialog")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("export-include-folder-names"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("export-include-note-names")).toBeInTheDocument();
+    expect(screen.getByTestId("export-format-markdown")).toBeInTheDocument();
+    expect(screen.getByTestId("export-format-docx")).toBeInTheDocument();
+    expect(screen.getByTestId("export-format-pdf")).toBeInTheDocument();
+    expect(screen.getByTestId("export-confirm-button")).toBeInTheDocument();
   });
 
-  it("should hide export menu when export button is clicked again", async () => {
+  it("should close export dialog when cancel is clicked", async () => {
     render(<ProjectsPage />, { wrapper: TestWrapper });
     await waitFor(() => {
       expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
     });
 
-    const exportButton = screen.getByTestId("content-export-button");
-    fireEvent.click(exportButton);
-    expect(screen.getByTestId("export-menu")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("content-export-button"));
+    expect(screen.getByTestId("export-dialog")).toBeInTheDocument();
 
-    fireEvent.click(exportButton);
-    expect(screen.queryByTestId("export-menu")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("export-cancel-button"));
+    expect(screen.queryByTestId("export-dialog")).not.toBeInTheDocument();
   });
 
   it("should call exportMarkdown fetch when markdown export is clicked", async () => {
@@ -1475,13 +1934,16 @@ describe("ProjectsPage Export", () => {
 
     fireEvent.click(screen.getByTestId("content-export-button"));
     await act(async () => {
-      fireEvent.click(screen.getByTestId("export-markdown"));
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
     });
 
     await waitFor(() => {
       expect(mockFetchExportMarkdown).toHaveBeenCalledWith({
         id: "node-1",
         includeDescendants: false,
+        includeFolderNames: true,
+        includeNoteNames: true,
+        sortMode: "alphabetical",
       });
     });
 
@@ -1496,7 +1958,507 @@ describe("ProjectsPage Export", () => {
     createElementSpy.mockRestore();
   });
 
-  it("should call exportMarkdown with includeDescendants for project export", async () => {
+  it("should include descendants when exporting a folder", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:test-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    selectedNodeData.name = "Story Folder";
+    selectedNodeData.type = "folder";
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tag: string) => {
+        if (tag === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+        return originalCreateElement(tag);
+      });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
+    });
+
+    await waitFor(() => {
+      expect(mockFetchExportMarkdown).toHaveBeenCalledWith({
+        id: "node-1",
+        includeDescendants: true,
+        includeFolderNames: true,
+        includeNoteNames: true,
+        sortMode: "alphabetical",
+      });
+    });
+
+    // Cleanup - restore only the spy we created, not all mocks
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    createElementSpy.mockRestore();
+  });
+
+  it("should call exportPdf and download a pdf file", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:pdf-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tag: string) => {
+        if (tag === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+        return originalCreateElement(tag);
+      });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-format-pdf"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-format-pdf")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
+    });
+
+    await waitFor(() => {
+      expect(mockFetchExportPdf).toHaveBeenCalledWith({
+        id: "node-1",
+        includeDescendants: false,
+        includeFolderNames: true,
+        includeNoteNames: true,
+        sortMode: "alphabetical",
+        templateId: "standard",
+      });
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockClick).toHaveBeenCalled();
+      expect(mockRevokeObjectURL).toHaveBeenCalled();
+      expect(mockAddToast).toHaveBeenCalledWith("exportSuccess", "success");
+    });
+
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    createElementSpy.mockRestore();
+  });
+
+  it("should persist the selected pdf template and use it for export", async () => {
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-format-pdf"));
+    });
+
+    const standardTemplateButton = screen.getByTestId(
+      "export-pdf-template-standard",
+    );
+    const bookTemplateButton = screen.getByTestId("export-pdf-template-book");
+
+    expect(standardTemplateButton).toHaveAttribute("aria-pressed", "true");
+    expect(bookTemplateButton).toHaveAttribute("aria-pressed", "false");
+
+    await act(async () => {
+      fireEvent.click(bookTemplateButton);
+    });
+
+    await waitFor(() => {
+      expect(mockSetAppPreferenceMutateAsync).toHaveBeenCalledWith({
+        key: "projects:pdfTemplateId",
+        value: "book",
+      });
+    });
+
+    expect(bookTemplateButton).toHaveAttribute("aria-pressed", "true");
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
+    });
+
+    await waitFor(() => {
+      expect(mockFetchExportPdf).toHaveBeenCalledWith({
+        id: "node-1",
+        includeDescendants: false,
+        includeFolderNames: true,
+        includeNoteNames: true,
+        sortMode: "alphabetical",
+        templateId: "book",
+      });
+    });
+  });
+
+  it("should call exportDocx and download a docx file", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:docx-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tag: string) => {
+        if (tag === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+        return originalCreateElement(tag);
+      });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-format-docx"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-format-docx")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
+    });
+
+    await waitFor(() => {
+      expect(mockFetchExportDocx).toHaveBeenCalledWith({
+        id: "node-1",
+        includeDescendants: false,
+        includeFolderNames: true,
+        includeNoteNames: true,
+        sortMode: "alphabetical",
+      });
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockClick).toHaveBeenCalled();
+      expect(mockAddToast).toHaveBeenCalledWith("exportSuccess", "success");
+    });
+
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    createElementSpy.mockRestore();
+  });
+
+  it("should call exportEpub and download an epub file", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:epub-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tag: string) => {
+        if (tag === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+        return originalCreateElement(tag);
+      });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-format-epub"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("export-format-epub")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
+    });
+
+    await waitFor(() => {
+      expect(mockFetchExportEpub).toHaveBeenCalledWith({
+        id: "node-1",
+        includeDescendants: false,
+        includeFolderNames: true,
+        includeNoteNames: true,
+        sortMode: "alphabetical",
+        coverAttachmentId: undefined,
+      });
+      expect(mockCreateObjectURL).toHaveBeenCalled();
+      expect(mockClick).toHaveBeenCalled();
+      expect(mockAddToast).toHaveBeenCalledWith("exportSuccess", "success");
+    });
+
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    createElementSpy.mockRestore();
+  });
+
+  it("should show epub cover picker when epub format is selected", async () => {
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+
+    // Cover picker should not be visible before selecting epub
+    expect(screen.queryByTestId("epub-cover-picker")).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-format-epub"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("epub-cover-picker")).toBeInTheDocument();
+      expect(screen.getByTestId("epub-cover-none")).toBeInTheDocument();
+      // "None" should be selected by default
+      expect(screen.getByTestId("epub-cover-none")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    });
+  });
+
+  it("should pass coverAttachmentId when a cover image is selected for epub export", async () => {
+    // The EPUB cover picker now uses getByProject (same query as the image picker),
+    // so we push the cover image into projectImagesData to make it available.
+    projectImagesData.push({
+      id: "cover-img-1",
+      filename: "cover-art.png",
+      mimeType: "image/png",
+    });
+
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:epub-cover-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tag: string) => {
+        if (tag === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+        return originalCreateElement(tag);
+      });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-format-epub"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("epub-cover-picker")).toBeInTheDocument();
+    });
+
+    // The cover attachment button should appear and we can click it
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("epub-cover-option-cover-img-1"));
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("epub-cover-option-cover-img-1"),
+      ).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByTestId("epub-cover-none")).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
+    });
+
+    await waitFor(() => {
+      expect(mockFetchExportEpub).toHaveBeenCalledWith({
+        id: "node-1",
+        includeDescendants: false,
+        includeFolderNames: true,
+        includeNoteNames: true,
+        sortMode: "alphabetical",
+        coverAttachmentId: "cover-img-1",
+      });
+      expect(mockAddToast).toHaveBeenCalledWith("exportSuccess", "success");
+    });
+
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    createElementSpy.mockRestore();
+  });
+
+  it("should show epub metadata section when epub format is selected", async () => {
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+
+    // Metadata section should not be visible before selecting EPUB
+    expect(
+      screen.queryByTestId("epub-metadata-section"),
+    ).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-format-epub"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("epub-metadata-section")).toBeInTheDocument();
+      expect(screen.getByTestId("epub-author-input")).toBeInTheDocument();
+      expect(screen.getByTestId("epub-description-input")).toBeInTheDocument();
+      expect(screen.getByTestId("epub-language-input")).toBeInTheDocument();
+    });
+  });
+
+  it("should pass epub metadata when exporting", async () => {
+    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:epub-meta-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tag: string) => {
+        if (tag === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+        return originalCreateElement(tag);
+      });
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-format-epub"));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("epub-metadata-section")).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId("epub-author-input"), {
+      target: { value: "Jane Doe" },
+    });
+    fireEvent.change(screen.getByTestId("epub-description-input"), {
+      target: { value: "A compelling story" },
+    });
+    fireEvent.change(screen.getByTestId("epub-language-input"), {
+      target: { value: "en-US" },
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
+    });
+
+    await waitFor(() => {
+      expect(mockFetchExportEpub).toHaveBeenCalledWith(
+        expect.objectContaining({
+          epubAuthor: "Jane Doe",
+          epubDescription: "A compelling story",
+          epubLanguage: "en-US",
+        }),
+      );
+      expect(mockAddToast).toHaveBeenCalledWith("exportSuccess", "success");
+    });
+
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+    createElementSpy.mockRestore();
+  });
+
+  it("should show error toast when export fails", async () => {
+    mockFetchExportMarkdown.mockRejectedValueOnce(new Error("Export failed"));
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+    await waitFor(() => {
+      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("content-export-button"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
+    });
+
+    await waitFor(() => {
+      expect(mockAddToast).toHaveBeenCalledWith("exportError", "error");
+    });
+  });
+
+  it("should send export name toggle values with the export request", async () => {
     const mockCreateObjectURL = vi.fn().mockReturnValue("blob:test-url");
     const mockRevokeObjectURL = vi.fn();
     const originalCreateObjectURL = URL.createObjectURL;
@@ -1523,105 +2485,112 @@ describe("ProjectsPage Export", () => {
     });
 
     fireEvent.click(screen.getByTestId("content-export-button"));
+    fireEvent.click(screen.getByTestId("export-include-folder-names"));
+    fireEvent.click(screen.getByTestId("export-include-note-names"));
+
     await act(async () => {
-      fireEvent.click(screen.getByTestId("export-project-markdown"));
+      fireEvent.click(screen.getByTestId("export-confirm-button"));
     });
 
     await waitFor(() => {
       expect(mockFetchExportMarkdown).toHaveBeenCalledWith({
         id: "node-1",
-        includeDescendants: true,
+        includeDescendants: false,
+        includeFolderNames: false,
+        includeNoteNames: false,
+        sortMode: "alphabetical",
       });
     });
 
-    // Cleanup - restore only the spy we created, not all mocks
     URL.createObjectURL = originalCreateObjectURL;
     URL.revokeObjectURL = originalRevokeObjectURL;
     createElementSpy.mockRestore();
   });
 
-  it("should call exportHtml and open print window for PDF export", async () => {
-    const mockPrint = vi.fn();
-    const mockFocus = vi.fn();
-    const mockAddEventListener = vi.fn(
-      (eventName: string, listener: EventListenerOrEventListenerObject) => {
-        if (eventName === "load") {
-          if (typeof listener === "function") {
-            listener(new Event("load"));
-          } else {
-            listener.handleEvent(new Event("load"));
-          }
-        }
-      },
-    );
-    const mockRemoveEventListener = vi.fn();
-    const mockWindowObj = {
-      addEventListener: mockAddEventListener,
-      removeEventListener: mockRemoveEventListener,
-      focus: mockFocus,
-      print: mockPrint,
-    };
-    const originalOpen = window.open;
-    const mockOpenFn = vi.fn().mockReturnValue(mockWindowObj);
-    const mockCreateObjectURL = vi.fn().mockReturnValue("blob:test-url");
-    const mockRevokeObjectURL = vi.fn();
-    const originalCreateObjectURL = URL.createObjectURL;
-    const originalRevokeObjectURL = URL.revokeObjectURL;
-    URL.createObjectURL = mockCreateObjectURL;
-    URL.revokeObjectURL = mockRevokeObjectURL;
-    Object.defineProperty(window, "open", {
-      value: mockOpenFn,
-      writable: true,
-      configurable: true,
-    });
-
+  it("should open export dialog from the navigation context menu", async () => {
     render(<ProjectsPage />, { wrapper: TestWrapper });
-    await waitFor(() => {
-      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
-    });
 
-    fireEvent.click(screen.getByTestId("content-export-button"));
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("export-pdf"));
-    });
+    fireEvent.click(screen.getByTestId("file-tree-context-menu-trigger"));
+    fireEvent.click(await screen.findByTestId("context-menu-export"));
 
-    await waitFor(() => {
-      expect(mockFetchExportHtml).toHaveBeenCalledWith({
-        id: "node-1",
-        includeDescendants: false,
-      });
-      expect(mockCreateObjectURL).toHaveBeenCalled();
-      expect(mockOpenFn).toHaveBeenCalledWith("blob:test-url", "_blank");
-      expect(mockFocus).toHaveBeenCalled();
-      expect(mockPrint).toHaveBeenCalled();
-      expect(mockAddToast).toHaveBeenCalledWith("exportSuccess", "success");
-    });
-
-    // Restore
-    Object.defineProperty(window, "open", {
-      value: originalOpen,
-      writable: true,
-      configurable: true,
-    });
-    URL.createObjectURL = originalCreateObjectURL;
-    URL.revokeObjectURL = originalRevokeObjectURL;
+    expect(screen.getByTestId("export-dialog")).toBeInTheDocument();
   });
 
-  it("should show error toast when export fails", async () => {
-    mockFetchExportMarkdown.mockRejectedValueOnce(new Error("Export failed"));
+  it("should enable the workspace settings button for a selected folder", async () => {
+    selectedNodeData.id = "folder-1";
+    selectedNodeData.name = "Story Folder";
+    selectedNodeData.type = "folder";
+    selectedNodeData.parentId = "proj-1";
+    selectedNodeData.metadata = { heroAttachmentId: "hero-folder-1" };
 
     render(<ProjectsPage />, { wrapper: TestWrapper });
-    await waitFor(() => {
-      expect(screen.getByTestId("content-export-button")).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByTestId("content-export-button"));
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("export-markdown"));
-    });
 
     await waitFor(() => {
-      expect(mockAddToast).toHaveBeenCalledWith("exportError", "error");
+      expect(screen.getByTestId("workspace-settings-button")).toBeEnabled();
+    });
+
+    expect(screen.getByTestId("content-title")).toHaveTextContent(
+      "Story Folder",
+    );
+    expect(mockProjectSettingsDialogProps.current).toBeNull();
+    expect(selectedNodeData.metadata).toEqual({
+      heroAttachmentId: "hero-folder-1",
+    });
+  });
+
+  it("should open folder settings from the content header", async () => {
+    selectedNodeData.id = "folder-1";
+    selectedNodeData.name = "Story Folder";
+    selectedNodeData.type = "folder";
+    selectedNodeData.parentId = "proj-1";
+    selectedNodeData.metadata = { heroAttachmentId: "hero-folder-1" };
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    const contentSettingsButton = await screen.findByTestId(
+      "content-settings-button",
+    );
+
+    fireEvent.click(contentSettingsButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("project-settings-dialog")).toBeInTheDocument();
+      expect(mockProjectSettingsDialogProps.current?.node).toEqual({
+        id: "folder-1",
+        name: "Story Folder",
+        type: "folder",
+        projectId: "proj-1",
+        summary: null,
+        metadata: {
+          heroAttachmentId: "hero-folder-1",
+        },
+      });
+    });
+  });
+
+  it("should open note settings from the content header", async () => {
+    selectedNodeData.id = "note-1";
+    selectedNodeData.name = "My Note";
+    selectedNodeData.type = "note";
+    selectedNodeData.parentId = "folder-1";
+    selectedNodeData.metadata = {};
+
+    render(<ProjectsPage />, { wrapper: TestWrapper });
+
+    const contentSettingsButton = await screen.findByTestId(
+      "content-settings-button",
+    );
+
+    fireEvent.click(contentSettingsButton);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("project-settings-dialog")).toBeInTheDocument();
+      expect(mockProjectSettingsDialogProps.current?.node).toMatchObject({
+        id: "note-1",
+        name: "My Note",
+        type: "note",
+        projectId: "proj-1",
+      });
     });
   });
 

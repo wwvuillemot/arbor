@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
-import { mediaAttachments } from "@server/db/schema";
+import { mediaAttachments, nodes } from "@server/db/schema";
 import { NodeService } from "@server/services/node-service";
 import { getTestDb } from "@tests/helpers/db";
 import {
@@ -93,6 +93,25 @@ describe("NodeService", () => {
           parentId: project.id,
         }),
       ).rejects.toThrow("Parent node is locked");
+    });
+
+    it("should create an embedding for a new note", async () => {
+      const project = await createTestProject("My Novel");
+
+      const createdNote = await nodeService.createNode({
+        type: "note",
+        name: "Simulation Notes",
+        parentId: project.id,
+        content: "Simulation output for ten scenarios",
+      });
+
+      const database = getTestDb();
+      const [storedNote] = await database
+        .select()
+        .from(nodes)
+        .where(eq(nodes.id, createdNote.id));
+
+      expect(storedNote.embedding).not.toBeNull();
     });
   });
 
@@ -226,6 +245,35 @@ describe("NodeService", () => {
           content: "Updated content",
         }),
       ).rejects.toThrow("Node is locked");
+    });
+
+    it("should refresh embeddings when note content changes", async () => {
+      const project = await createTestProject("My Novel");
+      const createdNote = await nodeService.createNode({
+        type: "note",
+        name: "Simulation Notes",
+        parentId: project.id,
+        content: "Initial simulation summary",
+      });
+
+      const database = getTestDb();
+      const [noteBeforeUpdate] = await database
+        .select()
+        .from(nodes)
+        .where(eq(nodes.id, createdNote.id));
+
+      await nodeService.updateNode(createdNote.id, {
+        content: "Updated simulation summary with new results",
+      });
+
+      const [noteAfterUpdate] = await database
+        .select()
+        .from(nodes)
+        .where(eq(nodes.id, createdNote.id));
+
+      expect(noteBeforeUpdate.embedding).not.toBeNull();
+      expect(noteAfterUpdate.embedding).not.toBeNull();
+      expect(noteAfterUpdate.embedding).not.toEqual(noteBeforeUpdate.embedding);
     });
   });
 

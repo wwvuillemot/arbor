@@ -1,4 +1,4 @@
-.PHONY: help setup build clean up down logs restart nuke health db-migrate db-push db-generate db-studio seed db-reset test test-unit test-integration test-e2e test-watch test-coverage coverage lint format typecheck audit preflight api-generate api-watch desktop desktop-build backup restore export-md
+.PHONY: help setup build clean up down logs restart nuke health db-migrate db-push db-generate db-studio seed db-reset embeddings-backfill test test-unit test-integration test-e2e test-watch test-coverage coverage lint format typecheck audit preflight api-generate api-watch desktop desktop-build backup restore export-md
 
 # Default target
 .DEFAULT_GOAL := help
@@ -31,6 +31,7 @@ help:
 	@echo "  make db-push         - Push schema directly (⚠️  can lose data, use db-migrate instead)"
 	@echo "  make db-studio       - Open Drizzle Studio (database GUI)"
 	@echo "  make seed            - Seed database with example projects"
+	@echo "  make embeddings-backfill - Backfill or rebuild node embeddings"
 	@echo "  make db-reset        - Reset database (⚠️  destroys data)"
 	@echo ""
 	@echo "Testing:"
@@ -205,6 +206,9 @@ db-studio:
 
 seed:
 	@pnpm run db:seed
+
+embeddings-backfill:
+	@pnpm run embeddings:backfill
 
 db-reset:
 	@echo "⚠️  WARNING: This will DELETE ALL DATA!"

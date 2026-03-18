@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export default function SearchPage() {
   const router = useRouter();
-  // Search is now a modal (Cmd+K). Redirect to projects.
+  // Legacy search route redirects to projects because search now opens from layout controls.
   useEffect(() => {
     router.replace("/projects");
   }, [router]);

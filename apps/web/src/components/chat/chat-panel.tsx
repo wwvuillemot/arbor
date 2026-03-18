@@ -206,6 +206,7 @@ export interface ChatPanelProps {
   projectName?: string | null;
   contextNodes?: { id: string; name: string; type: string }[];
   onRemoveContext?: (id: string) => void;
+  onSelectedThreadIdChange?: (threadId: string | null) => void;
   onAgentResponseSuccess?: () => void;
 }
 
@@ -224,6 +225,7 @@ export function ChatPanel({
   projectName,
   contextNodes = [],
   onRemoveContext,
+  onSelectedThreadIdChange,
   onAgentResponseSuccess,
 }: ChatPanelProps) {
   const t = useTranslations("chat");
@@ -234,7 +236,7 @@ export function ChatPanel({
   const [selectedThreadId, setSelectedThreadId] = React.useState<string | null>(
     () => {
       if (typeof window !== "undefined") {
-        return localStorage.getItem("arbor:selectedThreadId");
+        return localStorage.getItem("arbor:selectedThreadId") ?? null;
       }
       return null;
     },
@@ -262,6 +264,10 @@ export function ChatPanel({
       localStorage.removeItem("arbor:selectedThreadId");
     }
   }, [selectedThreadId]);
+
+  React.useEffect(() => {
+    onSelectedThreadIdChange?.(selectedThreadId);
+  }, [onSelectedThreadIdChange, selectedThreadId]);
 
   // Clear selected thread when project changes (threads are project-scoped)
   const prevProjectIdRef = React.useRef(projectId);

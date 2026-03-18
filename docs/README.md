@@ -9,6 +9,11 @@ This is a monorepo project. Documentation is organized by app.
 - **[`apps/api/`](../apps/api/)** - Backend API (see source code)
 - **[`apps/web/`](../apps/web/)** - Next.js frontend (see source code)
 
+## Export Documentation
+
+- **[`docs/export/README.md`](./export/README.md)** - Pandoc export notes and the DOCX reference-doc workflow
+- **[`docs/export/reference-style-spec.html`](./export/reference-style-spec.html)** - Browser-friendly style specification for creating `reference.docx` for Pandoc/Google Docs exports
+
 ## Quick Reference
 
 For getting started, see the root [`README.md`](../README.md).

@@ -58,6 +58,12 @@ backup.sql
 
 # Temporary files
 tmp/
+
+# Augment AI agent logs
+.augment-logs/
+
+# Debug/test EPUB extraction artifacts
+test-epub-*/
 temp/
 *.tmp
 

@@ -2,11 +2,22 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { Check, Plus, Trash2, ImageIcon, X, AlertTriangle } from "lucide-react";
+import {
+  Check,
+  Plus,
+  Trash2,
+  ImageIcon,
+  X,
+  AlertTriangle,
+  UploadCloud,
+} from "lucide-react";
 import { Dialog } from "@/components/dialog";
+import { MediaPickerGrid, InlineSvg } from "@/components/media-picker-grid";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
+import { arrayBufferToBase64 } from "@/lib/base64";
+import { useToast } from "@/contexts/toast-context";
 
 // ── Style preset types ────────────────────────────────────────────────────────
 
@@ -45,6 +56,31 @@ export function parseStylePresets(sp: Record<string, unknown> | undefined): {
     };
   }
   return { presets: [], activePresetId: undefined };
+}
+
+function cloneSettingsMetadata(
+  metadata: Record<string, unknown>,
+): Record<string, unknown> {
+  return { ...metadata };
+}
+
+function getInitialStyleEditorState(metadata: Record<string, unknown>) {
+  const { presets, activePresetId } = parseStylePresets(
+    metadata.styleProfile as Record<string, unknown> | undefined,
+  );
+  const editingPreset = presets.find(
+    (preset) => preset.id === (activePresetId ?? presets[0]?.id),
+  );
+
+  return {
+    presets,
+    activePresetId,
+    editingPresetId: activePresetId ?? presets[0]?.id,
+    editName: editingPreset?.name ?? "",
+    editArtStyle: editingPreset?.artStyle ?? "",
+    editColorPalette: editingPreset?.colorPalette ?? "",
+    editMoodKeywords: editingPreset?.moodKeywords ?? "",
+  };
 }
 
 // ── Focal Point Picker ────────────────────────────────────────────────────────
@@ -209,15 +245,19 @@ type Tab = "general" | "appearance" | "style";
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+export interface ProjectSettingsNode {
+  id: string;
+  name: string;
+  type: string;
+  projectId: string;
+  summary?: string | null;
+  metadata: Record<string, unknown>;
+}
+
 interface ProjectSettingsDialogProps {
   open: boolean;
   onClose: () => void;
-  project: {
-    id: string;
-    name: string;
-    summary?: string | null;
-    metadata: Record<string, unknown>;
-  };
+  node: ProjectSettingsNode;
   /** When provided, renders a "Delete project" danger zone in the General tab */
   onDelete?: () => void;
 }
@@ -225,118 +265,341 @@ interface ProjectSettingsDialogProps {
 export function ProjectSettingsDialog({
   open,
   onClose,
-  project,
+  node,
   onDelete,
 }: ProjectSettingsDialogProps) {
   const t = useTranslations("editor.projectSettings");
   const tSp = useTranslations("editor.styleProfile");
   const utils = trpc.useUtils();
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = React.useState<Tab>("general");
+  const [workingMetadata, setWorkingMetadata] = React.useState<
+    Record<string, unknown>
+  >(() => cloneSettingsMetadata(node.metadata));
+  const workingMetadataRef = React.useRef(workingMetadata);
+
+  React.useEffect(() => {
+    workingMetadataRef.current = workingMetadata;
+  }, [workingMetadata]);
+
+  const invalidateSettingsQueries = React.useCallback(() => {
+    void utils.nodes.getAllProjects.invalidate();
+    void utils.nodes.getById.invalidate();
+    void utils.nodes.getChildren.invalidate();
+    void utils.nodes.getDescendants.invalidate();
+  }, [utils]);
 
   // ── General tab state ───────────────────────────────────────────────────────
-  const [name, setName] = React.useState(project.name);
-  const [description, setDescription] = React.useState(project.summary ?? "");
+  const [name, setName] = React.useState(node.name);
+  const [description, setDescription] = React.useState(node.summary ?? "");
   const [generalSaved, setGeneralSaved] = React.useState(false);
+  const [epubAuthor, setEpubAuthor] = React.useState(
+    (node.metadata.epubAuthor as string | undefined) ?? "",
+  );
+  const [epubDescription, setEpubDescription] = React.useState(
+    (node.metadata.epubDescription as string | undefined) ?? "",
+  );
+  const [epubLanguage, setEpubLanguage] = React.useState(
+    (node.metadata.epubLanguage as string | undefined) ?? "",
+  );
 
   const updateGeneralMutation = trpc.nodes.update.useMutation({
     onSuccess: () => {
-      utils.nodes.getAllProjects.invalidate();
+      invalidateSettingsQueries();
       setGeneralSaved(true);
       setTimeout(() => setGeneralSaved(false), 2000);
+    },
+    onError: (error) => {
+      addToast(error.message || t("saveError"), "error");
     },
   });
 
   const handleSaveGeneral = () => {
+    const nextMetadata = {
+      ...workingMetadataRef.current,
+      epubAuthor: epubAuthor.trim() || undefined,
+      epubDescription: epubDescription.trim() || undefined,
+      epubLanguage: epubLanguage.trim() || undefined,
+    };
+    setWorkingMetadata(nextMetadata);
     updateGeneralMutation.mutate({
-      id: project.id,
-      data: { name: name.trim(), summary: description || null },
+      id: node.id,
+      data: {
+        name: name.trim(),
+        summary: description || null,
+        metadata: nextMetadata,
+      },
     });
   };
 
   // ── Appearance tab state ────────────────────────────────────────────────────
   const currentHeroId =
-    (project.metadata.heroAttachmentId as string | null) ?? null;
+    (workingMetadata.heroAttachmentId as string | null) ?? null;
   const [heroId, setHeroId] = React.useState<string | null>(currentHeroId);
   const [focalX, setFocalX] = React.useState<number>(
-    (project.metadata.heroFocalX as number | null) ?? 50,
+    (workingMetadata.heroFocalX as number | null) ?? 50,
   );
   const [focalY, setFocalY] = React.useState<number>(
-    (project.metadata.heroFocalY as number | null) ?? 50,
+    (workingMetadata.heroFocalY as number | null) ?? 50,
   );
 
-  const mediaQuery = trpc.media.getByNode.useQuery(
-    { nodeId: project.id },
+  const mediaQuery = trpc.media.getByProject.useQuery(
+    { projectId: node.projectId },
     { enabled: open && activeTab === "appearance", staleTime: 30_000 },
   );
 
   const setHeroMutation = trpc.nodes.setHeroImage.useMutation({
     onSuccess: () => {
-      utils.nodes.getAllProjects.invalidate();
+      invalidateSettingsQueries();
+    },
+    onError: (error) => {
+      // Roll back optimistic local state on failure
+      setHeroId(currentHeroId);
+      setWorkingMetadata((prev) => ({
+        ...prev,
+        heroAttachmentId: currentHeroId,
+      }));
+      addToast(error.message || t("saveError"), "error");
     },
   });
 
   const updateFocalMutation = trpc.nodes.update.useMutation({
     onSuccess: () => {
-      utils.nodes.getAllProjects.invalidate();
+      invalidateSettingsQueries();
+    },
+    onError: (error) => {
+      addToast(error.message || t("saveError"), "error");
     },
   });
 
+  // ── Image upload ────────────────────────────────────────────────────────────
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [isUploadingSvg, setIsUploadingSvg] = React.useState(false);
+  const uploadInputRef = React.useRef<HTMLInputElement>(null);
+  const chapterIconUploadInputRef = React.useRef<HTMLInputElement>(null);
+  const dinkusUploadInputRef = React.useRef<HTMLInputElement>(null);
+  const uploadMutation = trpc.media.upload.useMutation();
+
+  const handleUploadFile = React.useCallback(
+    async (file: File) => {
+      const ACCEPTED_TYPES = [
+        "image/png",
+        "image/jpeg",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
+      ];
+      const MAX_SIZE = 10 * 1024 * 1024;
+
+      if (!ACCEPTED_TYPES.includes(file.type)) {
+        return;
+      }
+      if (file.size > MAX_SIZE) {
+        return;
+      }
+
+      setIsUploading(true);
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const base64 = arrayBufferToBase64(arrayBuffer);
+        const attachment = await uploadMutation.mutateAsync({
+          nodeId: node.id,
+          projectId: node.projectId,
+          filename: file.name,
+          mimeType: file.type,
+          data: base64,
+        });
+        // Refetch media list so the new image appears in the grid
+        await utils.media.getByProject.invalidate({
+          projectId: node.projectId,
+        });
+        // Auto-select the newly uploaded image as hero
+        handleSetHero(attachment.id);
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [node.id, node.projectId, uploadMutation, utils],
+  );
+
+  const handleUploadInputChange = React.useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      // Reset so the same file can be re-selected
+      e.target.value = "";
+      await handleUploadFile(file);
+    },
+    [handleUploadFile],
+  );
+
+  /** Upload an SVG file and call onSuccess with the new attachment id (does NOT set as hero). */
+  const handleUploadSvg = React.useCallback(
+    async (file: File, onSuccess: (attachmentId: string) => void) => {
+      if (file.type !== "image/svg+xml") return;
+      const MAX_SIZE = 10 * 1024 * 1024;
+      if (file.size > MAX_SIZE) return;
+
+      setIsUploadingSvg(true);
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const base64 = arrayBufferToBase64(arrayBuffer);
+        const attachment = await uploadMutation.mutateAsync({
+          nodeId: node.id,
+          projectId: node.projectId,
+          filename: file.name,
+          mimeType: file.type,
+          data: base64,
+        });
+        await utils.media.getByProject.invalidate({
+          projectId: node.projectId,
+        });
+        onSuccess(attachment.id);
+      } finally {
+        setIsUploadingSvg(false);
+      }
+    },
+    [node.id, node.projectId, uploadMutation, utils],
+  );
+
   const handleSetHero = (attachmentId: string | null) => {
     setHeroId(attachmentId);
-    setHeroMutation.mutate({ nodeId: project.id, attachmentId });
+    setWorkingMetadata((previousMetadata) => ({
+      ...previousMetadata,
+      heroAttachmentId: attachmentId,
+    }));
+    setHeroMutation.mutate({ nodeId: node.id, attachmentId });
   };
 
   const handleFocalChange = (x: number, y: number) => {
     setFocalX(x);
     setFocalY(y);
+    const nextMetadata = {
+      ...workingMetadataRef.current,
+      heroFocalX: x,
+      heroFocalY: y,
+    };
+    setWorkingMetadata(nextMetadata);
     updateFocalMutation.mutate({
-      id: project.id,
+      id: node.id,
       data: {
-        metadata: {
-          ...project.metadata,
-          heroFocalX: x,
-          heroFocalY: y,
-        },
+        metadata: nextMetadata,
       },
     });
   };
 
-  // ── Style presets tab state ─────────────────────────────────────────────────
-  const { presets: initPresets, activePresetId: initActiveId } =
-    parseStylePresets(
-      project.metadata.styleProfile as Record<string, unknown> | undefined,
-    );
-  const initEditPreset = initPresets.find(
-    (p) => p.id === (initActiveId ?? initPresets[0]?.id),
+  // ── EPUB SVG assets (chapter icon + dinkus) ─────────────────────────────────
+  const [chapterIconId, setChapterIconId] = React.useState<string | null>(
+    (workingMetadata.chapterIconAttachmentId as string | null) ?? null,
+  );
+  const [dinkusId, setDinkusId] = React.useState<string | null>(
+    (workingMetadata.dinkusAttachmentId as string | null) ?? null,
   );
 
-  const [stylePresets, setStylePresets] =
-    React.useState<StylePreset[]>(initPresets);
+  const updateSvgMetaMutation = trpc.nodes.update.useMutation({
+    onSuccess: () => {
+      invalidateSettingsQueries();
+    },
+    onError: (error) => {
+      addToast(error.message || t("saveError"), "error");
+    },
+  });
+
+  const handleSetChapterIcon = (attachmentId: string | null) => {
+    setChapterIconId(attachmentId);
+    const nextMetadata = {
+      ...workingMetadataRef.current,
+      chapterIconAttachmentId: attachmentId ?? undefined,
+    };
+    setWorkingMetadata(nextMetadata);
+    updateSvgMetaMutation.mutate({
+      id: node.id,
+      data: { metadata: nextMetadata },
+    });
+  };
+
+  const handleSetDinkus = (attachmentId: string | null) => {
+    setDinkusId(attachmentId);
+    const nextMetadata = {
+      ...workingMetadataRef.current,
+      dinkusAttachmentId: attachmentId ?? undefined,
+    };
+    setWorkingMetadata(nextMetadata);
+    updateSvgMetaMutation.mutate({
+      id: node.id,
+      data: { metadata: nextMetadata },
+    });
+  };
+
+  // ── Style presets tab state ─────────────────────────────────────────────────
+  const initialStyleEditorState = React.useMemo(
+    () => getInitialStyleEditorState(workingMetadata),
+    [workingMetadata],
+  );
+
+  const [stylePresets, setStylePresets] = React.useState<StylePreset[]>(
+    initialStyleEditorState.presets,
+  );
   const [spActiveId, setSpActiveId] = React.useState<string | undefined>(
-    initActiveId,
+    initialStyleEditorState.activePresetId,
   );
   const [spEditingId, setSpEditingId] = React.useState<string | undefined>(
-    initActiveId ?? initPresets[0]?.id,
+    initialStyleEditorState.editingPresetId,
   );
   const [spEditName, setSpEditName] = React.useState(
-    initEditPreset?.name ?? "",
+    initialStyleEditorState.editName,
   );
   const [spEditArtStyle, setSpEditArtStyle] = React.useState(
-    initEditPreset?.artStyle ?? "",
+    initialStyleEditorState.editArtStyle,
   );
   const [spEditColorPalette, setSpEditColorPalette] = React.useState(
-    initEditPreset?.colorPalette ?? "",
+    initialStyleEditorState.editColorPalette,
   );
   const [spEditMoodKeywords, setSpEditMoodKeywords] = React.useState(
-    initEditPreset?.moodKeywords ?? "",
+    initialStyleEditorState.editMoodKeywords,
   );
   const [presetSaved, setPresetSaved] = React.useState(false);
 
+  React.useEffect(() => {
+    const nextMetadata = cloneSettingsMetadata(node.metadata);
+    const nextStyleEditorState = getInitialStyleEditorState(nextMetadata);
+
+    setActiveTab("general");
+    setName(node.name);
+    setDescription(node.summary ?? "");
+    setGeneralSaved(false);
+    setEpubAuthor((nextMetadata.epubAuthor as string | undefined) ?? "");
+    setEpubDescription(
+      (nextMetadata.epubDescription as string | undefined) ?? "",
+    );
+    setEpubLanguage((nextMetadata.epubLanguage as string | undefined) ?? "");
+    setWorkingMetadata(nextMetadata);
+    setHeroId((nextMetadata.heroAttachmentId as string | null) ?? null);
+    setFocalX((nextMetadata.heroFocalX as number | null) ?? 50);
+    setFocalY((nextMetadata.heroFocalY as number | null) ?? 50);
+    setChapterIconId(
+      (nextMetadata.chapterIconAttachmentId as string | null) ?? null,
+    );
+    setDinkusId((nextMetadata.dinkusAttachmentId as string | null) ?? null);
+    setStylePresets(nextStyleEditorState.presets);
+    setSpActiveId(nextStyleEditorState.activePresetId);
+    setSpEditingId(nextStyleEditorState.editingPresetId);
+    setSpEditName(nextStyleEditorState.editName);
+    setSpEditArtStyle(nextStyleEditorState.editArtStyle);
+    setSpEditColorPalette(nextStyleEditorState.editColorPalette);
+    setSpEditMoodKeywords(nextStyleEditorState.editMoodKeywords);
+    setPresetSaved(false);
+  }, [open, node.id, node.name, node.summary, node.metadata]);
+
   const updateStyleMutation = trpc.nodes.update.useMutation({
     onSuccess: () => {
-      utils.nodes.getAllProjects.invalidate();
+      invalidateSettingsQueries();
       setPresetSaved(true);
       setTimeout(() => setPresetSaved(false), 2000);
+    },
+    onError: (error) => {
+      addToast(error.message || t("saveError"), "error");
     },
   });
 
@@ -378,15 +641,17 @@ export function ProjectSettingsDialog({
     const finalPresets = exists
       ? stylePresets.map((p) => (p.id === spEditingId ? updated : p))
       : [...stylePresets, updated];
+    const nextMetadata = {
+      ...workingMetadataRef.current,
+      styleProfile: { presets: finalPresets, activePresetId: spEditingId },
+    };
     setStylePresets(finalPresets);
     setSpActiveId(spEditingId);
+    setWorkingMetadata(nextMetadata);
     updateStyleMutation.mutate({
-      id: project.id,
+      id: node.id,
       data: {
-        metadata: {
-          ...project.metadata,
-          styleProfile: { presets: finalPresets, activePresetId: spEditingId },
-        },
+        metadata: nextMetadata,
       },
     });
   };
@@ -398,6 +663,10 @@ export function ProjectSettingsDialog({
     const newActiveId =
       spEditingId === spActiveId ? filtered[0]?.id : spActiveId;
     const newEditingId = filtered[0]?.id;
+    const nextMetadata = {
+      ...workingMetadataRef.current,
+      styleProfile: { presets: filtered, activePresetId: newActiveId },
+    };
     setSpActiveId(newActiveId);
     setSpEditingId(newEditingId);
     const ep = filtered.find((p) => p.id === newEditingId);
@@ -405,13 +674,11 @@ export function ProjectSettingsDialog({
     setSpEditArtStyle(ep?.artStyle ?? "");
     setSpEditColorPalette(ep?.colorPalette ?? "");
     setSpEditMoodKeywords(ep?.moodKeywords ?? "");
+    setWorkingMetadata(nextMetadata);
     updateStyleMutation.mutate({
-      id: project.id,
+      id: node.id,
       data: {
-        metadata: {
-          ...project.metadata,
-          styleProfile: { presets: filtered, activePresetId: newActiveId },
-        },
+        metadata: nextMetadata,
       },
     });
   };
@@ -421,14 +688,16 @@ export function ProjectSettingsDialog({
   const tabs: { id: Tab; label: string }[] = [
     { id: "general", label: t("tabGeneral") },
     { id: "appearance", label: t("tabAppearance") },
-    { id: "style", label: t("tabStyle") },
+    ...(node.type === "project"
+      ? ([{ id: "style", label: t("tabStyle") }] as const)
+      : []),
   ];
 
   return (
     <Dialog
       open={open}
       onClose={onClose}
-      title={t("title", { name: project.name })}
+      title={t("title", { name: node.name })}
       maxWidth="2xl"
       showFullscreenToggle={false}
     >
@@ -480,6 +749,55 @@ export function ProjectSettingsDialog({
                   {t("descriptionHint")}
                 </p>
               </div>
+              {/* ── EPUB Metadata ────────────────────────────────────── */}
+              {node.type === "project" && (
+                <div className="flex flex-col gap-3 border-t pt-4">
+                  <div>
+                    <h3 className="text-sm font-medium">{t("epubSection")}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {t("epubSectionHint")}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">
+                      {t("epubAuthor")}
+                    </label>
+                    <input
+                      value={epubAuthor}
+                      onChange={(e) => setEpubAuthor(e.target.value)}
+                      placeholder={t("epubAuthorPlaceholder")}
+                      className="px-3 py-2 text-sm rounded-md border bg-background outline-none focus:ring-2 focus:ring-ring"
+                      data-testid="project-settings-epub-author"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">
+                      {t("epubDescription")}
+                    </label>
+                    <textarea
+                      value={epubDescription}
+                      onChange={(e) => setEpubDescription(e.target.value)}
+                      placeholder={t("epubDescriptionPlaceholder")}
+                      rows={3}
+                      className="px-3 py-2 text-sm rounded-md border bg-background outline-none focus:ring-2 focus:ring-ring resize-none"
+                      data-testid="project-settings-epub-description"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium">
+                      {t("epubLanguage")}
+                    </label>
+                    <input
+                      value={epubLanguage}
+                      onChange={(e) => setEpubLanguage(e.target.value)}
+                      placeholder={t("epubLanguagePlaceholder")}
+                      className="px-3 py-2 text-sm rounded-md border bg-background outline-none focus:ring-2 focus:ring-ring"
+                      data-testid="project-settings-epub-language"
+                    />
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={handleSaveGeneral}
                 disabled={updateGeneralMutation.isPending || !name.trim()}
@@ -490,7 +808,7 @@ export function ProjectSettingsDialog({
 
               {onDelete && (
                 <DangerZone
-                  projectName={project.name}
+                  projectName={node.name}
                   onDelete={() => {
                     onClose();
                     onDelete();
@@ -525,51 +843,165 @@ export function ProjectSettingsDialog({
                   </div>
                 )}
 
+                {/* Hidden file input for uploads */}
+                <input
+                  ref={uploadInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+                  className="hidden"
+                  onChange={handleUploadInputChange}
+                  data-testid="hero-upload-input"
+                />
+
                 {/* Image grid */}
-                {mediaQuery.isLoading ? (
-                  <p className="text-xs text-muted-foreground">
-                    {t("loadingImages")}
-                  </p>
-                ) : (mediaQuery.data ?? []).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-2 py-8 border border-dashed rounded-md text-muted-foreground">
-                    <ImageIcon className="w-8 h-8" />
-                    <p className="text-xs">{t("noImages")}</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2">
-                    {(mediaQuery.data ?? [])
-                      .filter((m) => m.mimeType?.startsWith("image/"))
-                      .map((media) => (
-                        <button
-                          key={media.id}
-                          onClick={() => handleSetHero(media.id)}
-                          className={cn(
-                            "relative aspect-square rounded-md overflow-hidden border-2 transition-all",
-                            heroId === media.id
-                              ? "border-primary ring-2 ring-primary ring-offset-1"
-                              : "border-transparent hover:border-primary/50",
-                          )}
-                        >
-                          <img
-                            src={getMediaAttachmentUrl(media.id)}
-                            alt={media.filename ?? ""}
-                            className="w-full h-full object-cover"
-                          />
-                          {heroId === media.id && (
-                            <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                              <Check className="w-5 h-5 text-primary drop-shadow" />
-                            </div>
-                          )}
-                        </button>
-                      ))}
-                  </div>
-                )}
+                <MediaPickerGrid
+                  items={(mediaQuery.data ?? []).filter((m) =>
+                    m.mimeType?.startsWith("image/"),
+                  )}
+                  selectedId={heroId}
+                  onSelect={handleSetHero}
+                  onUploadClick={() => uploadInputRef.current?.click()}
+                  isLoading={mediaQuery.isLoading}
+                  isUploading={isUploading}
+                  toggleable={false}
+                  columns={4}
+                  aspect="square"
+                  objectFit="cover"
+                  filterPlaceholder={t("filterImages")}
+                  uploadLabel={t("uploadImage")}
+                  emptyUploadLabel={t("uploadImage")}
+                  loadingLabel={t("loadingImages")}
+                  testIdPrefix="hero"
+                />
               </div>
+
+              {/* ── Chapter Icon (folder sections only) ────────────────── */}
+              {node.type === "folder" && (
+                <div>
+                  <h3 className="text-sm font-medium mb-1">
+                    {t("chapterIcon")}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {t("chapterIconHint")}
+                  </p>
+
+                  {chapterIconId && (
+                    <div className="mb-2 flex items-center gap-3">
+                      <InlineSvg
+                        url={getMediaAttachmentUrl(chapterIconId)}
+                        className="w-10 h-10 border rounded bg-muted/30"
+                      />
+                      <button
+                        onClick={() => handleSetChapterIcon(null)}
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                        data-testid="clear-chapter-icon-button"
+                      >
+                        {t("clearChapterIcon")}
+                      </button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={chapterIconUploadInputRef}
+                    type="file"
+                    accept="image/svg+xml"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file)
+                        await handleUploadSvg(file, handleSetChapterIcon);
+                    }}
+                  />
+                  <MediaPickerGrid
+                    items={(mediaQuery.data ?? []).filter(
+                      (m) => m.mimeType === "image/svg+xml",
+                    )}
+                    selectedId={chapterIconId}
+                    onSelect={handleSetChapterIcon}
+                    onUploadClick={() =>
+                      chapterIconUploadInputRef.current?.click()
+                    }
+                    isLoading={mediaQuery.isLoading}
+                    isUploading={isUploadingSvg}
+                    toggleable
+                    columns={4}
+                    aspect="square"
+                    objectFit="contain"
+                    invertOnDark
+                    showLabels
+                    filterPlaceholder={t("filterSvg")}
+                    uploadLabel={t("uploadSvg")}
+                    emptyUploadLabel={t("uploadSvg")}
+                    loadingLabel={t("loadingImages")}
+                    testIdPrefix="chapter-icon"
+                  />
+                </div>
+              )}
+
+              {/* ── Dinkus (folder + project as fallback) ──────────────── */}
+              {(node.type === "folder" || node.type === "project") && (
+                <div>
+                  <h3 className="text-sm font-medium mb-1">{t("dinkus")}</h3>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    {t("dinkusHint")}
+                  </p>
+
+                  {dinkusId && (
+                    <div className="mb-2 flex items-center gap-3">
+                      <InlineSvg
+                        url={getMediaAttachmentUrl(dinkusId)}
+                        className="w-24 h-8 border rounded bg-muted/30"
+                      />
+                      <button
+                        onClick={() => handleSetDinkus(null)}
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                        data-testid="clear-dinkus-button"
+                      >
+                        {t("clearDinkus")}
+                      </button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={dinkusUploadInputRef}
+                    type="file"
+                    accept="image/svg+xml"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) await handleUploadSvg(file, handleSetDinkus);
+                    }}
+                  />
+                  <MediaPickerGrid
+                    items={(mediaQuery.data ?? []).filter(
+                      (m) => m.mimeType === "image/svg+xml",
+                    )}
+                    selectedId={dinkusId}
+                    onSelect={handleSetDinkus}
+                    onUploadClick={() => dinkusUploadInputRef.current?.click()}
+                    isLoading={mediaQuery.isLoading}
+                    isUploading={isUploadingSvg}
+                    toggleable
+                    columns={3}
+                    aspect="wide"
+                    objectFit="contain"
+                    invertOnDark
+                    showLabels
+                    filterPlaceholder={t("filterSvg")}
+                    uploadLabel={t("uploadSvg")}
+                    emptyUploadLabel={t("uploadSvg")}
+                    loadingLabel={t("loadingImages")}
+                    testIdPrefix="dinkus"
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {/* ── Style Presets ─────────────────────────────────────────── */}
-          {activeTab === "style" && (
+          {activeTab === "style" && node.type === "project" && (
             <div className="flex flex-col gap-4 max-w-lg">
               <div>
                 <h3 className="text-sm font-medium mb-1">{tSp("title")}</h3>

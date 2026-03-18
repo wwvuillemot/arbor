@@ -865,77 +865,48 @@ describe("projects-page-helpers", () => {
   });
 
   it("derives node move mutation inputs for inside, before, after, and missing parent cases", () => {
-    const siblingNodes = [{ id: "node-a" }, { id: "node-b" }, { id: "node-c" }];
-
     expect(
       deriveNodeMoveMutationInput(
         "dragged-node",
         "target-folder",
         "inside",
         undefined,
-        [],
       ),
     ).toEqual({ id: "dragged-node", newParentId: "target-folder" });
     expect(
-      deriveNodeMoveMutationInput(
-        "dragged-node",
-        "node-b",
-        "before",
-        { id: "node-b", parentId: "folder-1" },
-        siblingNodes,
-      ),
+      deriveNodeMoveMutationInput("dragged-node", "node-b", "before", {
+        id: "node-b",
+        parentId: "folder-1",
+        position: 1,
+      }),
     ).toEqual({
       id: "dragged-node",
       newParentId: "folder-1",
       position: 1,
     });
     expect(
-      deriveNodeMoveMutationInput(
-        "dragged-node",
-        "node-b",
-        "after",
-        { id: "node-b", parentId: "folder-1" },
-        siblingNodes,
-      ),
+      deriveNodeMoveMutationInput("dragged-node", "node-b", "after", {
+        id: "node-b",
+        parentId: "folder-1",
+        position: 1,
+      }),
     ).toEqual({
       id: "dragged-node",
       newParentId: "folder-1",
       position: 2,
     });
     expect(
-      deriveNodeMoveMutationInput(
-        "dragged-node",
-        "missing-node",
-        "before",
-        { id: "missing-node", parentId: "folder-1" },
-        siblingNodes,
-      ),
-    ).toEqual({
-      id: "dragged-node",
-      newParentId: "folder-1",
-      position: 0,
-    });
+      deriveNodeMoveMutationInput("dragged-node", "missing-node", "before", {
+        id: "missing-node",
+        parentId: "folder-1",
+      }),
+    ).toBeNull();
     expect(
-      deriveNodeMoveMutationInput(
-        "dragged-node",
-        "missing-node",
-        "after",
-        { id: "missing-node", parentId: "folder-1" },
-        siblingNodes,
-      ),
-    ).toEqual({
-      id: "dragged-node",
-      newParentId: "folder-1",
-      position: siblingNodes.length,
-    });
-    expect(
-      deriveNodeMoveMutationInput(
-        "dragged-node",
-        "node-b",
-        "before",
-        { id: "node-b", parentId: null },
-        siblingNodes,
-      ),
+      deriveNodeMoveMutationInput("dragged-node", "node-b", "before", {
+        id: "node-b",
+        parentId: null,
+        position: 1,
+      }),
     ).toBeNull();
   });
 });

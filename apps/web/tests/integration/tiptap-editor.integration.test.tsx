@@ -211,9 +211,8 @@ describe("TiptapEditor integration", () => {
       createProvidersHarness(INITIAL_AI_HISTORY);
 
     function AutosaveHistoryRefreshHarness() {
-      const [content, setContent] = React.useState<TiptapDocument>(
-        INITIAL_DOCUMENT,
-      );
+      const [content, setContent] =
+        React.useState<TiptapDocument>(INITIAL_DOCUMENT);
       const hasAppliedExternalSyncRef = React.useRef(false);
       const handleContentChange = React.useCallback(
         (nextContent: TiptapDocument) => {

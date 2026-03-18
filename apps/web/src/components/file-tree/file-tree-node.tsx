@@ -186,10 +186,15 @@ export function FileTreeNode({
       onToggleChecked(node.id);
       return;
     }
-    if (isExpandable) {
-      onToggle(node.id);
-    }
     onSelect(node.id);
+  };
+
+  const handleToggleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isEditing || !isExpandable || isLoading) {
+      return;
+    }
+    onToggle(node.id);
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
@@ -328,7 +333,13 @@ export function FileTreeNode({
       >
         {/* Expand/collapse chevron */}
         {isExpandable ? (
-          <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+          <button
+            type="button"
+            className="flex-shrink-0 w-4 h-4 flex items-center justify-center"
+            onClick={handleToggleClick}
+            aria-label={isExpanded ? "Collapse node" : "Expand node"}
+            data-testid={`tree-node-toggle-${node.id}`}
+          >
             {isLoading ? (
               <span className="w-3 h-3 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
             ) : isExpanded ? (
@@ -336,7 +347,7 @@ export function FileTreeNode({
             ) : (
               <ChevronRight className="w-4 h-4 text-muted-foreground" />
             )}
-          </span>
+          </button>
         ) : (
           <span className="w-4" />
         )}

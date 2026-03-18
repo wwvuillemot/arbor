@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Architecting People — Reference Doc Style Spec</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Sans+3:wght@300;400;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --navy-deep: #04182e;
+        --navy-mid: #185fa5;
+        --blue-accent: #378add;
+        --blue-light: #e6f1fb;
+        --amber: #ba7517;
+        --amber-light: #faeeda;
+        --text: #1a1208;
+        --text-muted: #5a4a30;
+        --rule: #d0c8b8;
+        --bg: #faf6ee;
+        --card: #ffffff;
+        --border: #e8e0d0;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: "Source Sans 3", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 15px;
+        line-height: 1.6;
+      }
+
+      /* ── Header ── */
+      .page-header {
+        background: var(--navy-deep);
+        color: white;
+        padding: 3rem 4rem 2.5rem;
+        border-bottom: 3px solid var(--amber);
+      }
+      .page-header .eyebrow {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        letter-spacing: 2px;
+        color: var(--blue-accent);
+        text-transform: uppercase;
+        margin-bottom: 0.75rem;
+      }
+      .page-header h1 {
+        font-family: "Source Sans 3", sans-serif;
+        font-size: 28px;
+        font-weight: 300;
+        color: white;
+        letter-spacing: -0.3px;
+        margin-bottom: 0.4rem;
+      }
+      .page-header h1 span {
+        font-weight: 600;
+      }
+      .page-header .subtitle {
+        font-size: 14px;
+        color: #85b7eb;
+        font-weight: 300;
+      }
+
+      /* ── Layout ── */
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 3rem 4rem;
+        display: grid;
+        grid-template-columns: 340px 1fr;
+        gap: 3rem;
+        align-items: start;
+      }
+
+      /* ── Sidebar ── */
+      .sidebar {
+        position: sticky;
+        top: 2rem;
+      }
+
+      .nav-section {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 1.5rem;
+      }
+      .nav-section-header {
+        background: var(--navy-deep);
+        color: var(--blue-accent);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 0.7rem 1rem;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid var(--border);
+        cursor: pointer;
+        transition: background 0.15s;
+        text-decoration: none;
+        color: var(--text);
+      }
+      .nav-item:last-child {
+        border-bottom: none;
+      }
+      .nav-item:hover {
+        background: var(--blue-light);
+      }
+      .nav-item .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 0.75rem;
+        flex-shrink: 0;
+      }
+      .nav-item .label {
+        font-size: 13px;
+        font-weight: 400;
+      }
+      .nav-item .setting {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-left: auto;
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .info-box {
+        background: var(--amber-light);
+        border: 1px solid var(--amber);
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--text-muted);
+      }
+      .info-box strong {
+        color: var(--text);
+        display: block;
+        margin-bottom: 0.4rem;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+
+      /* ── Main content ── */
+      .main {
+        min-width: 0;
+      }
+
+      .style-section {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        overflow: hidden;
+      }
+
+      .style-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        background: #fdfcfa;
+      }
+      .style-section-header .style-name {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--navy-mid);
+        letter-spacing: 0.5px;
+      }
+      .style-section-header .style-tag {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        background: var(--blue-light);
+        color: var(--navy-mid);
+        padding: 3px 8px;
+        border-radius: 4px;
+        letter-spacing: 0.5px;
+      }
+
+      .preview-area {
+        padding: 2rem 2.5rem;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .settings-area {
+        padding: 1.25rem 1.5rem;
+        background: #fdfcfa;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 0.75rem;
+      }
+
+      .setting-item {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .setting-item .key {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: var(--text-muted);
+        font-family: "JetBrains Mono", monospace;
+      }
+      .setting-item .value {
+        font-size: 13px;
+        color: var(--text);
+        font-weight: 400;
+      }
+      .setting-item .value code {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        background: var(--blue-light);
+        color: var(--navy-mid);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+
+      /* ── Google Docs instruction panel ── */
+      .gdocs-steps {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 2rem;
+      }
+      .gdocs-steps-header {
+        background: var(--navy-deep);
+        color: white;
+        padding: 1rem 1.5rem;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .gdocs-steps-header .icon {
+        width: 20px;
+        height: 20px;
+        background: var(--blue-accent);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 700;
+        color: white;
+        flex-shrink: 0;
+      }
+      .step-list {
+        padding: 0;
+      }
+      .step {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border);
+        align-items: flex-start;
+      }
+      .step:last-child {
+        border-bottom: none;
+      }
+      .step-num {
+        width: 24px;
+        height: 24px;
+        background: var(--navy-deep);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+        flex-shrink: 0;
+        margin-top: 1px;
+      }
+      .step-content {
+        flex: 1;
+        min-width: 0;
+      }
+      .step-content .step-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 0.3rem;
+      }
+      .step-content .step-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+      .step-content .step-desc code {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        background: var(--blue-light);
+        color: var(--navy-mid);
+        padding: 1px 5px;
+        border-radius: 3px;
+      }
+      .step-content .menu-path {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 0.4rem;
+        flex-wrap: wrap;
+      }
+      .menu-path .menu-item {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        background: #f0f0ee;
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 2px 6px;
+        border-radius: 3px;
+      }
+      .menu-path .arrow {
+        font-size: 10px;
+        color: var(--text-muted);
+      }
+
+      /* ── PREVIEW STYLES — actual book typography ── */
+      .preview-part-header {
+        font-family: "Source Sans 3", sans-serif;
+        font-size: 10px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--navy-mid);
+        margin-bottom: 0.5rem;
+      }
+      .preview-h1 {
+        font-family: "Source Sans 3", sans-serif;
+        font-size: 32px;
+        font-weight: 600;
+        color: var(--navy-deep);
+        letter-spacing: -0.5px;
+        line-height: 1.15;
+        margin-bottom: 0.5rem;
+      }
+      .preview-rule {
+        width: 35%;
+        height: 1px;
+        background: var(--amber);
+        margin: 0.75rem 0 1.5rem;
+      }
+      .preview-h2 {
+        font-family: "Source Sans 3", sans-serif;
+        font-size: 20px;
+        font-weight: 600;
+        color: var(--navy-deep);
+        margin-bottom: 0.6rem;
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .preview-h2::before {
+        content: "";
+        display: inline-block;
+        width: 2px;
+        height: 1.2em;
+        background: var(--navy-mid);
+        border-radius: 1px;
+        flex-shrink: 0;
+      }
+      .preview-h3 {
+        font-family: "Source Sans 3", sans-serif;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+        margin-bottom: 0.5rem;
+        margin-top: 0.5rem;
+      }
+      .preview-body {
+        font-family: "EB Garamond", serif;
+        font-size: 17px;
+        line-height: 1.75;
+        color: var(--text);
+        margin-bottom: 1rem;
+      }
+      .preview-body em {
+        font-style: italic;
+      }
+      .preview-blockquote {
+        border-left: 2px solid var(--amber);
+        background: var(--amber-light);
+        padding: 0.75rem 1.25rem;
+        margin: 1rem 0;
+        font-family: "EB Garamond", serif;
+        font-size: 16px;
+        font-style: italic;
+        color: var(--text-muted);
+        line-height: 1.7;
+      }
+      .preview-mono {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 14px;
+        background: var(--blue-light);
+        color: var(--navy-mid);
+        padding: 2px 7px;
+        border-radius: 4px;
+      }
+      .preview-footnote {
+        font-family: "EB Garamond", serif;
+        font-size: 13px;
+        color: var(--text-muted);
+        border-top: 1px solid var(--rule);
+        padding-top: 0.75rem;
+        margin-top: 1rem;
+        line-height: 1.6;
+      }
+      .preview-footnote sup {
+        font-size: 10px;
+        color: var(--navy-mid);
+      }
+      .preview-divider {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin: 1.5rem 0;
+        color: var(--rule);
+        font-size: 12px;
+      }
+      .preview-divider::before,
+      .preview-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--rule);
+      }
+
+      /* ── Makefile panel ── */
+      .code-panel {
+        background: var(--navy-deep);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 2rem;
+      }
+      .code-panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .code-panel-header .filename {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--blue-accent);
+        letter-spacing: 0.5px;
+      }
+      .code-panel-header .lang {
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.3);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      .code-panel pre {
+        padding: 1.25rem 1.5rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        line-height: 1.75;
+        color: #c8dff0;
+        overflow-x: auto;
+        margin: 0;
+      }
+      .code-panel pre .comment {
+        color: rgba(255, 255, 255, 0.25);
+      }
+      .code-panel pre .flag {
+        color: #85b7eb;
+      }
+      .code-panel pre .string {
+        color: #c0dd97;
+      }
+      .code-panel pre .target {
+        color: #fac775;
+      }
+
+      /* ── Section divider ── */
+      .section-divider {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin: 2.5rem 0 1.5rem;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .section-divider::before,
+      .section-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-header">
+      <div class="eyebrow">Pandoc Reference Doc</div>
+      <h1><span>Architecting People</span> — Style Specification</h1>
+      <div class="subtitle">
+        Typography settings for reference.docx · Pandoc → Google Docs pipeline
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="nav-section">
+          <div class="nav-section-header">Styles in this spec</div>
+          <a href="#normal" class="nav-item">
+            <span class="dot" style="background: #ba7517"></span>
+            <span class="label">Normal / Body</span>
+            <span class="setting">EB Garamond 11</span>
+          </a>
+          <a href="#part" class="nav-item">
+            <span class="dot" style="background: #378add"></span>
+            <span class="label">Part title</span>
+            <span class="setting">Heading 1</span>
+          </a>
+          <a href="#chapter" class="nav-item">
+            <span class="dot" style="background: #185fa5"></span>
+            <span class="label">Chapter title</span>
+            <span class="setting">Heading 2</span>
+          </a>
+          <a href="#math" class="nav-item">
+            <span class="dot" style="background: #04182e"></span>
+            <span class="label">Math section</span>
+            <span class="setting">Heading 3</span>
+          </a>
+          <a href="#blockquote" class="nav-item">
+            <span class="dot" style="background: #fac775"></span>
+            <span class="label">Block quote</span>
+            <span class="setting">Quote</span>
+          </a>
+          <a href="#mono" class="nav-item">
+            <span class="dot" style="background: #0c447c"></span>
+            <span class="label">Math expressions</span>
+            <span class="setting">Verbatim Char</span>
+          </a>
+          <a href="#footnote" class="nav-item">
+            <span class="dot" style="background: #888780"></span>
+            <span class="label">Footnotes</span>
+            <span class="setting">Footnote Text</span>
+          </a>
+        </div>
+
+        <div class="info-box">
+          <strong>How to use this spec</strong>
+          Create a blank Google Doc, apply each style below, then download as
+          <code>.docx</code> via File → Download. Pass that file to Pandoc as
+          <code>--reference-doc=reference.docx</code>.
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div class="main">
+        <!-- How to create reference.docx -->
+        <div class="gdocs-steps">
+          <div class="gdocs-steps-header">
+            <div class="icon">G</div>
+            How to build reference.docx in Google Docs
+          </div>
+          <div class="step-list">
+            <div class="step">
+              <div class="step-num">1</div>
+              <div class="step-content">
+                <div class="step-title">Create a new blank Google Doc</div>
+                <div class="step-desc">
+                  Give it a name like <code>reference-template</code>. This file
+                  is only for style definitions — it will never contain actual
+                  manuscript content.
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">2</div>
+              <div class="step-content">
+                <div class="step-title">Open paragraph styles</div>
+                <div class="step-desc">
+                  <div class="menu-path">
+                    <span class="menu-item">Format</span>
+                    <span class="arrow">›</span>
+                    <span class="menu-item">Paragraph styles</span>
+                    <span class="arrow">›</span>
+                    <span class="menu-item">Options</span>
+                    <span class="arrow">›</span>
+                    <span class="menu-item">Save as my default styles</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">3</div>
+              <div class="step-content">
+                <div class="step-title">
+                  Type a line of sample text for each style
+                </div>
+                <div class="step-desc">
+                  Type one line per style (Normal body text, a Heading 1 title,
+                  a Heading 2 chapter name, etc.) — you'll apply the styles to
+                  each line individually.
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">4</div>
+              <div class="step-content">
+                <div class="step-title">
+                  Apply and update each style using the settings below
+                </div>
+                <div class="step-desc">
+                  Select the line, set font and size via the toolbar, then in
+                  the styles dropdown choose
+                  <code>Update "Heading X" to match</code>. Repeat for each
+                  style.
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">5</div>
+              <div class="step-content">
+                <div class="step-title">Download as DOCX</div>
+                <div class="step-desc">
+                  <div class="menu-path">
+                    <span class="menu-item">File</span>
+                    <span class="arrow">›</span>
+                    <span class="menu-item">Download</span>
+                    <span class="arrow">›</span>
+                    <span class="menu-item">Microsoft Word (.docx)</span>
+                  </div>
+                  Save as <code>reference.docx</code> in your manuscript
+                  directory.
+                </div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num">6</div>
+              <div class="step-content">
+                <div class="step-title">Test with Pandoc</div>
+                <div class="step-desc">
+                  Run <code>make docx</code> and upload the output to Google
+                  Drive. Verify headings, body text, and blockquotes look right.
+                  Adjust reference.docx and rerun if needed.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-divider">Style definitions</div>
+
+        <!-- NORMAL / BODY -->
+        <div class="style-section" id="normal">
+          <div class="style-section-header">
+            <span class="style-name">Normal — body text</span>
+            <span class="style-tag">Pandoc: Normal</span>
+          </div>
+          <div class="preview-area">
+            <p class="preview-body">
+              I wrote this because I believe most leadership fails not from
+              malice but from ignorance — the unchecked kind, the kind that
+              doesn't know what it doesn't know. And I wrote it because I spent
+              twenty-five years in technology learning, the hard way, that the
+              most important system you will ever architect is a human one.
+            </p>
+          </div>
+          <div class="settings-area">
+            <div class="setting-item">
+              <span class="key">Font</span>
+              <span class="value">EB Garamond</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Size</span>
+              <span class="value">11pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Line spacing</span>
+              <span class="value">1.25 (custom)</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space before</span>
+              <span class="value">0pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space after</span>
+              <span class="value">8pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">First line indent</span>
+              <span class="value">0.25in</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Alignment</span>
+              <span class="value">Left (not justified)</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Color</span>
+              <span class="value"><code>#1a1208</code></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- HEADING 1 — Part -->
+        <div class="style-section" id="part">
+          <div class="style-section-header">
+            <span class="style-name">Heading 1 — Part title</span>
+            <span class="style-tag">Pandoc: Heading 1</span>
+          </div>
+          <div class="preview-area">
+            <div class="preview-part-header">Part III</div>
+            <div class="preview-h1">The Leadership Maths</div>
+            <div class="preview-rule"></div>
+          </div>
+          <div class="settings-area">
+            <div class="setting-item">
+              <span class="key">Font</span>
+              <span class="value">Source Sans Pro</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Size</span>
+              <span class="value">28pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Weight</span>
+              <span class="value">SemiBold (600)</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Color</span>
+              <span class="value"><code>#04182e</code></span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space before</span>
+              <span class="value">48pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space after</span>
+              <span class="value">24pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Keep with next</span>
+              <span class="value">Yes</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Page break before</span>
+              <span class="value">Yes</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- HEADING 2 — Chapter -->
+        <div class="style-section" id="chapter">
+          <div class="style-section-header">
+            <span class="style-name">Heading 2 — Chapter title</span>
+            <span class="style-tag">Pandoc: Heading 2</span>
+          </div>
+          <div class="preview-area">
+            <div
+              class="preview-h2"
+              style="
+                font-size: 24px;
+                font-family: &quot;Source Sans 3&quot;, sans-serif;
+              "
+            >
+              Chapter 11 — The Self-Aware Leader
+            </div>
+          </div>
+          <div class="settings-area">
+            <div class="setting-item">
+              <span class="key">Font</span>
+              <span class="value">Source Sans Pro</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Size</span>
+              <span class="value">20pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Weight</span>
+              <span class="value">SemiBold (600)</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Color</span>
+              <span class="value"><code>#04182e</code></span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space before</span>
+              <span class="value">36pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space after</span>
+              <span class="value">16pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Keep with next</span>
+              <span class="value">Yes</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Page break before</span>
+              <span class="value">Yes</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- HEADING 3 — Math section -->
+        <div class="style-section" id="math">
+          <div class="style-section-header">
+            <span class="style-name">Heading 3 — Math section header</span>
+            <span class="style-tag">Pandoc: Heading 3</span>
+          </div>
+          <div class="preview-area">
+            <div class="preview-h2">EQ &gt; IQ</div>
+            <p class="preview-body">
+              There is a version of this chapter that opens with a study, or a
+              statistic, or a reference to Daniel Goleman's 1995 book that put
+              emotional intelligence on the map. I'm not going to write that
+              version.
+            </p>
+          </div>
+          <div class="settings-area">
+            <div class="setting-item">
+              <span class="key">Font</span>
+              <span class="value">Source Sans Pro</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Size</span>
+              <span class="value">14pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Weight</span>
+              <span class="value">SemiBold (600)</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Color</span>
+              <span class="value"><code>#04182e</code></span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space before</span>
+              <span class="value">24pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space after</span>
+              <span class="value">8pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Keep with next</span>
+              <span class="value">Yes</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Page break before</span>
+              <span class="value">No</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- BLOCK QUOTE -->
+        <div class="style-section" id="blockquote">
+          <div class="style-section-header">
+            <span class="style-name">Quote — block quote / Stories</span>
+            <span class="style-tag">Pandoc: Block Text</span>
+          </div>
+          <div class="preview-area">
+            <div class="preview-blockquote">
+              "You must never confuse faith that you will prevail in the end —
+              which you can never afford to lose — with the discipline to
+              confront the most brutal facts of your current reality, whatever
+              they might be."
+            </div>
+          </div>
+          <div class="settings-area">
+            <div class="setting-item">
+              <span class="key">Font</span>
+              <span class="value">EB Garamond</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Size</span>
+              <span class="value">11pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Style</span>
+              <span class="value">Italic</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Color</span>
+              <span class="value"><code>#5a4a30</code></span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Left indent</span>
+              <span class="value">0.4in</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Right indent</span>
+              <span class="value">0.4in</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space before</span>
+              <span class="value">12pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space after</span>
+              <span class="value">12pt</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- MONO / MATH EXPRESSIONS -->
+        <div class="style-section" id="mono">
+          <div class="style-section-header">
+            <span class="style-name"
+              >Verbatim Char — inline math expressions</span
+            >
+            <span class="style-tag">Pandoc: Verbatim Char</span>
+          </div>
+          <div class="preview-area">
+            <p class="preview-body">
+              The first math is <span class="preview-mono">EQ &gt; IQ</span>.
+              The second is <span class="preview-mono">Say ≈ Do</span>. Together
+              they describe a sequence: emotional intelligence outperforms raw
+              intelligence in leadership contexts, but only when your actions
+              match your words.
+            </p>
+          </div>
+          <div class="settings-area">
+            <div class="setting-item">
+              <span class="key">Font</span>
+              <span class="value">JetBrains Mono</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Size</span>
+              <span class="value">9.5pt (≈ 86% of body)</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Color</span>
+              <span class="value"><code>#185fa5</code></span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Background</span>
+              <span class="value"><code>#e6f1fb</code> (highlight)</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Weight</span>
+              <span class="value">Regular (400)</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Note</span>
+              <span class="value">Character style, not paragraph</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- FOOTNOTE -->
+        <div class="style-section" id="footnote">
+          <div class="style-section-header">
+            <span class="style-name">Footnote Text</span>
+            <span class="style-tag">Pandoc: Footnote Text</span>
+          </div>
+          <div class="preview-area">
+            <div class="preview-footnote">
+              <sup>1</sup> Wilson, T. D. (2002).
+              <em
+                >Strangers to Ourselves: Discovering the Adaptive
+                Unconscious.</em
+              >
+              Harvard University Press.<br />
+              <sup>2</sup> Miller, G. A. (1956). The Magical Number Seven, Plus
+              or Minus Two. <em>Psychological Review</em>, 63(2):81–97;
+              Eagleman, D. (2011). <em>Incognito.</em> Pantheon.
+            </div>
+          </div>
+          <div class="settings-area">
+            <div class="setting-item">
+              <span class="key">Font</span>
+              <span class="value">EB Garamond</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Size</span>
+              <span class="value">9pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Line spacing</span>
+              <span class="value">1.15</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Color</span>
+              <span class="value"><code>#5a4a30</code></span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space before</span>
+              <span class="value">4pt</span>
+            </div>
+            <div class="setting-item">
+              <span class="key">Space after</span>
+              <span class="value">4pt</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Makefile target -->
+        <div class="section-divider">Makefile target</div>
+
+        <div class="code-panel">
+          <div class="code-panel-header">
+            <span class="filename">Makefile</span>
+            <span class="lang">make</span>
+          </div>
+          <pre><span class="comment"># Produces architecting-people.docx for upload to Google Drive</span>
+<span class="comment"># Run: make docx</span>
+
+<span class="target">PARTS</span> = \
+  <span class="string">"PART 0 — INTRODUCTION.md"</span> \
+  <span class="string">"PART I — THE SIMULATION MIND.md"</span> \
+  <span class="string">"PART II — HUMAN NEEDS.md"</span> \
+  <span class="string">"PART III — THE LEADERSHIP MATHS.md"</span> \
+  <span class="string">"PART IV — LEADING BEYOND YOURSELF.md"</span> \
+  <span class="string">"PART VII — SILICON AND CARBON.md"</span> \
+  <span class="string">"PART VIII — REFERENCES.md"</span>
+
+<span class="target">docx</span>:
+	pandoc $(PARTS) \
+	  <span class="flag">--output</span>=architecting-people.docx \
+	  <span class="flag">--from</span>=markdown \
+	  <span class="flag">--reference-doc</span>=reference.docx \
+	  <span class="flag">--toc</span> \
+	  <span class="flag">--toc-depth</span>=2 \
+	  <span class="flag">--variable</span>=<span class="string">linestretch:1.25</span>
+
+<span class="target">pdf</span>:
+	pandoc $(PARTS) \
+	  <span class="flag">--output</span>=architecting-people.pdf \
+	  <span class="flag">--from</span>=markdown \
+	  <span class="flag">--pdf-engine</span>=xelatex \
+	  <span class="flag">--template</span>=book.tex \
+	  <span class="flag">--toc</span> \
+	  <span class="flag">--toc-depth</span>=2
+
+<span class="target">clean</span>:
+	rm -f architecting-people.docx architecting-people.pdf</pre>
+        </div>
+
+        <!-- Quick reference table -->
+        <div class="section-divider">Quick reference</div>
+
+        <div class="style-section">
+          <div class="style-section-header">
+            <span class="style-name">All styles at a glance</span>
+            <span class="style-tag">Copy into your template doc</span>
+          </div>
+          <div class="preview-area" style="padding: 1.5rem 2rem">
+            <div class="preview-part-header" style="margin-bottom: 0.2rem">
+              Part III
+            </div>
+            <div
+              class="preview-h1"
+              style="font-size: 26px; margin-bottom: 0.3rem"
+            >
+              The Leadership Maths
+            </div>
+            <div class="preview-rule" style="margin: 0.5rem 0 1rem"></div>
+            <div
+              class="preview-h2"
+              style="font-size: 18px; margin-bottom: 0.6rem"
+            >
+              Chapter 11 — The Self-Aware Leader
+            </div>
+            <p
+              class="preview-body"
+              style="font-size: 15px; margin-bottom: 0.8rem"
+            >
+              Before we can talk about leading people, we have to talk about
+              what people <em>are</em> — how the brain constructs reality, why
+              identity is a story we tell ourselves.
+            </p>
+            <div
+              class="preview-h2"
+              style="font-size: 13px; margin-bottom: 0.5rem"
+            >
+              EQ &gt; IQ
+            </div>
+            <p
+              class="preview-body"
+              style="font-size: 15px; margin-bottom: 0.5rem"
+            >
+              The expression <span class="preview-mono">EQ &gt; IQ</span> does
+              not mean intelligence is irrelevant. It means that above a
+              threshold of competence, emotional intelligence is the stronger
+              predictor of leadership effectiveness.
+            </p>
+            <div
+              class="preview-blockquote"
+              style="font-size: 14px; margin: 0.75rem 0"
+            >
+              Cleverness is a gift. Kindness is a choice.<br />— Jeff Bezos,
+              Princeton Commencement, 2010
+            </div>
+            <div class="preview-divider">·</div>
+            <div class="preview-footnote">
+              <sup>1</sup> Goleman, D. (1995).
+              <em>Emotional Intelligence.</em> Bantam Books.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -6,6 +6,8 @@ import {
   FolderPlus,
   FilePlus,
   Pencil,
+  Download,
+  Settings,
   Trash2,
   Tag,
   Lock,
@@ -17,7 +19,9 @@ export interface ContextMenuAction {
   type:
     | "newFolder"
     | "newNote"
+    | "settings"
     | "rename"
+    | "export"
     | "toggleLock"
     | "delete"
     | "tagSelection";
@@ -91,9 +95,19 @@ export function NodeContextMenu({
         ]
       : []),
     {
+      type: "settings" as const,
+      label: t("settings"),
+      icon: Settings,
+    },
+    {
       type: "rename" as const,
       label: t("rename"),
       icon: Pencil,
+    },
+    {
+      type: "export" as const,
+      label: t("export"),
+      icon: Download,
     },
     {
       type: "toggleLock" as const,
@@ -134,9 +148,7 @@ export function NodeContextMenu({
       </>
       {menuItems.map((item, _index) => (
         <React.Fragment key={item.type}>
-          {item.type === "rename" && isContainer && (
-            <div className="my-1 border-t" />
-          )}
+          {item.type === "rename" && <div className="my-1 border-t" />}
           {item.type === "delete" && <div className="my-1 border-t" />}
           <button
             role="menuitem"

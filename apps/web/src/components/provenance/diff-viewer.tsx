@@ -312,9 +312,9 @@ export function DiffViewer({
               key={index}
               className={cn(
                 seg.op === 1 &&
-                "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200",
+                  "bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200",
                 seg.op === -1 &&
-                "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 line-through",
+                  "bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 line-through",
               )}
               data-testid={`diff-segment-${index}`}
             >

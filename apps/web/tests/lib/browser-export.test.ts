@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { downloadTextFile, openHtmlPrintWindow } from "@/lib/browser-export";
+import {
+  downloadBinaryFile,
+  downloadTextFile,
+  openHtmlPrintWindow,
+} from "@/lib/browser-export";
 
 describe("browser export utilities", () => {
   it("downloads text content through a temporary anchor", () => {
@@ -30,6 +34,47 @@ describe("browser export utilities", () => {
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockClick).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalledWith("blob:download-url");
+
+    createElementSpy.mockRestore();
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
+  });
+
+  it("downloads binary content through a temporary anchor", () => {
+    const mockCreateObjectURL = vi
+      .fn()
+      .mockReturnValue("blob:binary-download-url");
+    const mockRevokeObjectURL = vi.fn();
+    const originalCreateObjectURL = URL.createObjectURL;
+    const originalRevokeObjectURL = URL.revokeObjectURL;
+    URL.createObjectURL = mockCreateObjectURL;
+    URL.revokeObjectURL = mockRevokeObjectURL;
+
+    const mockClick = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation((tagName: string) => {
+        if (tagName === "a") {
+          const anchor = originalCreateElement("a");
+          anchor.click = mockClick;
+          return anchor;
+        }
+
+        return originalCreateElement(tagName);
+      });
+
+    downloadBinaryFile(
+      Uint8Array.from([80, 75, 3, 4]),
+      "export.docx",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+
+    expect(mockCreateObjectURL).toHaveBeenCalled();
+    expect(mockClick).toHaveBeenCalled();
+    expect(mockRevokeObjectURL).toHaveBeenCalledWith(
+      "blob:binary-download-url",
+    );
 
     createElementSpy.mockRestore();
     URL.createObjectURL = originalCreateObjectURL;

@@ -182,8 +182,9 @@ export function deriveNodeMoveMutationInput(
   draggedNodeId: string,
   targetNodeId: string,
   position: "before" | "inside" | "after",
-  targetNode: { id: string; parentId: string | null } | undefined,
-  siblingNodes: { id: string }[],
+  targetNode:
+    | { id: string; parentId: string | null; position?: number | null }
+    | undefined,
 ): { id: string; newParentId: string; position?: number } | null {
   if (position === "inside") {
     return {
@@ -192,27 +193,15 @@ export function deriveNodeMoveMutationInput(
     };
   }
 
-  if (!targetNode?.parentId) {
+  if (!targetNode?.parentId || typeof targetNode.position !== "number") {
     return null;
-  }
-
-  const targetIndex = siblingNodes.findIndex(
-    (siblingNode) => siblingNode.id === targetNodeId,
-  );
-
-  let insertPosition: number;
-  if (targetIndex === -1) {
-    insertPosition = position === "before" ? 0 : siblingNodes.length;
-  } else if (position === "before") {
-    insertPosition = targetIndex;
-  } else {
-    insertPosition = targetIndex + 1;
   }
 
   return {
     id: draggedNodeId,
     newParentId: targetNode.parentId,
-    position: insertPosition,
+    position:
+      position === "before" ? targetNode.position : targetNode.position + 1,
   };
 }
 

@@ -7,6 +7,7 @@ import { CommandPalette } from "../command-palette/command-palette";
 import { AboutDialog } from "../about-dialog";
 import { SetupScreen } from "../setup-screen";
 import { SearchModal } from "../search";
+import { ToastContainer } from "../toast-container";
 import { useCommandPalette } from "@/hooks/use-command-palette";
 import { useAboutDialog } from "@/hooks/use-about-dialog";
 import { useNavigationCommands } from "@/hooks/use-navigation-commands";
@@ -14,6 +15,7 @@ import { useAboutCommand } from "@/hooks/use-about-command";
 import { useCommandGroups } from "@/hooks/use-command-groups";
 import { useSetup } from "@/hooks/use-setup";
 import { useTheme } from "@/hooks/use-theme";
+import { ToastProvider } from "@/contexts/toast-context";
 
 export interface AppLayoutProps {
   children: React.ReactNode;
@@ -39,18 +41,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   // Register about command
   useAboutCommand(() => aboutDialog.setOpen(true));
 
-  // Cmd+K / Ctrl+K to open search
-  React.useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
-        e.preventDefault();
-        setSearchOpen((prev) => !prev);
-      }
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, []);
-
   // Run setup on mount
   React.useEffect(() => {
     setup.runSetup();
@@ -64,9 +54,8 @@ export function AppLayout({ children }: AppLayoutProps) {
     [router],
   );
 
-  // Show setup screen if setup is required
-  if (setup.isSetupRequired && setup.mode) {
-    return (
+  const appLayoutContent =
+    setup.isSetupRequired && setup.mode ? (
       <SetupScreen
         mode={setup.mode}
         currentStep={setup.currentStep}
@@ -74,23 +63,30 @@ export function AppLayout({ children }: AppLayoutProps) {
         error={setup.error}
         onRetry={setup.retry}
       />
+    ) : (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar onSearchOpen={() => setSearchOpen(true)} />
+        <main className="flex-1 overflow-y-auto">{children}</main>
+        <CommandPalette
+          open={commandPalette.open}
+          onOpenChange={commandPalette.setOpen}
+        />
+        <AboutDialog
+          open={aboutDialog.open}
+          onOpenChange={aboutDialog.setOpen}
+        />
+        <SearchModal
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSelectNode={handleSearchSelectNode}
+        />
+      </div>
     );
-  }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar onSearchOpen={() => setSearchOpen(true)} />
-      <main className="flex-1 overflow-y-auto">{children}</main>
-      <CommandPalette
-        open={commandPalette.open}
-        onOpenChange={commandPalette.setOpen}
-      />
-      <AboutDialog open={aboutDialog.open} onOpenChange={aboutDialog.setOpen} />
-      <SearchModal
-        open={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        onSelectNode={handleSearchSelectNode}
-      />
-    </div>
+    <ToastProvider>
+      {appLayoutContent}
+      <ToastContainer />
+    </ToastProvider>
   );
 }

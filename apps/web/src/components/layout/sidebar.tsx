@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProjectSelector } from "@/components/project-selector";
+import { useAppPreferences } from "@/hooks/use-app-preferences";
 
 export interface SidebarItem {
   id: string;
@@ -45,14 +46,53 @@ const navigationItems: SidebarItem[] = [
   },
 ];
 
+const SIDEBAR_COLLAPSED_PREFERENCE_KEY = "layout:sidebarCollapsed";
+
+function resolveSidebarCollapsedPreference(
+  preferenceValue: unknown,
+  fallbackValue: boolean,
+) {
+  return typeof preferenceValue === "boolean" ? preferenceValue : fallbackValue;
+}
+
 export function Sidebar({
   className,
   defaultCollapsed = false,
   onSearchOpen,
 }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = React.useState(defaultCollapsed);
+  const { getPreference, setPreference, isLoading } = useAppPreferences();
   const pathname = usePathname();
   const t = useTranslations("sidebar");
+  const persistedCollapsedPreference = resolveSidebarCollapsedPreference(
+    getPreference(SIDEBAR_COLLAPSED_PREFERENCE_KEY, defaultCollapsed),
+    defaultCollapsed,
+  );
+  const [isCollapsed, setIsCollapsed] = React.useState(
+    persistedCollapsedPreference,
+  );
+
+  React.useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    setIsCollapsed(persistedCollapsedPreference);
+  }, [isLoading, persistedCollapsedPreference]);
+
+  const handleCollapseToggle = React.useCallback(() => {
+    setIsCollapsed((currentIsCollapsed) => {
+      const nextIsCollapsed = !currentIsCollapsed;
+
+      void setPreference(
+        SIDEBAR_COLLAPSED_PREFERENCE_KEY,
+        nextIsCollapsed,
+      ).catch(() => {
+        setIsCollapsed(currentIsCollapsed);
+      });
+
+      return nextIsCollapsed;
+    });
+  }, [setPreference]);
 
   return (
     <aside
@@ -79,7 +119,7 @@ export function Sidebar({
 
       {/* Collapse toggle button - positioned on right edge, near the top */}
       <button
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        onClick={handleCollapseToggle}
         className="absolute -right-3 top-6 z-10 flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-md hover:bg-accent transition-all"
         aria-label={isCollapsed ? t("expandLabel") : t("collapseLabel")}
       >
@@ -104,11 +144,6 @@ export function Sidebar({
           <Search className="h-5 w-5 flex-shrink-0" />
           {!isCollapsed && (
             <span className="flex-1 text-left">{t("search")}</span>
-          )}
-          {!isCollapsed && (
-            <kbd className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 border rounded bg-muted font-mono">
-              ⌘F
-            </kbd>
           )}
         </button>
       </div>

@@ -80,28 +80,53 @@ export async function augmentSearchResults(
   }
 
   const ancestryRows = await db.execute(sql`
+    WITH RECURSIVE ancestry AS (
+      SELECT
+        n.id AS requested_id,
+        n.id AS current_id,
+        n.parent_id,
+        n.type,
+        n.name,
+        0 AS depth
+      FROM nodes n
+      WHERE n.id = ANY(ARRAY[${sql.join(
+        nodeIds.map((nodeId) => sql`${nodeId}::uuid`),
+        sql`, `,
+      )}])
+
+      UNION ALL
+
+      SELECT
+        ancestry.requested_id,
+        parent.id AS current_id,
+        parent.parent_id,
+        parent.type,
+        parent.name,
+        ancestry.depth + 1 AS depth
+      FROM ancestry
+      INNER JOIN nodes parent ON parent.id = ancestry.parent_id
+    ),
+    project_ancestry AS (
+      SELECT DISTINCT ON (requested_id)
+        requested_id,
+        current_id AS project_id,
+        name AS project_name
+      FROM ancestry
+      WHERE type = 'project'
+      ORDER BY requested_id, depth ASC
+    )
     SELECT
-      n.id,
-      COALESCE(
-        CASE WHEN n.type = 'project' THEN n.id END,
-        CASE WHEN p1.type = 'project' THEN p1.id END,
-        CASE WHEN p2.type = 'project' THEN p2.id END,
-        CASE WHEN p3.type = 'project' THEN p3.id END
-      ) AS project_id,
-      COALESCE(
-        CASE WHEN n.type = 'project' THEN n.name END,
-        CASE WHEN p1.type = 'project' THEN p1.name END,
-        CASE WHEN p2.type = 'project' THEN p2.name END,
-        CASE WHEN p3.type = 'project' THEN p3.name END
-      ) AS project_name
-    FROM nodes n
-    LEFT JOIN nodes p1 ON p1.id = n.parent_id
-    LEFT JOIN nodes p2 ON p2.id = p1.parent_id
-    LEFT JOIN nodes p3 ON p3.id = p2.parent_id
-    WHERE n.id = ANY(ARRAY[${sql.join(
-      nodeIds.map((nodeId) => sql`${nodeId}::uuid`),
-      sql`, `,
-    )}])
+      requested_nodes.id,
+      project_ancestry.project_id,
+      project_ancestry.project_name
+    FROM (
+      SELECT UNNEST(ARRAY[${sql.join(
+        nodeIds.map((nodeId) => sql`${nodeId}::uuid`),
+        sql`, `,
+      )}]) AS id
+    ) AS requested_nodes
+    LEFT JOIN project_ancestry
+      ON project_ancestry.requested_id = requested_nodes.id
   `);
 
   const ancestryByNodeId = new Map<

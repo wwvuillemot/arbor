@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTranslations } from "next-intl";
-import { FolderPlus, FilePlus, Star } from "lucide-react";
+import { Clock3, FolderPlus, FilePlus, Star } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import {
   FileTreeNode,
@@ -16,6 +16,8 @@ export type AttributionFilter =
   | "human"
   | "ai-generated"
   | "ai-assisted";
+
+export type FileTreeSortMode = "alphabetical" | "manual";
 
 /**
  * Determine attribution level from provenance strings.
@@ -63,6 +65,8 @@ export interface FileTreeProps {
   /** When provided, show checkboxes and track selection for bulk ops */
   selectedNodeIds?: Set<string>;
   onToggleNodeSelected?: (nodeId: string) => void;
+  sortMode?: FileTreeSortMode;
+  onSortModeChange?: (sortMode: FileTreeSortMode) => void;
   className?: string;
 }
 
@@ -71,6 +75,83 @@ export interface FileTreeHandle {
 }
 
 const containerTypes = new Set(["folder", "project"]);
+const MAX_RECENT_NODES = 5;
+const DEFAULT_FILE_TREE_SORT_MODE: FileTreeSortMode = "alphabetical";
+
+function getExpandedNodesStorageKey(projectId: string): string {
+  return `arbor:fileTreeExpandedNodes:${projectId}`;
+}
+
+function ensureProjectExpanded(
+  projectId: string,
+  nodeIds: Iterable<string>,
+): Set<string> {
+  const nextExpandedNodes = new Set(nodeIds);
+  nextExpandedNodes.add(projectId);
+  return nextExpandedNodes;
+}
+
+function readStoredExpandedNodes(projectId: string): Set<string> {
+  if (typeof window === "undefined") {
+    return ensureProjectExpanded(projectId, []);
+  }
+
+  try {
+    const storedValue = localStorage.getItem(
+      getExpandedNodesStorageKey(projectId),
+    );
+    if (!storedValue) {
+      return ensureProjectExpanded(projectId, []);
+    }
+
+    const parsedValue = JSON.parse(storedValue);
+    if (!Array.isArray(parsedValue)) {
+      return ensureProjectExpanded(projectId, []);
+    }
+
+    const expandedNodeIds = parsedValue.filter(
+      (value): value is string => typeof value === "string",
+    );
+
+    return ensureProjectExpanded(projectId, expandedNodeIds);
+  } catch {
+    return ensureProjectExpanded(projectId, []);
+  }
+}
+
+function writeStoredExpandedNodes(
+  projectId: string,
+  expandedNodes: Set<string>,
+): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(
+      getExpandedNodesStorageKey(projectId),
+      JSON.stringify(
+        Array.from(ensureProjectExpanded(projectId, expandedNodes)),
+      ),
+    );
+  } catch {
+    // Ignore localStorage persistence failures.
+  }
+}
+
+function shouldIncludeInRecents(node: TreeNode): boolean {
+  return !containerTypes.has(node.type);
+}
+
+function updateRecentNodes(
+  previousNodes: TreeNode[],
+  nextNode: TreeNode,
+): TreeNode[] {
+  const deduplicatedNodes = previousNodes.filter(
+    (node) => node.id !== nextNode.id,
+  );
+  return [nextNode, ...deduplicatedNodes].slice(0, MAX_RECENT_NODES);
+}
 
 export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
   function FileTree(
@@ -90,15 +171,25 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
       onToggleFavorite,
       selectedNodeIds,
       onToggleNodeSelected,
+      sortMode: controlledSortMode,
+      onSortModeChange,
       className,
     },
     ref,
   ) {
     const t = useTranslations("fileTree");
-    const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(
-      () => new Set([projectId]),
+    const [internalSortMode, setInternalSortMode] =
+      React.useState<FileTreeSortMode>(DEFAULT_FILE_TREE_SORT_MODE);
+    const sortMode = controlledSortMode ?? internalSortMode;
+    const [expandedNodes, setExpandedNodes] = React.useState<Set<string>>(() =>
+      readStoredExpandedNodes(projectId),
     );
+    const [expandedNodesStorageProjectId, setExpandedNodesStorageProjectId] =
+      React.useState(projectId);
+    const [recentNodes, setRecentNodes] = React.useState<TreeNode[]>([]);
+    const [recentsExpanded, setRecentsExpanded] = React.useState(true);
     const [favoritesExpanded, setFavoritesExpanded] = React.useState(true);
+    const showPinnedSections = onToggleFavorite !== undefined;
 
     const favoritesQuery = trpc.nodes.getFavorites.useQuery(
       { projectId },
@@ -114,9 +205,7 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
       expandNode: (nodeId: string) => {
         setExpandedNodes((prev) => {
           if (prev.has(nodeId)) return prev;
-          const next = new Set(prev);
-          next.add(nodeId);
-          return next;
+          return ensureProjectExpanded(projectId, [...prev, nodeId]);
         });
       },
     }));
@@ -142,26 +231,66 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
       ReturnType<typeof trpc.nodes.getChildren.useQuery>
     >();
 
-    const toggleNode = React.useCallback((nodeId: string) => {
-      setExpandedNodes((prev) => {
-        const next = new Set(prev);
-        if (next.has(nodeId)) {
-          next.delete(nodeId);
-        } else {
-          next.add(nodeId);
-        }
-        return next;
-      });
-    }, []);
+    const toggleNode = React.useCallback(
+      (nodeId: string) => {
+        setExpandedNodes((prev) => {
+          if (nodeId === projectId) {
+            return prev;
+          }
 
-    // Ensure project is always expanded
+          const next = new Set(prev);
+          if (next.has(nodeId)) {
+            next.delete(nodeId);
+          } else {
+            next.add(nodeId);
+          }
+          return ensureProjectExpanded(projectId, next);
+        });
+      },
+      [projectId],
+    );
+
+    const handleNodeSelect = React.useCallback(
+      (node: TreeNode) => {
+        if (shouldIncludeInRecents(node)) {
+          setRecentNodes((previousNodes) =>
+            updateRecentNodes(previousNodes, node),
+          );
+        }
+
+        onSelectNode(node.id);
+      },
+      [onSelectNode],
+    );
+
+    const handleSortModeChange = React.useCallback(
+      (nextSortMode: FileTreeSortMode) => {
+        if (controlledSortMode === undefined) {
+          setInternalSortMode(nextSortMode);
+        }
+
+        onSortModeChange?.(nextSortMode);
+      },
+      [controlledSortMode, onSortModeChange],
+    );
+
     React.useEffect(() => {
-      setExpandedNodes((prev) => {
-        if (prev.has(projectId)) return prev;
-        const next = new Set(prev);
-        next.add(projectId);
-        return next;
-      });
+      setExpandedNodesStorageProjectId(projectId);
+      setExpandedNodes(readStoredExpandedNodes(projectId));
+    }, [projectId]);
+
+    React.useEffect(() => {
+      if (expandedNodesStorageProjectId !== projectId) {
+        return;
+      }
+
+      writeStoredExpandedNodes(projectId, expandedNodes);
+    }, [expandedNodes, expandedNodesStorageProjectId, projectId]);
+
+    React.useEffect(() => {
+      setRecentNodes([]);
+      setRecentsExpanded(true);
+      setFavoritesExpanded(true);
     }, [projectId]);
 
     return (
@@ -184,6 +313,44 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
           >
             <FilePlus className="w-4 h-4" />
           </button>
+          <div
+            className="ml-auto flex items-center gap-1"
+            data-testid="file-tree-sort-controls"
+          >
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              {t("sort.label")}
+            </span>
+            <div className="flex items-center rounded-md border bg-background p-0.5">
+              <button
+                type="button"
+                onClick={() => handleSortModeChange("alphabetical")}
+                className={cn(
+                  "rounded px-2 py-1 text-xs transition-colors",
+                  sortMode === "alphabetical"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                aria-pressed={sortMode === "alphabetical"}
+                data-testid="file-tree-sort-alphabetical"
+              >
+                {t("sort.alphabetical")}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSortModeChange("manual")}
+                className={cn(
+                  "rounded px-2 py-1 text-xs transition-colors",
+                  sortMode === "manual"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                aria-pressed={sortMode === "manual"}
+                data-testid="file-tree-sort-manual"
+              >
+                {t("sort.manual")}
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Tree */}
@@ -192,68 +359,91 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
           role="tree"
           aria-label="File tree"
         >
-          {/* Favorites pinned section */}
-          {onToggleFavorite && (
-            <div className="mb-1">
+          {showPinnedSections && (
+            <>
+              <div className="mb-1">
+                <button
+                  type="button"
+                  onClick={() => setRecentsExpanded((value) => !value)}
+                  aria-expanded={recentsExpanded}
+                  aria-controls="file-tree-recents-panel"
+                  className="w-full flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <Clock3 className="w-3 h-3" />
+                  {t("recents.section")}
+                </button>
+                {recentsExpanded && (
+                  <div
+                    id="file-tree-recents-panel"
+                    data-testid="file-tree-recents-panel"
+                  >
+                    <PinnedNodesList
+                      nodes={recentNodes}
+                      emptyMessage={t("recents.empty")}
+                      expandedNodes={expandedNodes}
+                      selectedNodeId={selectedNodeId}
+                      onToggle={toggleNode}
+                      onSelect={handleNodeSelect}
+                      onContextMenu={onContextMenu}
+                      onRename={onRenameNode}
+                      onDrop={onMoveNode}
+                      filterNodeIds={filterNodeIds}
+                      attributionFilter={attributionFilter}
+                      onAddToContext={onAddToContext}
+                      contextNodeIds={contextNodeIds}
+                      onToggleFavorite={onToggleFavorite}
+                      selectedNodeIds={selectedNodeIds}
+                      onToggleNodeSelected={onToggleNodeSelected}
+                      sortMode={sortMode}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Favorites pinned section */}
               <button
+                type="button"
                 onClick={() => setFavoritesExpanded((v) => !v)}
+                aria-expanded={favoritesExpanded}
+                aria-controls="file-tree-favorites-panel"
                 className="w-full flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Star className="w-3 h-3" />
                 {t("favorites.section")}
               </button>
               {favoritesExpanded && (
-                <div>
-                  {!favoritesQuery.data || favoritesQuery.data.length === 0 ? (
-                    <p className="px-4 py-1 text-xs text-muted-foreground/60 italic">
-                      {t("favorites.empty")}
-                    </p>
-                  ) : (
-                    favoritesQuery.data.map((favNode) => (
-                      <FileTreeNode
-                        key={favNode.id}
-                        node={favNode as TreeNode}
-                        depth={0}
-                        isExpanded={expandedNodes.has(favNode.id)}
-                        isSelected={selectedNodeId === favNode.id}
-                        isLoading={false}
-                        onToggle={toggleNode}
-                        onSelect={onSelectNode}
-                        onContextMenu={onContextMenu}
-                        onRename={onRenameNode}
-                        onDrop={onMoveNode}
-                        onToggleFavorite={onToggleFavorite}
-                        onAddToContext={onAddToContext}
-                        isInContext={contextNodeIds?.has(favNode.id)}
-                        isChecked={selectedNodeIds?.has(favNode.id)}
-                        onToggleChecked={onToggleNodeSelected}
-                        renderChildren={(childParentId, childDepth) => (
-                          <ChildrenList
-                            parentId={childParentId}
-                            depth={childDepth}
-                            expandedNodes={expandedNodes}
-                            selectedNodeId={selectedNodeId}
-                            onToggle={toggleNode}
-                            onSelect={onSelectNode}
-                            onContextMenu={onContextMenu}
-                            onRename={onRenameNode}
-                            onDrop={onMoveNode}
-                            filterNodeIds={filterNodeIds}
-                            attributionFilter={attributionFilter}
-                            onAddToContext={onAddToContext}
-                            contextNodeIds={contextNodeIds}
-                            onToggleFavorite={onToggleFavorite}
-                            selectedNodeIds={selectedNodeIds}
-                            onToggleNodeSelected={onToggleNodeSelected}
-                          />
-                        )}
-                      />
-                    ))
-                  )}
-                  <div className="h-px bg-border mx-2 mt-1 mb-1" />
+                <div
+                  id="file-tree-favorites-panel"
+                  data-testid="file-tree-favorites-panel"
+                >
+                  <PinnedNodesList
+                    nodes={
+                      (favoritesQuery.data as TreeNode[] | undefined) ?? []
+                    }
+                    emptyMessage={t("favorites.empty")}
+                    expandedNodes={expandedNodes}
+                    selectedNodeId={selectedNodeId}
+                    onToggle={toggleNode}
+                    onSelect={handleNodeSelect}
+                    onContextMenu={onContextMenu}
+                    onRename={onRenameNode}
+                    onDrop={onMoveNode}
+                    filterNodeIds={filterNodeIds}
+                    attributionFilter={attributionFilter}
+                    onAddToContext={onAddToContext}
+                    contextNodeIds={contextNodeIds}
+                    onToggleFavorite={onToggleFavorite}
+                    selectedNodeIds={selectedNodeIds}
+                    onToggleNodeSelected={onToggleNodeSelected}
+                    sortMode={sortMode}
+                  />
                 </div>
               )}
-            </div>
+              <div
+                data-testid="file-tree-pinned-separator"
+                className="h-px bg-border mx-2 mt-1 mb-1"
+              />
+            </>
           )}
 
           <ChildrenList
@@ -262,7 +452,7 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
             expandedNodes={expandedNodes}
             selectedNodeId={selectedNodeId}
             onToggle={toggleNode}
-            onSelect={onSelectNode}
+            onSelect={handleNodeSelect}
             onContextMenu={onContextMenu}
             onRename={onRenameNode}
             onDrop={onMoveNode}
@@ -273,6 +463,7 @@ export const FileTree = React.forwardRef<FileTreeHandle, FileTreeProps>(
             onToggleFavorite={onToggleFavorite}
             selectedNodeIds={selectedNodeIds}
             onToggleNodeSelected={onToggleNodeSelected}
+            sortMode={sortMode}
             emptyMessage={t("emptyProject")}
           />
         </div>
@@ -329,6 +520,98 @@ function hasMatchingDescendants(
   );
 }
 
+function PinnedNodesList({
+  nodes,
+  emptyMessage,
+  expandedNodes,
+  selectedNodeId,
+  onToggle,
+  onSelect,
+  onContextMenu,
+  onRename,
+  onDrop,
+  filterNodeIds,
+  attributionFilter,
+  onAddToContext,
+  contextNodeIds,
+  onToggleFavorite,
+  selectedNodeIds,
+  onToggleNodeSelected,
+  sortMode,
+}: {
+  nodes: TreeNode[];
+  emptyMessage: string;
+  expandedNodes: Set<string>;
+  selectedNodeId: string | null;
+  onToggle: (nodeId: string) => void;
+  onSelect: (node: TreeNode) => void;
+  onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
+  onRename?: (nodeId: string, newName: string) => void;
+  onDrop?: (
+    draggedNodeId: string,
+    targetNodeId: string,
+    position: DropPosition,
+  ) => void;
+  filterNodeIds?: Set<string> | null;
+  attributionFilter?: AttributionFilter;
+  onAddToContext?: (node: TreeNode) => void;
+  contextNodeIds?: Set<string>;
+  onToggleFavorite?: (nodeId: string) => void;
+  selectedNodeIds?: Set<string>;
+  onToggleNodeSelected?: (nodeId: string) => void;
+  sortMode: FileTreeSortMode;
+}) {
+  if (nodes.length === 0) {
+    return (
+      <p className="px-4 py-1 text-xs text-muted-foreground/60 italic">
+        {emptyMessage}
+      </p>
+    );
+  }
+
+  return nodes.map((node) => (
+    <FileTreeNode
+      key={node.id}
+      node={node}
+      depth={0}
+      isExpanded={expandedNodes.has(node.id)}
+      isSelected={selectedNodeId === node.id}
+      isLoading={false}
+      onToggle={onToggle}
+      onSelect={() => onSelect(node)}
+      onContextMenu={onContextMenu}
+      onRename={onRename}
+      onDrop={onDrop}
+      onToggleFavorite={onToggleFavorite}
+      onAddToContext={onAddToContext}
+      isInContext={contextNodeIds?.has(node.id)}
+      isChecked={selectedNodeIds?.has(node.id)}
+      onToggleChecked={onToggleNodeSelected}
+      renderChildren={(childParentId, childDepth) => (
+        <ChildrenList
+          parentId={childParentId}
+          depth={childDepth}
+          expandedNodes={expandedNodes}
+          selectedNodeId={selectedNodeId}
+          onToggle={onToggle}
+          onSelect={onSelect}
+          onContextMenu={onContextMenu}
+          onRename={onRename}
+          onDrop={onDrop}
+          filterNodeIds={filterNodeIds}
+          attributionFilter={attributionFilter}
+          onAddToContext={onAddToContext}
+          contextNodeIds={contextNodeIds}
+          onToggleFavorite={onToggleFavorite}
+          selectedNodeIds={selectedNodeIds}
+          onToggleNodeSelected={onToggleNodeSelected}
+          sortMode={sortMode}
+        />
+      )}
+    />
+  ));
+}
+
 /** Renders children of a given parent, fetching via tRPC */
 function ChildrenList({
   parentId,
@@ -347,6 +630,7 @@ function ChildrenList({
   onToggleFavorite,
   selectedNodeIds,
   onToggleNodeSelected,
+  sortMode,
   emptyMessage,
 }: {
   parentId: string;
@@ -354,7 +638,7 @@ function ChildrenList({
   expandedNodes: Set<string>;
   selectedNodeId: string | null;
   onToggle: (nodeId: string) => void;
-  onSelect: (nodeId: string) => void;
+  onSelect: (node: TreeNode) => void;
   onContextMenu: (e: React.MouseEvent, node: TreeNode) => void;
   onRename?: (nodeId: string, newName: string) => void;
   onDrop?: (
@@ -369,6 +653,7 @@ function ChildrenList({
   onToggleFavorite?: (nodeId: string) => void;
   selectedNodeIds?: Set<string>;
   onToggleNodeSelected?: (nodeId: string) => void;
+  sortMode: FileTreeSortMode;
   emptyMessage?: string;
 }) {
   const childrenQuery = trpc.nodes.getChildren.useQuery(
@@ -478,15 +763,25 @@ function ChildrenList({
     return null;
   }
 
-  // Sort: folders before files, then by position, then alphabetically
+  // Sort: folders before files, then by the active sort mode.
   const sortedChildren = [...filteredChildren].sort((a, b) => {
     const aIsContainer = containerTypes.has(a.type);
     const bIsContainer = containerTypes.has(b.type);
     if (aIsContainer !== bIsContainer) return aIsContainer ? -1 : 1;
+
+    const alphabeticalComparison = a.name.localeCompare(b.name, undefined, {
+      sensitivity: "base",
+    });
     const posA = (a as { position?: number | null }).position ?? 0;
     const posB = (b as { position?: number | null }).position ?? 0;
+
+    if (sortMode === "alphabetical") {
+      if (alphabeticalComparison !== 0) return alphabeticalComparison;
+      return posA - posB;
+    }
+
     if (posA !== posB) return posA - posB;
-    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    return alphabeticalComparison;
   });
 
   return (
@@ -500,7 +795,7 @@ function ChildrenList({
           isSelected={selectedNodeId === child.id}
           isLoading={false}
           onToggle={onToggle}
-          onSelect={onSelect}
+          onSelect={() => onSelect(child as TreeNode)}
           onContextMenu={onContextMenu}
           onRename={onRename}
           onDrop={onDrop}
@@ -527,6 +822,7 @@ function ChildrenList({
               onToggleFavorite={onToggleFavorite}
               selectedNodeIds={selectedNodeIds}
               onToggleNodeSelected={onToggleNodeSelected}
+              sortMode={sortMode}
             />
           )}
         />

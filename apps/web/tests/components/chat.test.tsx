@@ -4,8 +4,14 @@
  * Tests for ChatMessage and ChatPanel components.
  */
 import * as React from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from "@testing-library/react";
 
 // Mock next-intl
 vi.mock("next-intl", () => ({
@@ -275,6 +281,9 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("ChatMessage", () => {
+  const originalClipboard = navigator.clipboard;
+  const originalExecCommand = document.execCommand;
+
   const baseMessage: ChatMessageData = {
     id: "msg-1",
     role: "user",
@@ -286,6 +295,19 @@ describe("ChatMessage", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    Object.defineProperty(navigator, "clipboard", {
+      value: originalClipboard,
+      configurable: true,
+    });
+    Object.defineProperty(document, "execCommand", {
+      value: originalExecCommand,
+      configurable: true,
+    });
   });
 
   it("should render a message with content", () => {
@@ -367,6 +389,79 @@ describe("ChatMessage", () => {
   it("should show copy button for messages with content", () => {
     render(<ChatMessage message={baseMessage} />);
     expect(screen.getByTestId("copy-message")).toBeInTheDocument();
+  });
+
+  it("should copy message content with the Clipboard API when available", async () => {
+    vi.useFakeTimers();
+
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+
+    render(<ChatMessage message={baseMessage} />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("copy-message"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(writeText).toHaveBeenCalledWith(baseMessage.content);
+    expect(screen.getByText("✓")).toBeInTheDocument();
+
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+  });
+
+  it("should fall back to execCommand copy when the Clipboard API is unavailable", async () => {
+    vi.useFakeTimers();
+
+    const execCommand = vi.fn().mockReturnValue(true);
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+    });
+    Object.defineProperty(document, "execCommand", {
+      value: execCommand,
+      configurable: true,
+    });
+
+    render(<ChatMessage message={baseMessage} />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("copy-message"));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(execCommand).toHaveBeenCalledWith("copy");
+    expect(screen.getByText("✓")).toBeInTheDocument();
+
+    act(() => {
+      vi.runOnlyPendingTimers();
+    });
+  });
+
+  it("should not crash when no copy mechanism is available", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: undefined,
+      configurable: true,
+    });
+    Object.defineProperty(document, "execCommand", {
+      value: undefined,
+      configurable: true,
+    });
+
+    render(<ChatMessage message={baseMessage} />);
+
+    expect(() => {
+      fireEvent.click(screen.getByTestId("copy-message"));
+    }).not.toThrow();
+
+    await waitFor(() => {
+      expect(screen.queryByText("✓")).not.toBeInTheDocument();
+    });
   });
 
   it("should show tool calls when present", () => {
@@ -567,6 +662,7 @@ describe("ChatMessage", () => {
 describe("ChatPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     mockMessages = buildMockMessages();
     mockSendMessageState.isPending = false;
     mockSendMessageState.variables = undefined;
@@ -657,6 +753,37 @@ describe("ChatPanel", () => {
         agentMode: "assistant",
       }),
     );
+  });
+
+  it("should notify listeners when the selected thread changes", async () => {
+    const handleSelectedThreadIdChange = vi.fn();
+
+    render(
+      <ChatPanel onSelectedThreadIdChange={handleSelectedThreadIdChange} />,
+    );
+
+    await waitFor(() => {
+      expect(handleSelectedThreadIdChange).toHaveBeenCalledWith(null);
+    });
+
+    fireEvent.click(screen.getAllByTestId("thread-item")[1]);
+
+    await waitFor(() => {
+      expect(handleSelectedThreadIdChange).toHaveBeenLastCalledWith("thread-2");
+    });
+  });
+
+  it("should restore the selected thread from localStorage and notify listeners", async () => {
+    const handleSelectedThreadIdChange = vi.fn();
+    window.localStorage.setItem("arbor:selectedThreadId", "thread-2");
+
+    render(
+      <ChatPanel onSelectedThreadIdChange={handleSelectedThreadIdChange} />,
+    );
+
+    await waitFor(() => {
+      expect(handleSelectedThreadIdChange).toHaveBeenCalledWith("thread-2");
+    });
   });
 
   it("should select a thread when clicked", () => {

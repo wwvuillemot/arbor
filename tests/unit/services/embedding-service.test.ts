@@ -474,6 +474,91 @@ describe("EmbeddingService", () => {
     });
   });
 
+  describe("countBackfillCandidates", () => {
+    it("should count eligible nodes by backfill mode", async () => {
+      const project = await createTestProject();
+      await createTestNote("Note", project.id, "Content");
+
+      expect(await embeddingService.countBackfillCandidates("missing")).toBe(2);
+
+      await embeddingService.embedAllMissing();
+
+      expect(await embeddingService.countBackfillCandidates("missing")).toBe(0);
+      expect(await embeddingService.countBackfillCandidates("all")).toBe(2);
+    });
+  });
+
+  describe("backfillEmbeddings", () => {
+    it("should refresh historical embeddings in batches when mode is all", async () => {
+      const project = await createTestProject();
+      const note1 = await createTestNote(
+        "Note 1",
+        project.id,
+        "Original content",
+      );
+      await createTestNote("Note 2", project.id, "Other content");
+      await embeddingService.embedAllMissing();
+
+      const [beforeRefresh] = await db
+        .select()
+        .from(nodes)
+        .where(eq(nodes.id, note1.id));
+
+      await db
+        .update(nodes)
+        .set({ content: "Updated historical content" })
+        .where(eq(nodes.id, note1.id));
+
+      const completedBatches: number[] = [];
+      const result = await embeddingService.backfillEmbeddings({
+        mode: "all",
+        batchSize: 1,
+        onBatchComplete: ({ batchNumber }) => {
+          completedBatches.push(batchNumber);
+        },
+      });
+
+      const [afterRefresh] = await db
+        .select()
+        .from(nodes)
+        .where(eq(nodes.id, note1.id));
+
+      expect(result.mode).toBe("all");
+      expect(result.totalCandidates).toBe(3);
+      expect(result.processedCount).toBe(3);
+      expect(result.embeddedCount).toBe(3);
+      expect(result.batches).toBe(3);
+      expect(completedBatches).toEqual([1, 2, 3]);
+      expect(afterRefresh.embedding).not.toEqual(beforeRefresh.embedding);
+    });
+
+    it("should only process nodes with missing embeddings in missing mode", async () => {
+      const project = await createTestProject();
+      const note1 = await createTestNote("Note 1", project.id, "Content 1");
+      const note2 = await createTestNote("Note 2", project.id, "Content 2");
+      await embeddingService.embedAllMissing();
+      await embeddingService.clearEmbedding(note2.id);
+
+      const result = await embeddingService.backfillEmbeddings({
+        mode: "missing",
+        batchSize: 2,
+      });
+
+      const [updatedNote2] = await db
+        .select()
+        .from(nodes)
+        .where(eq(nodes.id, note2.id));
+
+      expect(result.mode).toBe("missing");
+      expect(result.totalCandidates).toBe(1);
+      expect(result.processedCount).toBe(1);
+      expect(result.embeddedCount).toBe(1);
+      expect(result.batches).toBe(1);
+      expect(updatedNote2.embedding).not.toBeNull();
+      expect(note1.id).not.toBe(note2.id);
+    });
+  });
+
   // ─── clearEmbedding ──────────────────────────────────────────────────────
 
   describe("clearEmbedding", () => {

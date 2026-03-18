@@ -1,6 +1,7 @@
 import * as React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { FileTree } from "@/components/file-tree/file-tree";
 import {
   FileTreeNode,
   type TreeNode,
@@ -9,11 +10,46 @@ import { CreateNodeDialog } from "@/components/file-tree/create-node-dialog";
 import { RenameDialog } from "@/components/file-tree/rename-dialog";
 import { NodeContextMenu } from "@/components/file-tree/context-menu";
 
+type FileTreeTrpcState = {
+  favorites: TreeNode[];
+  nodesById: Map<string, TreeNode>;
+  childrenByParent: Map<string, TreeNode[]>;
+};
+
+const {
+  mockFavoritesUseQuery,
+  mockNodeByIdUseQuery,
+  mockChildrenUseQuery,
+  mockDescendantsUseQuery,
+  fileTreeTrpcState,
+} = vi.hoisted(() => ({
+  mockFavoritesUseQuery: vi.fn(),
+  mockNodeByIdUseQuery: vi.fn(),
+  mockChildrenUseQuery: vi.fn(),
+  mockDescendantsUseQuery: vi.fn(),
+  fileTreeTrpcState: {
+    favorites: [],
+    nodesById: new Map(),
+    childrenByParent: new Map(),
+  } as FileTreeTrpcState,
+}));
+
 // Mock next-intl (already mocked in setup.ts, but be explicit)
 vi.mock("next-intl", () => ({
   useTranslations: () => (key: string) => key,
   NextIntlClientProvider: ({ children }: { children: React.ReactNode }) =>
     children,
+}));
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    nodes: {
+      getFavorites: { useQuery: mockFavoritesUseQuery },
+      getById: { useQuery: mockNodeByIdUseQuery },
+      getChildren: { useQuery: mockChildrenUseQuery },
+      getDescendants: { useQuery: mockDescendantsUseQuery },
+    },
+  },
 }));
 
 function makeNode(overrides: Partial<TreeNode> = {}): TreeNode {
@@ -30,6 +66,301 @@ function makeNode(overrides: Partial<TreeNode> = {}): TreeNode {
     ...overrides,
   };
 }
+
+describe("FileTree", () => {
+  const favoriteNode = makeNode({
+    id: "favorite-1",
+    name: "Favorite Node",
+    type: "note",
+    parentId: "project-1",
+    metadata: { isFavorite: true },
+  });
+  const recentCandidateNodes = [
+    makeNode({
+      id: "note-1",
+      name: "Alpha Note",
+      type: "note",
+      parentId: "project-1",
+    }),
+    makeNode({
+      id: "note-2",
+      name: "Bravo Note",
+      type: "note",
+      parentId: "project-1",
+    }),
+    makeNode({
+      id: "note-3",
+      name: "Charlie Note",
+      type: "note",
+      parentId: "project-1",
+    }),
+    makeNode({
+      id: "note-4",
+      name: "Delta Note",
+      type: "note",
+      parentId: "project-1",
+    }),
+    makeNode({
+      id: "note-5",
+      name: "Echo Note",
+      type: "note",
+      parentId: "project-1",
+    }),
+    makeNode({
+      id: "note-6",
+      name: "Foxtrot Note",
+      type: "note",
+      parentId: "project-1",
+    }),
+  ];
+
+  const onSelectNode = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.localStorage.clear();
+    fileTreeTrpcState.favorites = [favoriteNode];
+    fileTreeTrpcState.childrenByParent = new Map([
+      ["project-1", recentCandidateNodes],
+    ]);
+    fileTreeTrpcState.nodesById = new Map(
+      [favoriteNode, ...recentCandidateNodes].map((node) => [node.id, node]),
+    );
+
+    mockFavoritesUseQuery.mockImplementation(() => ({
+      data: fileTreeTrpcState.favorites,
+      isLoading: false,
+      error: null,
+    }));
+    mockNodeByIdUseQuery.mockImplementation(({ id }: { id?: string }) => ({
+      data: id ? (fileTreeTrpcState.nodesById.get(id) ?? null) : null,
+      isLoading: false,
+      error: null,
+    }));
+    mockChildrenUseQuery.mockImplementation(
+      ({ parentId }: { parentId: string }) => ({
+        data: fileTreeTrpcState.childrenByParent.get(parentId) ?? [],
+        isLoading: false,
+        error: null,
+      }),
+    );
+    mockDescendantsUseQuery.mockImplementation(() => ({
+      data: [],
+      isLoading: false,
+      error: null,
+    }));
+  });
+
+  function renderFileTree(
+    props: Partial<React.ComponentProps<typeof FileTree>> = {},
+  ) {
+    return render(
+      <FileTree
+        projectId="project-1"
+        selectedNodeId={null}
+        onSelectNode={onSelectNode}
+        onContextMenu={vi.fn()}
+        onCreateFolder={vi.fn()}
+        onCreateNote={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        {...props}
+      />,
+    );
+  }
+
+  it("renders Recents above Favorites and only keeps the last five clicked nodes", () => {
+    renderFileTree();
+
+    const recentsButton = screen.getByRole("button", {
+      name: "recents.section",
+    });
+    const favoritesButton = screen.getByRole("button", {
+      name: "favorites.section",
+    });
+    expect(
+      recentsButton.compareDocumentPosition(favoritesButton) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getAllByText("Alpha Note")[0]);
+    fireEvent.click(screen.getByText("Bravo Note"));
+    fireEvent.click(screen.getByText("Charlie Note"));
+    fireEvent.click(screen.getByText("Delta Note"));
+    fireEvent.click(screen.getByText("Echo Note"));
+    fireEvent.click(screen.getByText("Foxtrot Note"));
+
+    const recentsPanel = screen.getByTestId("file-tree-recents-panel");
+    expect(
+      within(recentsPanel).queryByText("Alpha Note"),
+    ).not.toBeInTheDocument();
+
+    const recentTreeItems = within(recentsPanel).getAllByRole("treeitem");
+    expect(recentTreeItems).toHaveLength(5);
+    expect(recentTreeItems.map((item) => item.textContent)).toEqual([
+      expect.stringContaining("Foxtrot Note"),
+      expect.stringContaining("Echo Note"),
+      expect.stringContaining("Delta Note"),
+      expect.stringContaining("Charlie Note"),
+      expect.stringContaining("Bravo Note"),
+    ]);
+  });
+
+  it("moves an already-clicked node to the top of Recents without duplicating it", () => {
+    renderFileTree();
+
+    fireEvent.click(screen.getAllByText("Alpha Note")[0]);
+    fireEvent.click(screen.getByText("Bravo Note"));
+    fireEvent.click(screen.getByText("Charlie Note"));
+    fireEvent.click(screen.getAllByText("Alpha Note")[0]);
+
+    const recentTreeItems = within(
+      screen.getByTestId("file-tree-recents-panel"),
+    ).getAllByRole("treeitem");
+    expect(recentTreeItems).toHaveLength(3);
+    expect(recentTreeItems.map((item) => item.textContent)).toEqual([
+      expect.stringContaining("Alpha Note"),
+      expect.stringContaining("Charlie Note"),
+      expect.stringContaining("Bravo Note"),
+    ]);
+  });
+
+  it("keeps the pinned-section separator visible when Favorites is collapsed", () => {
+    renderFileTree();
+
+    fireEvent.click(screen.getByRole("button", { name: "favorites.section" }));
+
+    expect(
+      screen.getByTestId("file-tree-pinned-separator"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("file-tree-favorites-panel"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("does not add folders to Recents", () => {
+    const folderNode = makeNode({
+      id: "folder-1",
+      name: "Reference Folder",
+      type: "folder",
+      parentId: "project-1",
+    });
+
+    fileTreeTrpcState.childrenByParent = new Map([
+      ["project-1", [folderNode, ...recentCandidateNodes]],
+    ]);
+    fileTreeTrpcState.nodesById = new Map(
+      [favoriteNode, folderNode, ...recentCandidateNodes].map((node) => [
+        node.id,
+        node,
+      ]),
+    );
+
+    renderFileTree();
+
+    fireEvent.click(screen.getByText("Reference Folder"));
+
+    const recentsPanel = screen.getByTestId("file-tree-recents-panel");
+    expect(
+      within(recentsPanel).queryByText("Reference Folder"),
+    ).not.toBeInTheDocument();
+    expect(within(recentsPanel).getByText("recents.empty")).toBeInTheDocument();
+  });
+
+  it("switches between alphabetical and manual sort order", () => {
+    const manualSortNodes = [
+      makeNode({
+        id: "manual-1",
+        name: "Zulu Note",
+        type: "note",
+        parentId: "project-1",
+        position: 2,
+      }),
+      makeNode({
+        id: "manual-2",
+        name: "Alpha Note",
+        type: "note",
+        parentId: "project-1",
+        position: 1,
+      }),
+      makeNode({
+        id: "manual-3",
+        name: "Beta Note",
+        type: "note",
+        parentId: "project-1",
+        position: 0,
+      }),
+    ];
+
+    fileTreeTrpcState.favorites = [];
+    fileTreeTrpcState.childrenByParent = new Map([
+      ["project-1", manualSortNodes],
+    ]);
+    fileTreeTrpcState.nodesById = new Map(
+      manualSortNodes.map((node) => [node.id, node]),
+    );
+
+    renderFileTree({ onToggleFavorite: undefined });
+
+    expect(
+      screen.getAllByRole("treeitem").map((item) => item.textContent),
+    ).toEqual([
+      expect.stringContaining("Alpha Note"),
+      expect.stringContaining("Beta Note"),
+      expect.stringContaining("Zulu Note"),
+    ]);
+
+    fireEvent.click(screen.getByTestId("file-tree-sort-manual"));
+
+    expect(
+      screen.getAllByRole("treeitem").map((item) => item.textContent),
+    ).toEqual([
+      expect.stringContaining("Beta Note"),
+      expect.stringContaining("Alpha Note"),
+      expect.stringContaining("Zulu Note"),
+    ]);
+  });
+
+  it("restores expanded folders from localStorage after remount", () => {
+    const folderNode = makeNode({
+      id: "folder-1",
+      name: "Outline",
+      type: "folder",
+      parentId: "project-1",
+    });
+    const nestedNote = makeNode({
+      id: "nested-note-1",
+      name: "Nested Note",
+      type: "note",
+      parentId: "folder-1",
+    });
+
+    fileTreeTrpcState.favorites = [];
+    fileTreeTrpcState.childrenByParent = new Map([
+      ["project-1", [folderNode]],
+      ["folder-1", [nestedNote]],
+    ]);
+    fileTreeTrpcState.nodesById = new Map(
+      [folderNode, nestedNote].map((node) => [node.id, node]),
+    );
+
+    const firstRender = renderFileTree({ onToggleFavorite: undefined });
+
+    fireEvent.click(screen.getByTestId("tree-node-toggle-folder-1"));
+
+    expect(screen.getByText("Nested Note")).toBeInTheDocument();
+    expect(
+      JSON.parse(
+        window.localStorage.getItem("arbor:fileTreeExpandedNodes:project-1") ??
+          "[]",
+      ),
+    ).toEqual(expect.arrayContaining(["project-1", "folder-1"]));
+
+    firstRender.unmount();
+    renderFileTree({ onToggleFavorite: undefined });
+
+    expect(screen.getByText("Nested Note")).toBeInTheDocument();
+  });
+});
 
 describe("FileTreeNode", () => {
   const defaultProps = {
@@ -86,11 +417,20 @@ describe("FileTreeNode", () => {
     expect(screen.getByRole("treeitem")).not.toHaveAttribute("aria-expanded");
   });
 
-  it("should call onToggle and onSelect when folder is clicked", () => {
+  it("should call only onSelect when a folder row is clicked", () => {
     render(<FileTreeNode {...defaultProps} />);
     fireEvent.click(screen.getByRole("treeitem"));
-    expect(defaultProps.onToggle).toHaveBeenCalledWith("node-1");
+    expect(defaultProps.onToggle).not.toHaveBeenCalled();
     expect(defaultProps.onSelect).toHaveBeenCalledWith("node-1");
+  });
+
+  it("should call only onToggle when a folder chevron is clicked", () => {
+    render(<FileTreeNode {...defaultProps} />);
+
+    fireEvent.click(screen.getByTestId("tree-node-toggle-node-1"));
+
+    expect(defaultProps.onToggle).toHaveBeenCalledWith("node-1");
+    expect(defaultProps.onSelect).not.toHaveBeenCalled();
   });
 
   it("should call only onSelect when note is clicked (not onToggle)", () => {
@@ -119,7 +459,7 @@ describe("FileTreeNode", () => {
   it("should handle Enter key", () => {
     render(<FileTreeNode {...defaultProps} />);
     fireEvent.keyDown(screen.getByRole("treeitem"), { key: "Enter" });
-    expect(defaultProps.onToggle).toHaveBeenCalledWith("node-1");
+    expect(defaultProps.onToggle).not.toHaveBeenCalled();
     expect(defaultProps.onSelect).toHaveBeenCalledWith("node-1");
   });
 
@@ -513,25 +853,38 @@ describe("NodeContextMenu", () => {
   it("should show New Folder, New Note, Rename, Delete for folders", () => {
     render(<NodeContextMenu {...defaultProps} node={folderNode} />);
     const menuItems = screen.getAllByRole("menuitem");
-    expect(menuItems).toHaveLength(6);
+    expect(menuItems).toHaveLength(8);
     expect(screen.getByText("tagNode")).toBeInTheDocument();
     expect(screen.getByText("newFolder")).toBeInTheDocument();
     expect(screen.getByText("newNote")).toBeInTheDocument();
+    expect(screen.getByText("settings")).toBeInTheDocument();
     expect(screen.getByText("rename")).toBeInTheDocument();
+    expect(screen.getByText("export")).toBeInTheDocument();
     expect(screen.getByText("lock")).toBeInTheDocument();
     expect(screen.getByText("delete")).toBeInTheDocument();
   });
 
-  it("should show Rename, Lock, and Delete for notes", () => {
+  it("should show Settings, Rename, Lock, and Delete for notes", () => {
     render(<NodeContextMenu {...defaultProps} node={noteNode} />);
     const menuItems = screen.getAllByRole("menuitem");
-    expect(menuItems).toHaveLength(4);
+    expect(menuItems).toHaveLength(6);
     expect(screen.getByText("tagNode")).toBeInTheDocument();
+    expect(screen.getByText("settings")).toBeInTheDocument();
     expect(screen.getByText("rename")).toBeInTheDocument();
+    expect(screen.getByText("export")).toBeInTheDocument();
     expect(screen.getByText("lock")).toBeInTheDocument();
     expect(screen.getByText("delete")).toBeInTheDocument();
     expect(screen.queryByText("newFolder")).not.toBeInTheDocument();
     expect(screen.queryByText("newNote")).not.toBeInTheDocument();
+  });
+
+  it("should call onAction with settings action for notes", () => {
+    render(<NodeContextMenu {...defaultProps} node={noteNode} />);
+    fireEvent.click(screen.getByText("settings"));
+    expect(defaultProps.onAction).toHaveBeenCalledWith({
+      type: "settings",
+      node: noteNode,
+    });
   });
 
   it("should show unlock for locked nodes", () => {
@@ -563,6 +916,15 @@ describe("NodeContextMenu", () => {
     fireEvent.click(screen.getByText("newFolder"));
     expect(defaultProps.onAction).toHaveBeenCalledWith({
       type: "newFolder",
+      node: folderNode,
+    });
+  });
+
+  it("should call onAction with settings action for folders", () => {
+    render(<NodeContextMenu {...defaultProps} />);
+    fireEvent.click(screen.getByText("settings"));
+    expect(defaultProps.onAction).toHaveBeenCalledWith({
+      type: "settings",
       node: folderNode,
     });
   });

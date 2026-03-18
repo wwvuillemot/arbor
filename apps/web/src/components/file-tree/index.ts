@@ -2,6 +2,7 @@ export {
   FileTree,
   type FileTreeHandle,
   type AttributionFilter,
+  type FileTreeSortMode,
 } from "./file-tree";
 export {
   FileTreeNode,

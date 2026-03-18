@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
+import { useAppPreferences } from "@/hooks/use-app-preferences";
 import { useCurrentProject } from "@/hooks/use-current-project";
 import { useAutoSave } from "@/hooks/use-auto-save";
 import { useToast } from "@/contexts/toast-context";
@@ -27,6 +28,7 @@ import {
   FileTree,
   type FileTreeHandle,
   type AttributionFilter,
+  type FileTreeSortMode,
   CreateNodeDialog,
   RenameDialog,
   NodeContextMenu,
@@ -46,7 +48,8 @@ import { NodeAttribution, VersionHistory } from "@/components/provenance";
 import { ChatSidebar } from "@/components/chat";
 import { Dialog } from "@/components/dialog";
 import { getMediaAttachmentUrl } from "@/lib/media-url";
-import { downloadTextFile, openHtmlPrintWindow } from "@/lib/browser-export";
+import { MediaPickerGrid } from "@/components/media-picker-grid";
+import { downloadBinaryFile, downloadTextFile } from "@/lib/browser-export";
 import { HeroGradient } from "@/components/hero-gradient";
 import { NoteCard } from "@/components/note-card";
 import {
@@ -60,8 +63,12 @@ import {
   type LinkPickerSourceNode,
 } from "./projects-page-helpers";
 import {
+  type PdfTemplateId,
+  runProjectDocxExport,
+  runProjectEpubExport,
   runProjectMarkdownExport,
   runProjectPdfExport,
+  runProjectZipExport,
 } from "./projects-export-workflow";
 import { CreateProjectDialog } from "./projects-create-dialog";
 import {
@@ -75,13 +82,233 @@ import {
   uploadImportedImagesAndPatchNodes,
 } from "./projects-import-side-effects";
 import { runProjectImportWorkflow } from "./projects-import-workflow";
-import { ProjectSettingsDialog } from "./project-settings-dialog";
+import {
+  ProjectSettingsDialog,
+  type ProjectSettingsNode,
+} from "@/app/[locale]/(app)/projects/project-settings-dialog";
 import type { Editor } from "@tiptap/react";
+
+type ChatContextNode = {
+  id: string;
+  name: string;
+  type: string;
+};
+
+type ExportNameOptions = {
+  includeFolderNames: boolean;
+  includeNoteNames: boolean;
+};
+
+function normalizeSettingsMetadata(metadata: unknown): Record<string, unknown> {
+  return (metadata as Record<string, unknown> | null) ?? {};
+}
+
+function createProjectSettingsNode(project: {
+  id: string;
+  name: string;
+  summary?: string | null;
+  metadata?: unknown;
+}): ProjectSettingsNode {
+  return {
+    id: project.id,
+    name: project.name,
+    type: "project",
+    projectId: project.id,
+    summary: project.summary ?? null,
+    metadata: normalizeSettingsMetadata(project.metadata),
+  };
+}
+
+function createFolderSettingsNode(
+  folder: {
+    id: string;
+    name: string;
+    metadata?: unknown;
+  },
+  projectId: string,
+): ProjectSettingsNode {
+  return {
+    id: folder.id,
+    name: folder.name,
+    type: "folder",
+    projectId,
+    summary: null,
+    metadata: normalizeSettingsMetadata(folder.metadata),
+  };
+}
+
+function createAnyNodeSettingsNode(
+  node: { id: string; name: string; metadata?: unknown },
+  nodeType: string,
+  projectId: string,
+): ProjectSettingsNode {
+  return {
+    id: node.id,
+    name: node.name,
+    type: nodeType,
+    projectId,
+    summary: null,
+    metadata: normalizeSettingsMetadata(node.metadata),
+  };
+}
+
+function getFolderSettingsProjectId(
+  currentProjectId: string | null | undefined,
+  folderParentId: string | null | undefined,
+): string | null {
+  return currentProjectId ?? folderParentId ?? null;
+}
+
+const PROJECTS_SORT_MODE_PREFERENCE_KEY = "projects:sortMode";
+const PROJECTS_EXPORT_NAME_OPTIONS_PREFERENCE_KEY =
+  "projects:exportNameOptions";
+const PROJECTS_PDF_TEMPLATE_PREFERENCE_KEY = "projects:pdfTemplateId";
+const DEFAULT_PROJECTS_SORT_MODE: FileTreeSortMode = "alphabetical";
+const DEFAULT_EXPORT_NAME_OPTIONS: ExportNameOptions = {
+  includeFolderNames: true,
+  includeNoteNames: true,
+};
+const DEFAULT_PROJECTS_PDF_TEMPLATE_ID: PdfTemplateId = "standard";
+
+type PdfTemplateOption = {
+  id: PdfTemplateId;
+  label: string;
+  description: string;
+  isDefault: boolean;
+};
+
+type ExportFormat = "markdown" | "docx" | "pdf" | "zip" | "epub";
+
+type ExportDialogState = {
+  open: boolean;
+  node: TreeNode | null;
+};
+
+const CHAT_CONTEXT_STORAGE_PREFIX = "arbor:chatContextNodes:";
+const CHAT_CONTEXT_DRAFT_STORAGE_KEY = `${CHAT_CONTEXT_STORAGE_PREFIX}draft`;
+
+function getChatContextStorageKey(threadId: string | null) {
+  return threadId
+    ? `${CHAT_CONTEXT_STORAGE_PREFIX}${threadId}`
+    : CHAT_CONTEXT_DRAFT_STORAGE_KEY;
+}
+
+function isChatContextNode(value: unknown): value is ChatContextNode {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.name === "string" &&
+    typeof candidate.type === "string"
+  );
+}
+
+function isFileTreeSortMode(value: unknown): value is FileTreeSortMode {
+  return value === "alphabetical" || value === "manual";
+}
+
+function resolveFileTreeSortModePreference(
+  preferenceValue: unknown,
+): FileTreeSortMode {
+  return isFileTreeSortMode(preferenceValue)
+    ? preferenceValue
+    : DEFAULT_PROJECTS_SORT_MODE;
+}
+
+function isExportNameOptions(value: unknown): value is ExportNameOptions {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+
+  return (
+    typeof candidate.includeFolderNames === "boolean" &&
+    typeof candidate.includeNoteNames === "boolean"
+  );
+}
+
+function resolveExportNameOptionsPreference(
+  preferenceValue: unknown,
+): ExportNameOptions {
+  return isExportNameOptions(preferenceValue)
+    ? preferenceValue
+    : DEFAULT_EXPORT_NAME_OPTIONS;
+}
+
+function resolvePdfTemplatePreference(
+  preferenceValue: unknown,
+  pdfTemplateOptions: readonly PdfTemplateOption[],
+): PdfTemplateId {
+  const defaultTemplateId =
+    pdfTemplateOptions.find((templateOption) => templateOption.isDefault)?.id ??
+    DEFAULT_PROJECTS_PDF_TEMPLATE_ID;
+
+  if (typeof preferenceValue !== "string") {
+    return defaultTemplateId;
+  }
+
+  const hasMatchingTemplate = pdfTemplateOptions.some(
+    (templateOption) => templateOption.id === preferenceValue,
+  );
+
+  return hasMatchingTemplate
+    ? (preferenceValue as PdfTemplateId)
+    : defaultTemplateId;
+}
+
+function shouldExportDescendants(nodeType: string | null | undefined): boolean {
+  return nodeType === "folder" || nodeType === "project";
+}
+
+function readStoredChatContext(threadId: string | null): ChatContextNode[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  const storedValue = localStorage.getItem(getChatContextStorageKey(threadId));
+  if (!storedValue) {
+    return [];
+  }
+
+  try {
+    const parsedValue = JSON.parse(storedValue);
+    if (!Array.isArray(parsedValue)) {
+      return [];
+    }
+
+    return parsedValue.filter(isChatContextNode);
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredChatContext(
+  threadId: string | null,
+  contextNodes: ChatContextNode[],
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const storageKey = getChatContextStorageKey(threadId);
+  if (contextNodes.length === 0) {
+    localStorage.removeItem(storageKey);
+    return;
+  }
+
+  localStorage.setItem(storageKey, JSON.stringify(contextNodes));
+}
 
 function FolderCardView({
   nodes,
   onOpenNode,
   onToggleFavorite,
+  onSettings,
 }: {
   nodes: {
     id: string;
@@ -92,6 +319,7 @@ function FolderCardView({
   }[];
   onOpenNode: (nodeId: string) => void;
   onToggleFavorite?: (nodeId: string) => void;
+  onSettings?: (nodeId: string) => void;
 }) {
   const nodeIds = React.useMemo(() => nodes.map((n) => n.id), [nodes]);
   const firstMediaQuery = trpc.media.getFirstImageByNodes.useQuery(
@@ -114,14 +342,36 @@ function FolderCardView({
         className="mx-auto grid w-full max-w-[calc(18rem*4+3rem)] gap-4 [grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr))]"
         data-testid="folder-card-grid"
       >
-        {nodes.map((node) => (
-          <NoteCard
-            key={node.id}
-            node={{ ...node, firstMediaId: firstMediaMap[node.id] ?? null }}
-            onClick={() => onOpenNode(node.id)}
-            onToggleFavorite={onToggleFavorite}
-          />
-        ))}
+        {nodes.map((node) => {
+          const nodeMetadata = normalizeSettingsMetadata(node.metadata);
+
+          return (
+            <NoteCard
+              key={node.id}
+              node={{
+                ...node,
+                firstMediaId:
+                  (nodeMetadata.heroAttachmentId as
+                    | string
+                    | null
+                    | undefined) ??
+                  firstMediaMap[node.id] ??
+                  null,
+                heroFocalX: nodeMetadata.heroFocalX as
+                  | number
+                  | null
+                  | undefined,
+                heroFocalY: nodeMetadata.heroFocalY as
+                  | number
+                  | null
+                  | undefined,
+              }}
+              onClick={() => onOpenNode(node.id)}
+              onToggleFavorite={onToggleFavorite}
+              onSettings={onSettings ? () => onSettings(node.id) : undefined}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -139,6 +389,39 @@ export default function ProjectsPage() {
   const tFileTree = useTranslations("fileTree");
   const tCommon = useTranslations("common");
   const { addToast } = useToast();
+  const {
+    getPreference,
+    setPreference,
+    isLoading: areAppPreferencesLoading,
+  } = useAppPreferences();
+  const persistedSortModePreference = resolveFileTreeSortModePreference(
+    getPreference(
+      PROJECTS_SORT_MODE_PREFERENCE_KEY,
+      DEFAULT_PROJECTS_SORT_MODE,
+    ),
+  );
+  const persistedExportNameOptions = resolveExportNameOptionsPreference(
+    getPreference(
+      PROJECTS_EXPORT_NAME_OPTIONS_PREFERENCE_KEY,
+      DEFAULT_EXPORT_NAME_OPTIONS,
+    ),
+  );
+  const pdfTemplatesQuery = trpc.nodes.getPdfTemplates.useQuery(undefined, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
+
+  const pdfTemplateOptions = React.useMemo(
+    () => pdfTemplatesQuery.data ?? [],
+    [pdfTemplatesQuery.data],
+  );
+  const persistedPdfTemplatePreference = resolvePdfTemplatePreference(
+    getPreference(
+      PROJECTS_PDF_TEMPLATE_PREFERENCE_KEY,
+      DEFAULT_PROJECTS_PDF_TEMPLATE_ID,
+    ),
+    pdfTemplateOptions,
+  );
 
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
@@ -148,12 +431,8 @@ export default function ProjectsPage() {
     name: string;
   } | null>(null);
   const [projectName, setProjectName] = React.useState("");
-  const [listSettingsProject, setListSettingsProject] = React.useState<{
-    id: string;
-    name: string;
-    summary?: string | null;
-    metadata: Record<string, unknown>;
-  } | null>(null);
+  const [settingsNode, setSettingsNode] =
+    React.useState<ProjectSettingsNode | null>(null);
 
   const router = useRouter();
   const searchParamsString =
@@ -229,26 +508,62 @@ export default function ProjectsPage() {
   }, []);
 
   // Chat context nodes — files/folders the user has pinned to add to LLM context
+  const [selectedChatThreadId, setSelectedChatThreadId] = React.useState<
+    string | null
+  >(null);
   const [chatContextNodes, setChatContextNodes] = React.useState<
-    { id: string; name: string; type: string }[]
-  >([]);
+    ChatContextNode[]
+  >(() => readStoredChatContext(null));
   const chatContextNodeIds = React.useMemo(
     () => new Set(chatContextNodes.map((n) => n.id)),
     [chatContextNodes],
   );
+  const latestChatContextNodesRef = React.useRef(chatContextNodes);
+  const previousSelectedChatThreadIdRef = React.useRef<string | null>(null);
+  const skipNextChatContextPersistenceRef = React.useRef(false);
 
-  const handleAddToContext = React.useCallback(
-    (node: { id: string; name: string; type: string }) => {
-      setChatContextNodes((prev) => {
-        if (prev.some((n) => n.id === node.id)) {
-          // Toggle off if already in context
-          return prev.filter((n) => n.id !== node.id);
-        }
-        return [...prev, { id: node.id, name: node.name, type: node.type }];
-      });
-    },
-    [],
-  );
+  React.useEffect(() => {
+    latestChatContextNodesRef.current = chatContextNodes;
+  }, [chatContextNodes]);
+
+  React.useEffect(() => {
+    const previousSelectedChatThreadId =
+      previousSelectedChatThreadIdRef.current;
+    previousSelectedChatThreadIdRef.current = selectedChatThreadId;
+
+    const storedChatContextNodes = readStoredChatContext(selectedChatThreadId);
+    const shouldKeepDraftContextForNewThread =
+      selectedChatThreadId !== null &&
+      previousSelectedChatThreadId === null &&
+      storedChatContextNodes.length === 0 &&
+      latestChatContextNodesRef.current.length > 0;
+
+    if (shouldKeepDraftContextForNewThread) {
+      return;
+    }
+
+    skipNextChatContextPersistenceRef.current = true;
+    setChatContextNodes(storedChatContextNodes);
+  }, [selectedChatThreadId]);
+
+  React.useEffect(() => {
+    if (skipNextChatContextPersistenceRef.current) {
+      skipNextChatContextPersistenceRef.current = false;
+      return;
+    }
+
+    writeStoredChatContext(selectedChatThreadId, chatContextNodes);
+  }, [selectedChatThreadId, chatContextNodes]);
+
+  const handleAddToContext = React.useCallback((node: ChatContextNode) => {
+    setChatContextNodes((prev) => {
+      if (prev.some((n) => n.id === node.id)) {
+        // Toggle off if already in context
+        return prev.filter((n) => n.id !== node.id);
+      }
+      return [...prev, { id: node.id, name: node.name, type: node.type }];
+    });
+  }, []);
   const [nodeCreateDialog, setNodeCreateDialog] = React.useState<{
     open: boolean;
     type: "folder" | "note";
@@ -289,13 +604,148 @@ export default function ProjectsPage() {
   const [aiImagePrompt, setAiImagePrompt] = React.useState("");
   const [showLinkPicker, setShowLinkPicker] = React.useState(false);
   const [linkPickerSearch, setLinkPickerSearch] = React.useState("");
-  const [showExportMenu, setShowExportMenu] = React.useState(false);
+  const [exportDialogState, setExportDialogState] =
+    React.useState<ExportDialogState>({
+      open: false,
+      node: null,
+    });
+  const [selectedExportFormat, setSelectedExportFormat] =
+    React.useState<ExportFormat>("markdown");
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [fileTreeSortMode, setFileTreeSortMode] =
+    React.useState<FileTreeSortMode>(persistedSortModePreference);
+  const [exportNameOptions, setExportNameOptions] =
+    React.useState<ExportNameOptions>(persistedExportNameOptions);
+  const [selectedPdfTemplateId, setSelectedPdfTemplateId] =
+    React.useState<PdfTemplateId>(persistedPdfTemplatePreference);
+  const [selectedCoverAttachmentId, setSelectedCoverAttachmentId] =
+    React.useState<string | null>(null);
+  const [epubAuthor, setEpubAuthor] = React.useState("");
+  const [epubDescription, setEpubDescription] = React.useState("");
+  const [epubLanguage, setEpubLanguage] = React.useState("");
+
+  // Fetch image attachments for the EPUB cover picker using the full project scope
+  // so all images across every note/folder in the project are available as cover options.
+  const epubAttachmentsQuery = trpc.media.getByProject.useQuery(
+    { projectId: currentProjectId! },
+    {
+      enabled: selectedExportFormat === "epub" && !!currentProjectId,
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    },
+  );
+  const epubImageAttachments = React.useMemo(
+    () =>
+      (epubAttachmentsQuery.data ?? []).filter((a) =>
+        a.mimeType.startsWith("image/"),
+      ),
+    [epubAttachmentsQuery.data],
+  );
+
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = React.useState(false);
   const [historyCompareVersions, setHistoryCompareVersions] = React.useState<{
     versionA: number;
     versionB: number;
   } | null>(null);
-  const exportMenuRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (areAppPreferencesLoading) {
+      return;
+    }
+
+    setFileTreeSortMode(persistedSortModePreference);
+  }, [areAppPreferencesLoading, persistedSortModePreference]);
+
+  React.useEffect(() => {
+    if (areAppPreferencesLoading) {
+      return;
+    }
+
+    setExportNameOptions(persistedExportNameOptions);
+  }, [areAppPreferencesLoading, persistedExportNameOptions]);
+
+  React.useEffect(() => {
+    if (areAppPreferencesLoading || pdfTemplatesQuery.isLoading) {
+      return;
+    }
+
+    setSelectedPdfTemplateId(persistedPdfTemplatePreference);
+  }, [
+    areAppPreferencesLoading,
+    pdfTemplatesQuery.isLoading,
+    persistedPdfTemplatePreference,
+  ]);
+
+  const handleSortModeChange = React.useCallback(
+    (nextSortMode: FileTreeSortMode) => {
+      setFileTreeSortMode((currentSortMode) => {
+        if (currentSortMode === nextSortMode) {
+          return currentSortMode;
+        }
+
+        void setPreference(
+          PROJECTS_SORT_MODE_PREFERENCE_KEY,
+          nextSortMode,
+        ).catch(() => {
+          setFileTreeSortMode(currentSortMode);
+        });
+
+        return nextSortMode;
+      });
+    },
+    [setPreference],
+  );
+
+  const handleExportNameOptionsChange = React.useCallback(
+    (updater: (currentOptions: ExportNameOptions) => ExportNameOptions) => {
+      setExportNameOptions((currentOptions) => {
+        const nextOptions = updater(currentOptions);
+
+        if (
+          currentOptions.includeFolderNames ===
+            nextOptions.includeFolderNames &&
+          currentOptions.includeNoteNames === nextOptions.includeNoteNames
+        ) {
+          return currentOptions;
+        }
+
+        void setPreference(
+          PROJECTS_EXPORT_NAME_OPTIONS_PREFERENCE_KEY,
+          nextOptions,
+        ).catch(() => {
+          setExportNameOptions(currentOptions);
+        });
+
+        return nextOptions;
+      });
+    },
+    [setPreference],
+  );
+
+  const handlePdfTemplateChange = React.useCallback(
+    (nextTemplateId: PdfTemplateId) => {
+      setSelectedPdfTemplateId((currentTemplateId) => {
+        if (
+          currentTemplateId === nextTemplateId ||
+          !pdfTemplateOptions.some(
+            (templateOption) => templateOption.id === nextTemplateId,
+          )
+        ) {
+          return currentTemplateId;
+        }
+
+        void setPreference(
+          PROJECTS_PDF_TEMPLATE_PREFERENCE_KEY,
+          nextTemplateId,
+        ).catch(() => {
+          setSelectedPdfTemplateId(currentTemplateId);
+        });
+
+        return nextTemplateId;
+      });
+    },
+    [pdfTemplateOptions, setPreference],
+  );
 
   // Tag panel resize/collapse state — persisted in localStorage
   const TAG_PANEL_HEIGHT_KEY = "arbor:tagPanelHeight";
@@ -650,40 +1100,51 @@ export default function ProjectsPage() {
   });
 
   // Node move mutation (for drag-and-drop in file tree)
-  const nodeMoveMutation = trpc.nodes.move.useMutation({
-    onSuccess: () => {
-      utils.nodes.getChildren.invalidate();
-      addToast(tFileTree("moveSuccess"), "success");
-    },
-    onError: (error) => {
-      console.error("Error moving node:", error);
-      addToast(tFileTree("moveError"), "error");
-    },
-  });
+  const nodeMoveMutation = trpc.nodes.move.useMutation();
 
   const handleMoveNode = React.useCallback(
-    (draggedNodeId: string, targetNodeId: string, position: DropPosition) => {
-      const targetNode = utils.nodes.getById.getData({ id: targetNodeId }) as
-        | { id: string; parentId: string | null }
-        | undefined;
-      const siblingNodes = targetNode?.parentId
-        ? (utils.nodes.getChildren.getData({
-          parentId: targetNode.parentId,
-        }) ?? [])
-        : [];
-      const moveInput = deriveNodeMoveMutationInput(
-        draggedNodeId,
-        targetNodeId,
-        position,
-        targetNode,
-        siblingNodes,
-      );
+    async (
+      draggedNodeId: string,
+      targetNodeId: string,
+      position: DropPosition,
+    ) => {
+      try {
+        const targetNode = (await utils.nodes.getById.fetch({
+          id: targetNodeId,
+        })) as {
+          id: string;
+          parentId: string | null;
+          position?: number | null;
+        } | null;
+        const moveInput = deriveNodeMoveMutationInput(
+          draggedNodeId,
+          targetNodeId,
+          position,
+          targetNode ?? undefined,
+        );
 
-      if (moveInput) {
-        nodeMoveMutation.mutate(moveInput);
+        if (!moveInput) {
+          return;
+        }
+
+        await nodeMoveMutation.mutateAsync(moveInput);
+        await Promise.all([
+          utils.nodes.getChildren.invalidate(),
+          utils.nodes.getById.invalidate({ id: draggedNodeId }),
+        ]);
+        addToast(tFileTree("moveSuccess"), "success");
+      } catch (error) {
+        console.error("Error moving node:", error);
+        addToast(tFileTree("moveError"), "error");
       }
     },
-    [nodeMoveMutation, utils.nodes.getById, utils.nodes.getChildren],
+    [
+      nodeMoveMutation,
+      utils.nodes.getById,
+      utils.nodes.getChildren,
+      addToast,
+      tFileTree,
+    ],
   );
 
   // Bulk node selection & tag modal
@@ -739,9 +1200,45 @@ export default function ProjectsPage() {
   const projectMeta =
     (currentProject?.metadata as Record<string, unknown> | null) ?? {};
   const isCurrentProjectLocked = projectMeta.isLocked === true;
+  const currentProjectSettingsNode = React.useMemo(() => {
+    if (!currentProject) {
+      return null;
+    }
 
-  // Project settings dialog
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
+    return createProjectSettingsNode({
+      id: currentProject.id,
+      name: currentProject.name,
+      summary: (currentProject as { summary?: string | null }).summary ?? null,
+      metadata: projectMeta,
+    });
+  }, [currentProject, projectMeta]);
+  const selectedWorkspaceSettingsNode = React.useMemo(() => {
+    const selectedNode = selectedNodeQuery.data as
+      | {
+          id: string;
+          name: string;
+          type?: string;
+          parentId?: string | null;
+          metadata?: unknown;
+        }
+      | undefined;
+
+    if (selectedNode?.type === "folder") {
+      const folderProjectId = getFolderSettingsProjectId(
+        currentProjectId,
+        selectedNode.parentId,
+      );
+      if (folderProjectId) {
+        return createFolderSettingsNode(selectedNode, folderProjectId);
+      }
+    }
+
+    if (selectedNode?.type === "note" && currentProjectId) {
+      return createAnyNodeSettingsNode(selectedNode, "note", currentProjectId);
+    }
+
+    return currentProjectSettingsNode;
+  }, [currentProjectId, currentProjectSettingsNode, selectedNodeQuery.data]);
 
   // Media upload mutation
   const mediaUploadMutation = trpc.media.upload.useMutation();
@@ -902,8 +1399,8 @@ export default function ProjectsPage() {
         currentProject?.id,
         forceList,
         selectedNodeQuery.data as
-        | { id: string; type: string; parentId: string | null }
-        | undefined,
+          | { id: string; type: string; parentId: string | null }
+          | undefined,
       );
     },
     [currentProject?.id, forceList, selectedNodeQuery.data],
@@ -1126,56 +1623,173 @@ export default function ProjectsPage() {
     />
   );
 
-  // Close export menu on outside click
-  React.useEffect(() => {
-    if (!showExportMenu) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        exportMenuRef.current &&
-        !exportMenuRef.current.contains(e.target as Node)
-      ) {
-        setShowExportMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showExportMenu]);
+  const closeExportDialog = React.useCallback(() => {
+    setExportDialogState({ open: false, node: null });
+  }, []);
 
-  // Export handlers
-  const handleExportMarkdown = React.useCallback(
-    async (includeDescendants: boolean) => {
-      if (!selectedNodeId) return;
+  const requestCloseExportDialog = React.useCallback(() => {
+    if (isExporting) {
+      return;
+    }
 
-      await runProjectMarkdownExport({
-        nodeId: selectedNodeId,
-        nodeName: selectedNodeQuery.data?.name,
-        includeDescendants,
-        fetchMarkdown: utils.nodes.exportMarkdown.fetch,
-        downloadTextFile,
-        addSuccessToast: () => addToast(tFileTree("exportSuccess"), "success"),
-        addErrorToast: () => addToast(tFileTree("exportError"), "error"),
-        closeExportMenu: () => setShowExportMenu(false),
-      });
+    closeExportDialog();
+  }, [closeExportDialog, isExporting]);
+
+  const openExportDialog = React.useCallback(
+    (node: TreeNode, initialFormat: ExportFormat = "markdown") => {
+      setSelectedExportFormat(initialFormat);
+      setExportDialogState({ open: true, node });
+
+      // EPUB cover: use the project hero if the node doesn't have its own hero.
+      // epubAuthor/epubDescription/epubLanguage are always stored on the project root,
+      // so we read them from currentProject regardless of which node triggered the export.
+      const nodeMeta = node.metadata as Record<string, unknown> | null;
+      const projectMeta = currentProject?.metadata as Record<
+        string,
+        unknown
+      > | null;
+
+      const heroAttachmentId =
+        nodeMeta?.heroAttachmentId ?? projectMeta?.heroAttachmentId ?? null;
+      setSelectedCoverAttachmentId(
+        typeof heroAttachmentId === "string" ? heroAttachmentId : null,
+      );
+
+      // Pre-fill EPUB metadata fields from the project's stored settings
+      setEpubAuthor(
+        typeof projectMeta?.epubAuthor === "string"
+          ? projectMeta.epubAuthor
+          : "",
+      );
+      setEpubDescription(
+        typeof projectMeta?.epubDescription === "string"
+          ? projectMeta.epubDescription
+          : "",
+      );
+      setEpubLanguage(
+        typeof projectMeta?.epubLanguage === "string"
+          ? projectMeta.epubLanguage
+          : "",
+      );
     },
-    [selectedNodeId, selectedNodeQuery.data?.name, utils, addToast, tFileTree],
+    [currentProject],
   );
 
-  const handleExportPdf = React.useCallback(
-    async (includeDescendants: boolean) => {
-      if (!selectedNodeId) return;
+  const handleExportConfirm = React.useCallback(async () => {
+    const exportNode = exportDialogState.node;
+
+    if (!exportNode) {
+      return;
+    }
+
+    const includeDescendants = shouldExportDescendants(exportNode.type);
+
+    setIsExporting(true);
+
+    try {
+      if (selectedExportFormat === "markdown") {
+        await runProjectMarkdownExport({
+          nodeId: exportNode.id,
+          nodeName: exportNode.name,
+          includeDescendants,
+          includeFolderNames: exportNameOptions.includeFolderNames,
+          includeNoteNames: exportNameOptions.includeNoteNames,
+          sortMode: fileTreeSortMode,
+          fetchMarkdown: utils.nodes.exportMarkdown.fetch,
+          downloadTextFile,
+          addSuccessToast: () =>
+            addToast(tFileTree("exportSuccess"), "success"),
+          addErrorToast: () => addToast(tFileTree("exportError"), "error"),
+          closeExportMenu: closeExportDialog,
+        });
+        return;
+      }
+
+      if (selectedExportFormat === "docx") {
+        await runProjectDocxExport({
+          nodeId: exportNode.id,
+          includeDescendants,
+          includeFolderNames: exportNameOptions.includeFolderNames,
+          includeNoteNames: exportNameOptions.includeNoteNames,
+          sortMode: fileTreeSortMode,
+          fetchDocx: utils.nodes.exportDocx.fetch,
+          downloadBinaryFile,
+          addSuccessToast: () =>
+            addToast(tFileTree("exportSuccess"), "success"),
+          addErrorToast: () => addToast(tFileTree("exportError"), "error"),
+          closeExportMenu: closeExportDialog,
+        });
+        return;
+      }
+
+      if (selectedExportFormat === "zip") {
+        await runProjectZipExport({
+          nodeId: exportNode.id,
+          sortMode: fileTreeSortMode,
+          fetchZip: utils.nodes.exportZip.fetch,
+          downloadBinaryFile,
+          addSuccessToast: () =>
+            addToast(tFileTree("exportSuccess"), "success"),
+          addErrorToast: () => addToast(tFileTree("exportError"), "error"),
+          closeExportMenu: closeExportDialog,
+        });
+        return;
+      }
+
+      if (selectedExportFormat === "epub") {
+        await runProjectEpubExport({
+          nodeId: exportNode.id,
+          includeDescendants,
+          includeFolderNames: exportNameOptions.includeFolderNames,
+          includeNoteNames: exportNameOptions.includeNoteNames,
+          sortMode: fileTreeSortMode,
+          coverAttachmentId: selectedCoverAttachmentId ?? undefined,
+          epubAuthor: epubAuthor || undefined,
+          epubDescription: epubDescription || undefined,
+          epubLanguage: epubLanguage || undefined,
+          fetchEpub: utils.nodes.exportEpub.fetch,
+          downloadBinaryFile,
+          addSuccessToast: () =>
+            addToast(tFileTree("exportSuccess"), "success"),
+          addErrorToast: () => addToast(tFileTree("exportError"), "error"),
+          closeExportMenu: closeExportDialog,
+        });
+        return;
+      }
 
       await runProjectPdfExport({
-        nodeId: selectedNodeId,
+        nodeId: exportNode.id,
         includeDescendants,
-        fetchHtml: utils.nodes.exportHtml.fetch,
-        openHtmlPrintWindow,
+        includeFolderNames: exportNameOptions.includeFolderNames,
+        includeNoteNames: exportNameOptions.includeNoteNames,
+        sortMode: fileTreeSortMode,
+        templateId: selectedPdfTemplateId,
+        fetchPdf: utils.nodes.exportPdf.fetch,
+        downloadBinaryFile,
         addSuccessToast: () => addToast(tFileTree("exportSuccess"), "success"),
         addErrorToast: () => addToast(tFileTree("exportError"), "error"),
-        closeExportMenu: () => setShowExportMenu(false),
+        closeExportMenu: closeExportDialog,
       });
-    },
-    [selectedNodeId, utils, addToast, tFileTree],
-  );
+    } finally {
+      setIsExporting(false);
+    }
+  }, [
+    addToast,
+    addToast,
+    closeExportDialog,
+    epubAuthor,
+    epubDescription,
+    epubLanguage,
+    exportDialogState.node,
+    exportNameOptions.includeFolderNames,
+    exportNameOptions.includeNoteNames,
+    fileTreeSortMode,
+    selectedCoverAttachmentId,
+    selectedExportFormat,
+    selectedPdfTemplateId,
+    tFileTree,
+    utils,
+  ]);
 
   // Auto-save for editor content
   const handleAutoSave = React.useCallback(
@@ -1201,17 +1815,88 @@ export default function ProjectsPage() {
 
   const autoSaveContent =
     isNoteEditing &&
-      selectedNodeId !== null &&
-      editorContentNodeIdRef.current === selectedNodeId
+    selectedNodeId !== null &&
+    editorContentNodeIdRef.current === selectedNodeId
       ? editorContent
       : null;
 
-  const { status: autoSaveStatus, markSaved } = useAutoSave({
+  const {
+    status: autoSaveStatus,
+    markSaved,
+    flush: flushAutoSave,
+  } = useAutoSave({
     nodeId: selectedNodeId,
     content: autoSaveContent,
     onSave: handleAutoSave,
     debounceMs: NOTE_AUTO_SAVE_DEBOUNCE_MS,
   });
+
+  const handleManualNoteSave = React.useCallback(async () => {
+    if (
+      selectedNodeId === null ||
+      !isNoteEditing ||
+      isSelectedNodeLocked ||
+      selectedNodeQuery.data?.type !== "note"
+    ) {
+      return;
+    }
+
+    await flushAutoSave();
+  }, [
+    flushAutoSave,
+    isNoteEditing,
+    isSelectedNodeLocked,
+    selectedNodeId,
+    selectedNodeQuery.data?.type,
+  ]);
+
+  const handleNoteEditToggle = React.useCallback(() => {
+    if (isSelectedNodeLocked) {
+      return;
+    }
+
+    if (!isNoteEditing) {
+      setIsNoteEditing(true);
+      return;
+    }
+
+    void (async () => {
+      try {
+        await flushAutoSave();
+        setIsNoteEditing(false);
+      } catch {
+        // Keep edit mode active when the final flush fails so the user does not
+        // silently lose changes.
+      }
+    })();
+  }, [flushAutoSave, isNoteEditing, isSelectedNodeLocked]);
+
+  React.useEffect(() => {
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      const isSaveShortcut =
+        (event.metaKey || event.ctrlKey) &&
+        !event.altKey &&
+        event.key.toLowerCase() === "s";
+
+      if (!isSaveShortcut || !isNoteEditing || isSelectedNodeLocked) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (event.repeat) {
+        return;
+      }
+
+      void handleManualNoteSave();
+    };
+
+    window.addEventListener("keydown", handleWindowKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleWindowKeyDown);
+    };
+  }, [handleManualNoteSave, isNoteEditing, isSelectedNodeLocked]);
 
   React.useEffect(() => {
     refreshSelectedNodeRef.current = async (nodeId: string) => {
@@ -1456,6 +2141,44 @@ export default function ProjectsPage() {
           parentId: action.node.id,
         });
         break;
+      case "settings": {
+        if (action.node.type === "project") {
+          setSettingsNode(
+            currentProjectSettingsNode ??
+              createProjectSettingsNode({
+                id: action.node.id,
+                name: action.node.name,
+                metadata: action.node.metadata,
+              }),
+          );
+          break;
+        }
+
+        if (action.node.type === "folder") {
+          const folderProjectId = getFolderSettingsProjectId(
+            currentProjectId,
+            action.node.parentId,
+          );
+          if (folderProjectId) {
+            setSettingsNode(
+              createFolderSettingsNode(action.node, folderProjectId),
+            );
+          }
+          break;
+        }
+
+        // Notes and any other node type within a project
+        if (currentProjectId) {
+          setSettingsNode(
+            createAnyNodeSettingsNode(
+              action.node,
+              action.node.type,
+              currentProjectId,
+            ),
+          );
+        }
+        break;
+      }
       case "rename":
         if (isActionNodeLocked) break;
         setRenameDialog({
@@ -1463,6 +2186,9 @@ export default function ProjectsPage() {
           nodeId: action.node.id,
           currentName: action.node.name,
         });
+        break;
+      case "export":
+        openExportDialog(action.node);
         break;
       case "toggleLock":
         toggleLockMutation.mutate({ nodeId: action.node.id });
@@ -1485,6 +2211,20 @@ export default function ProjectsPage() {
   if (currentProjectId && currentProject && !forceList) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const selNode = selectedNodeQuery.data as any;
+    const activePdfTemplateId =
+      pdfTemplateOptions.find(
+        (templateOption) => templateOption.id === selectedPdfTemplateId,
+      )?.id ?? DEFAULT_PROJECTS_PDF_TEMPLATE_ID;
+    const exportDialogNode = exportDialogState.node;
+    const exportDialogScopeDescription = exportDialogNode
+      ? shouldExportDescendants(exportDialogNode.type)
+        ? tFileTree("exportDialog.scopeWithChildren", {
+            name: exportDialogNode.name,
+          })
+        : tFileTree("exportDialog.scopeSingleNode", {
+            name: exportDialogNode.name,
+          })
+      : "";
     const isEditorEditable =
       selNode?.type === "note" && !isSelectedNodeLocked ? isNoteEditing : false;
     return (
@@ -1518,9 +2258,16 @@ export default function ProjectsPage() {
                 )}
               </button>
               <button
-                onClick={() => setSettingsOpen(true)}
-                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                title="Project settings"
+                onClick={() => {
+                  if (selectedWorkspaceSettingsNode) {
+                    setSettingsNode(selectedWorkspaceSettingsNode);
+                  }
+                }}
+                className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                title={tCommon("settings")}
+                aria-label={tCommon("settings")}
+                disabled={!selectedWorkspaceSettingsNode}
+                data-testid="workspace-settings-button"
               >
                 <Settings className="w-3 h-3" />
               </button>
@@ -1563,6 +2310,8 @@ export default function ProjectsPage() {
               onToggleFavorite={handleToggleFavorite}
               selectedNodeIds={selectedBulkNodeIds}
               onToggleNodeSelected={handleToggleBulkNode}
+              sortMode={fileTreeSortMode}
+              onSortModeChange={handleSortModeChange}
               className="flex-1 min-h-0"
             />
             {currentProjectId && (
@@ -1680,11 +2429,11 @@ export default function ProjectsPage() {
                           className={cn(
                             "text-xs px-2 py-1 rounded",
                             autoSaveStatus === "saving" &&
-                            "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
+                              "text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900/30",
                             autoSaveStatus === "saved" &&
-                            "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
+                              "text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900/30",
                             autoSaveStatus === "error" &&
-                            "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
+                              "text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30",
                             autoSaveStatus === "idle" && "hidden",
                           )}
                           data-testid="auto-save-status"
@@ -1709,10 +2458,7 @@ export default function ProjectsPage() {
                       )}
                       {selNode?.type === "note" && (
                         <button
-                          onClick={() => {
-                            if (isSelectedNodeLocked) return;
-                            setIsNoteEditing((value) => !value);
-                          }}
+                          onClick={handleNoteEditToggle}
                           className={cn(
                             "flex items-center gap-1 text-xs px-2 py-1 rounded transition-colors disabled:cursor-not-allowed disabled:opacity-50",
                             isEditorEditable
@@ -1738,53 +2484,33 @@ export default function ProjectsPage() {
                       <span className="text-xs text-muted-foreground px-2 py-1 rounded bg-muted">
                         {tFileTree(`nodeTypes.${selNode?.type}`)}
                       </span>
-                      <div className="relative" ref={exportMenuRef}>
+                      {selNode && (
                         <button
-                          onClick={() => setShowExportMenu((prev) => !prev)}
+                          type="button"
+                          onClick={() =>
+                            handleContextMenuAction({
+                              type: "settings",
+                              node: selNode as TreeNode,
+                            })
+                          }
                           className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
-                          title={tFileTree("export")}
-                          aria-label={tFileTree("export")}
-                          data-testid="content-export-button"
+                          title={tCommon("settings")}
+                          aria-label={tCommon("settings")}
+                          data-testid="content-settings-button"
                         >
-                          <Download className="w-4 h-4" />
+                          <Settings className="w-4 h-4" />
                         </button>
-                        {showExportMenu && (
-                          <div
-                            className="absolute right-0 top-full mt-1 w-56 rounded-md border bg-popover text-popover-foreground shadow-md z-50"
-                            data-testid="export-menu"
-                          >
-                            <button
-                              onClick={() => handleExportMarkdown(false)}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors rounded-t-md"
-                              data-testid="export-markdown"
-                            >
-                              {tFileTree("exportMarkdown")}
-                            </button>
-                            <button
-                              onClick={() => handleExportMarkdown(true)}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                              data-testid="export-project-markdown"
-                            >
-                              {tFileTree("exportProject")}
-                            </button>
-                            <hr className="border-border" />
-                            <button
-                              onClick={() => handleExportPdf(false)}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
-                              data-testid="export-pdf"
-                            >
-                              {tFileTree("exportPdf")}
-                            </button>
-                            <button
-                              onClick={() => handleExportPdf(true)}
-                              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors rounded-b-md"
-                              data-testid="export-project-pdf"
-                            >
-                              {tFileTree("exportProjectPdf")}
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => openExportDialog(selNode as TreeNode)}
+                        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-accent-foreground transition-colors"
+                        title={tFileTree("export")}
+                        aria-label={tFileTree("export")}
+                        data-testid="content-export-button"
+                      >
+                        <Download className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => {
                           if (isSelectedNodeLocked) return;
@@ -1937,8 +2663,8 @@ export default function ProjectsPage() {
                                         Loading images...
                                       </p>
                                     ) : (projectImagesQuery.data ?? []).filter(
-                                      (a) => a.mimeType.startsWith("image/"),
-                                    ).length === 0 ? (
+                                        (a) => a.mimeType.startsWith("image/"),
+                                      ).length === 0 ? (
                                       <p className="text-sm text-muted-foreground text-center py-4">
                                         {tEditor("imageUpload.noImagesYet")}
                                       </p>
@@ -2070,6 +2796,27 @@ export default function ProjectsPage() {
                     }
                     onOpenNode={navigateToNode}
                     onToggleFavorite={handleToggleFavorite}
+                    onSettings={(childNodeId) => {
+                      const childNode = (
+                        folderChildrenQuery.data as
+                          | {
+                              id: string;
+                              name: string;
+                              type: string;
+                              metadata?: unknown;
+                            }[]
+                          | undefined
+                      )?.find((n) => n.id === childNodeId);
+                      if (childNode && currentProjectId) {
+                        setSettingsNode(
+                          createAnyNodeSettingsNode(
+                            childNode,
+                            childNode.type,
+                            currentProjectId,
+                          ),
+                        );
+                      }
+                    }}
                   />
                 ) : (
                   <div className="flex-1 overflow-y-auto p-6">
@@ -2122,20 +2869,6 @@ export default function ProjectsPage() {
             }
             onCreate={handleNodeCreate}
           />
-          {settingsOpen && currentProject && (
-            <ProjectSettingsDialog
-              open={settingsOpen}
-              onClose={() => setSettingsOpen(false)}
-              project={{
-                id: currentProject.id,
-                name: currentProject.name,
-                summary:
-                  (currentProject as { summary?: string | null }).summary ??
-                  null,
-                metadata: projectMeta,
-              }}
-            />
-          )}
           <RenameDialog
             open={renameDialog.open}
             currentName={renameDialog.currentName}
@@ -2160,6 +2893,314 @@ export default function ProjectsPage() {
             }
             onAction={handleContextMenuAction}
           />
+          <Dialog
+            open={exportDialogState.open}
+            onClose={requestCloseExportDialog}
+            title={tFileTree("exportDialog.title")}
+            showFullscreenToggle={false}
+            maxWidth="md"
+            footer={
+              <div className="flex items-center justify-end gap-2 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={requestCloseExportDialog}
+                  className="rounded-md border px-4 py-2 text-sm transition-colors hover:bg-accent"
+                  disabled={isExporting}
+                  data-testid="export-cancel-button"
+                >
+                  {tCommon("cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleExportConfirm()}
+                  className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!exportDialogState.node || isExporting}
+                  data-testid="export-confirm-button"
+                >
+                  {isExporting
+                    ? tFileTree("exportDialog.exporting")
+                    : tFileTree("exportDialog.confirm")}
+                </button>
+              </div>
+            }
+          >
+            <div
+              className="flex-1 overflow-y-auto px-6 pb-6"
+              data-testid="export-dialog"
+            >
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    {tFileTree("exportDialog.description")}
+                  </p>
+                  {exportDialogNode && (
+                    <p
+                      className="text-sm font-medium text-foreground"
+                      data-testid="export-scope-description"
+                    >
+                      {exportDialogScopeDescription}
+                    </p>
+                  )}
+                </div>
+
+                <fieldset className="space-y-2">
+                  <legend className="text-sm font-medium">
+                    {tFileTree("exportDialog.formatLabel")}
+                  </legend>
+                  <div className="grid gap-2 sm:grid-cols-5">
+                    {(
+                      [
+                        "markdown",
+                        "docx",
+                        "pdf",
+                        "zip",
+                        "epub",
+                      ] as const satisfies readonly ExportFormat[]
+                    ).map((format) => {
+                      const isSelectedFormat = selectedExportFormat === format;
+
+                      return (
+                        <button
+                          key={format}
+                          type="button"
+                          onClick={() => setSelectedExportFormat(format)}
+                          className={cn(
+                            "rounded-md border px-3 py-2 text-sm font-medium transition-colors",
+                            isSelectedFormat
+                              ? "border-accent bg-accent text-accent-foreground"
+                              : "border-border hover:bg-accent/50",
+                          )}
+                          aria-pressed={isSelectedFormat}
+                          data-testid={`export-format-${format}`}
+                        >
+                          {tFileTree(`exportDialog.formats.${format}`)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={exportNameOptions.includeFolderNames}
+                      onChange={(event) =>
+                        handleExportNameOptionsChange((previousOptions) => ({
+                          ...previousOptions,
+                          includeFolderNames: event.target.checked,
+                        }))
+                      }
+                      data-testid="export-include-folder-names"
+                    />
+                    <span>{tFileTree("includeFolderNames")}</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={exportNameOptions.includeNoteNames}
+                      onChange={(event) =>
+                        handleExportNameOptionsChange((previousOptions) => ({
+                          ...previousOptions,
+                          includeNoteNames: event.target.checked,
+                        }))
+                      }
+                      data-testid="export-include-note-names"
+                    />
+                    <span>{tFileTree("includeNoteNames")}</span>
+                  </label>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {tFileTree("sort.label")}
+                  </p>
+                  <div
+                    className="flex items-center rounded-md border bg-background p-0.5"
+                    data-testid="export-sort-controls"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSortModeChange("alphabetical")}
+                      className={cn(
+                        "rounded px-2 py-1 text-xs transition-colors",
+                        fileTreeSortMode === "alphabetical"
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                      aria-pressed={fileTreeSortMode === "alphabetical"}
+                      data-testid="export-sort-alphabetical"
+                    >
+                      {tFileTree("sort.alphabetical")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSortModeChange("manual")}
+                      className={cn(
+                        "rounded px-2 py-1 text-xs transition-colors",
+                        fileTreeSortMode === "manual"
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                      aria-pressed={fileTreeSortMode === "manual"}
+                      data-testid="export-sort-manual"
+                    >
+                      {tFileTree("sort.manual")}
+                    </button>
+                  </div>
+                </div>
+
+                {selectedExportFormat === "pdf" &&
+                  pdfTemplateOptions.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {tFileTree("pdfTemplate")}
+                      </p>
+                      <div className="mt-1 space-y-1">
+                        {pdfTemplateOptions.map((templateOption) => {
+                          const isActiveTemplate =
+                            activePdfTemplateId === templateOption.id;
+
+                          return (
+                            <button
+                              key={templateOption.id}
+                              type="button"
+                              onClick={() =>
+                                handlePdfTemplateChange(templateOption.id)
+                              }
+                              className={cn(
+                                "w-full rounded border px-2 py-1.5 text-left transition-colors",
+                                isActiveTemplate
+                                  ? "border-accent bg-accent/60 text-accent-foreground"
+                                  : "border-border hover:bg-accent/50",
+                              )}
+                              aria-pressed={isActiveTemplate}
+                              data-testid={`export-pdf-template-${templateOption.id}`}
+                            >
+                              <span className="block text-xs font-medium">
+                                {templateOption.label}
+                              </span>
+                              <span className="block text-[11px] text-muted-foreground">
+                                {templateOption.description}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                {selectedExportFormat === "epub" && (
+                  <div data-testid="epub-cover-picker">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">
+                      {tFileTree("exportDialog.epubCoverLabel")}
+                    </p>
+                    {/* "None" option */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedCoverAttachmentId(null)}
+                      className={cn(
+                        "mb-2 flex h-8 items-center justify-center rounded border px-3 text-xs transition-colors",
+                        selectedCoverAttachmentId === null
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:bg-accent/50",
+                      )}
+                      aria-pressed={selectedCoverAttachmentId === null}
+                      data-testid="epub-cover-none"
+                    >
+                      {tFileTree("exportDialog.epubCoverNone")}
+                    </button>
+                    <MediaPickerGrid
+                      items={epubImageAttachments}
+                      selectedId={selectedCoverAttachmentId}
+                      onSelect={(id) => setSelectedCoverAttachmentId(id)}
+                      isLoading={epubAttachmentsQuery.isLoading}
+                      columns={4}
+                      aspect="square"
+                      objectFit="cover"
+                      showLabels
+                      filterPlaceholder={tFileTree(
+                        "exportDialog.epubCoverFilter",
+                      )}
+                      loadingLabel={tFileTree("exportDialog.epubCoverLoading")}
+                      testIdPrefix="epub-cover"
+                    />
+                  </div>
+                )}
+
+                {selectedExportFormat === "epub" && (
+                  <div
+                    className="mt-4 space-y-3"
+                    data-testid="epub-metadata-section"
+                  >
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {tFileTree("exportDialog.epubMetaHeading")}
+                    </p>
+
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="epub-author"
+                        className="text-xs text-muted-foreground"
+                      >
+                        {tFileTree("exportDialog.epubAuthorLabel")}
+                      </label>
+                      <input
+                        id="epub-author"
+                        type="text"
+                        value={epubAuthor}
+                        onChange={(e) => setEpubAuthor(e.target.value)}
+                        placeholder={tFileTree(
+                          "exportDialog.epubAuthorPlaceholder",
+                        )}
+                        className="w-full rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        data-testid="epub-author-input"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="epub-description"
+                        className="text-xs text-muted-foreground"
+                      >
+                        {tFileTree("exportDialog.epubDescriptionLabel")}
+                      </label>
+                      <textarea
+                        id="epub-description"
+                        value={epubDescription}
+                        onChange={(e) => setEpubDescription(e.target.value)}
+                        placeholder={tFileTree(
+                          "exportDialog.epubDescriptionPlaceholder",
+                        )}
+                        rows={2}
+                        className="w-full resize-none rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        data-testid="epub-description-input"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label
+                        htmlFor="epub-language"
+                        className="text-xs text-muted-foreground"
+                      >
+                        {tFileTree("exportDialog.epubLanguageLabel")}
+                      </label>
+                      <input
+                        id="epub-language"
+                        type="text"
+                        value={epubLanguage}
+                        onChange={(e) => setEpubLanguage(e.target.value)}
+                        placeholder={tFileTree(
+                          "exportDialog.epubLanguagePlaceholder",
+                        )}
+                        className="w-full rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                        data-testid="epub-language-input"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Dialog>
 
           {/* Node delete confirmation */}
           {nodeDeleteConfirm.open && nodeDeleteConfirm.node && (
@@ -2302,12 +3343,33 @@ export default function ProjectsPage() {
             projectId={currentProjectId}
             projectName={currentProject?.name ?? null}
             contextNodes={chatContextNodes}
+            onSelectedThreadIdChange={setSelectedChatThreadId}
             onRemoveContext={(id) =>
               setChatContextNodes((prev) => prev.filter((n) => n.id !== id))
             }
             onAgentResponseSuccess={handleAgentResponseSuccess}
           />
         </div>
+
+        {settingsNode && (
+          <ProjectSettingsDialog
+            open
+            onClose={() => setSettingsNode(null)}
+            node={settingsNode}
+            onDelete={
+              settingsNode.type === "project"
+                ? () => {
+                    const projectToDelete = settingsNode;
+                    setSettingsNode(null);
+                    openDeleteDialog({
+                      id: projectToDelete.id,
+                      name: projectToDelete.name,
+                    });
+                  }
+                : undefined
+            }
+          />
+        )}
 
         {linkPickerDialog}
       </>
@@ -2389,14 +3451,16 @@ export default function ProjectsPage() {
                     navigateToProjects();
                   }}
                   onSettings={() =>
-                    setListSettingsProject({
-                      id: project.id,
-                      name: project.name,
-                      summary:
-                        (project as { summary?: string | null }).summary ??
-                        null,
-                      metadata: meta,
-                    })
+                    setSettingsNode(
+                      createProjectSettingsNode({
+                        id: project.id,
+                        name: project.name,
+                        summary:
+                          (project as { summary?: string | null }).summary ??
+                          null,
+                        metadata: meta,
+                      }),
+                    )
                   }
                 />
               );
@@ -2643,18 +3707,23 @@ export default function ProjectsPage() {
           </div>
         )}
 
-        {listSettingsProject && (
+        {settingsNode && (
           <ProjectSettingsDialog
             open
-            onClose={() => setListSettingsProject(null)}
-            project={listSettingsProject}
-            onDelete={() => {
-              setListSettingsProject(null);
-              openDeleteDialog({
-                id: listSettingsProject.id,
-                name: listSettingsProject.name,
-              });
-            }}
+            onClose={() => setSettingsNode(null)}
+            node={settingsNode}
+            onDelete={
+              settingsNode.type === "project"
+                ? () => {
+                    const projectToDelete = settingsNode;
+                    setSettingsNode(null);
+                    openDeleteDialog({
+                      id: projectToDelete.id,
+                      name: projectToDelete.name,
+                    });
+                  }
+                : undefined
+            }
           />
         )}
       </div>

@@ -4,11 +4,14 @@ import * as React from "react";
 import { useToast, type Toast } from "@/contexts/toast-context";
 import {
   X,
+  Copy,
+  Check,
   CheckCircle2,
   AlertCircle,
   Info,
   AlertTriangle,
 } from "lucide-react";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 
 const TOAST_ICONS = {
@@ -38,17 +41,16 @@ interface ToastItemProps {
 function ToastItem({ toast, index, total, onRemove }: ToastItemProps) {
   const [isExiting, setIsExiting] = React.useState(false);
   const [isEntering, setIsEntering] = React.useState(true);
+  const [copied, setCopied] = React.useState(false);
   const Icon = TOAST_ICONS[toast.type];
 
-  // Index 0 is oldest, highest index is newest (at bottom)
-  // Older toasts (lower index) should be smaller and higher
+  // Index 0 is oldest, highest index is newest.
+  // Older toasts are slightly smaller and fainter.
   const positionFromBottom = total - index - 1;
 
-  // Older toasts get progressively smaller (scale down)
-  const scale = 1 - positionFromBottom * 0.1; // 10% smaller for each position
-  const translateY = -positionFromBottom * 10; // 10px higher for each older toast
-  const opacity = 1 - positionFromBottom * 0.15; // Fade slightly
-  const zIndex = index; // Newer toasts (higher index) on top
+  const scale = Math.max(0.92, 1 - positionFromBottom * 0.04);
+  const opacity = Math.max(0.75, 1 - positionFromBottom * 0.08);
+  const zIndex = total - index;
 
   // Fade in on mount
   React.useEffect(() => {
@@ -73,38 +75,65 @@ function ToastItem({ toast, index, total, onRemove }: ToastItemProps) {
     setTimeout(() => onRemove(toast.id), 300);
   };
 
+  const handleCopy = React.useCallback(async () => {
+    if (await copyTextToClipboard(toast.message)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [toast.message]);
+
   return (
     <div
-      className={cn(
-        "absolute bottom-0 right-0 w-96 transition-all duration-300 ease-out",
-      )}
+      className={cn("w-full transition-all duration-300 ease-out")}
+      data-testid="toast-item"
       style={{
         transform: isExiting
           ? `translateY(20px) scale(${scale})`
           : isEntering
             ? `translateY(20px) scale(${scale})`
-            : `translateY(${translateY}px) scale(${scale})`,
+            : `translateY(0px) scale(${scale})`,
         opacity: isExiting ? 0 : isEntering ? 0 : opacity,
         zIndex,
-        transformOrigin: "bottom center",
+        transformOrigin: "bottom right",
       }}
     >
       <div
+        data-testid="toast-card"
         className={cn(
           "flex items-start gap-3 rounded-lg border-2 p-4 shadow-lg",
           "backdrop-blur-sm",
           TOAST_COLORS[toast.type],
         )}
+        role="status"
       >
         <Icon className="h-5 w-5 flex-shrink-0 mt-0.5" />
-        <p className="flex-1 text-sm font-medium">{toast.message}</p>
-        <button
-          onClick={handleRemove}
-          className="flex-shrink-0 rounded-md p-1 hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-          aria-label="Close"
+        <p
+          data-testid="toast-message"
+          className="min-w-0 flex-1 select-text whitespace-pre-wrap break-words text-sm font-medium"
         >
-          <X className="h-4 w-4" />
-        </button>
+          {toast.message}
+        </p>
+        <div className="flex flex-shrink-0 items-center gap-1 self-start">
+          <button
+            onClick={handleCopy}
+            className="rounded-md p-1 transition-colors hover:bg-black/10 dark:hover:bg-white/10"
+            aria-label={copied ? "Copied toast message" : "Copy toast message"}
+            title={copied ? "Copied" : "Copy"}
+          >
+            {copied ? (
+              <Check className="h-4 w-4" />
+            ) : (
+              <Copy className="h-4 w-4" />
+            )}
+          </button>
+          <button
+            onClick={handleRemove}
+            className="rounded-md p-1 transition-colors hover:bg-black/10 dark:hover:bg-white/10"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -116,8 +145,14 @@ export function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] pointer-events-none">
-      <div className="relative w-96 h-32 pointer-events-auto">
+    <div
+      className="pointer-events-none fixed inset-x-4 bottom-4 z-[100] flex justify-end sm:left-auto sm:right-4"
+      data-testid="toast-container"
+    >
+      <div
+        className="pointer-events-auto flex w-full max-w-sm flex-col gap-2"
+        data-testid="toast-stack"
+      >
         {toasts.map((toast, index) => (
           <ToastItem
             key={toast.id}
